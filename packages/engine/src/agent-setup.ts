@@ -63,10 +63,17 @@ export interface AgentSetupInput {
   fallback?: unknown;
   onlyOwner?: unknown;
   autonomy?: unknown;
+  /** A brain group of the setup's computer (ADR 0180): copied only to agents on that computer. Omitted: left alone. */
+  group?: unknown;
 }
 
 /** `speed` goes to the agents picked, never into what new agents start with: Fast is off until someone turns it on. */
-type Setup = schema.AgentSetup & { onlyOwner?: boolean; autonomy?: CommandApproval; speed?: BrainSpeed };
+type Setup = schema.AgentSetup & {
+  onlyOwner?: boolean;
+  autonomy?: CommandApproval;
+  speed?: BrainSpeed;
+  group?: string | null;
+};
 
 /** Why an agent can't take the setup. */
 export type SetupReason =
@@ -153,6 +160,7 @@ function readSetup(input: AgentSetupInput): Setup {
     contextTokens,
     fallback: (input.fallback as boolean | undefined) ?? true,
     ...(input.onlyOwner !== undefined ? { onlyOwner: input.onlyOwner as boolean } : {}),
+    ...(input.group !== undefined ? { group: nullableId(input.group, "group") } : {}),
     ...autonomy,
   };
 }
@@ -395,6 +403,8 @@ function planFor(
     ...(setup.speed ? { speed: setup.speed } : {}),
     contextTokens: setup.contextTokens ?? null,
     fallback: setup.fallback ?? true,
+    // Only to an agent on the group's computer (`takesAccount` has checked it is on the setup's); else it keeps its own.
+    ...(setup.group !== undefined ? { group: setup.group } : {}),
   };
   const thinksSo = (account: string | null, onlyOwner?: boolean) =>
     brainOf(t.brain) === kind &&
@@ -404,6 +414,7 @@ function planFor(
     (how.speed === undefined || t.brainSpeed === how.speed) &&
     t.contextTokens === how.contextTokens &&
     t.brainFallback === how.fallback &&
+    (setup.group === undefined || (t.brainGroupId ?? null) === setup.group) &&
     (onlyOwner === undefined || !answersOthers(audienceOf(t), t.ownerUserId) === onlyOwner);
   const takes = takesAccount(t, c);
   if (takes === true) {

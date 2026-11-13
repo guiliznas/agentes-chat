@@ -64,6 +64,7 @@ import {
   planOpened,
 } from "./audience";
 import { recordAudit } from "./audit";
+import type { BrainGroupStrategy, GroupMemberPick } from "./brains/groups";
 import { BRAIN_NAMES, type BrainKind, brainRunsOn, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { defaultCredentials, providerKeyOf } from "./credentials";
@@ -442,6 +443,14 @@ export interface RightHandWorkspaceAi {
   key?: { provider: string; label: string } | null;
 }
 
+export interface BrainGroupSummary {
+  id: string;
+  name: string;
+  strategy: BrainGroupStrategy;
+  /** Who a run picks now (no conversation in mind); null when no member can serve the agent. */
+  current: { accountId: string; label: string; kind: BrainKind } | null;
+}
+
 export interface AgentBrainView {
   agentId: string;
   /** The team's right hand only: which of its AIs this is. */
@@ -464,6 +473,11 @@ export interface AgentBrainView {
   canEdit: boolean;
   /** The account its computer brain runs with (ADR 0041); null = the computer's own sign-in. */
   account: string | null;
+  /**
+   * The brain group it thinks with (ADR 0180), with the member a run would pick now. The brain, model and account
+   * above stay as saved on the agent: they are what comes back when it leaves the group.
+   */
+  group: BrainGroupSummary | null;
   /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
   effort: BrainEffortSetting | null;
   /** How fast it answers in conversations (ADR 0149): kept whatever it thinks with, applied only where it fits. */
@@ -633,6 +647,7 @@ function view(
     machines,
     canEdit: true,
     account: agent.brainAccountId,
+    group: null,
     effort: isBrainEffortSetting(agent.brainEffort) ? agent.brainEffort : null,
     speed: isBrainSpeed(agent.brainSpeed) ? agent.brainSpeed : "standard",
     contextTokens: isContextLimit(agent.contextTokens) ? agent.contextTokens : null,
@@ -920,6 +935,7 @@ export async function getAgentBrain(
   ]);
   return {
     ...view(agent, machine, machines, accounts, userId),
+    group: await groupView(deps.db, agent),
     keys,
     ...(access.scope ? { workspaceAi: await workspaceAi(deps.db, access.agent, userId) } : {}),
   };
@@ -968,6 +984,11 @@ export interface AgentBrainInput {
   speed?: unknown;
   /** One of `CONTEXT_LIMITS`, or null for the model's window; kept through brain switches. Omitted = keep it. */
   contextTokens?: unknown;
+  /**
+   * The brain group it thinks with (ADR 0180): a group of its computer, which picks the account each run. Omitted =
+   * keep it; null = leave it (the brain, model and account saved on the agent come back as they were).
+   */
+  group?: string | null;
 }
 
 const EVERYONE: AgentAudience = { mode: "everyone", userIds: [], roleIds: [] };
@@ -1027,6 +1048,7 @@ export async function setAgentBrain(
   }
   const brain = (input.brain as BrainKind | undefined) ?? from;
   const changed = brain !== from;
+  const group = await nextBrainGroup(deps.db, orgId, agent, rightHand, input.group);
   const [machine, machines] = await Promise.all([
     agentMachine(deps.db, orgId, agent.machineId),
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
@@ -1147,8 +1169,10 @@ export async function setAgentBrain(
     effort !== agent.brainEffort ||
     speed !== agent.brainSpeed ||
     contextTokens !== agent.contextTokens ||
+    group !== agent.brainGroupId ||
     planForOthers !== agent.planForOthers;
-  if (!thinks && !audience) return view(agent, machine, machines, accounts, userId);
+  if (!thinks && !audience)
+    return { ...view(agent, machine, machines, accounts, userId), group: await groupView(deps.db, agent) };
   const { row, released } = await deps.db.transaction(async (tx) => {
     // A login made for one agent thinks for one: the check is taken again under its row's lock, so two agents
     // picking it at once can't both have it.
@@ -1194,6 +1218,7 @@ export async function setAgentBrain(
         brainEffort: effort,
         brainSpeed: speed,
         contextTokens,
+        brainGroupId: group,
         planForOthers,
         // The people and roles lists stay while it is its owner's only, for when it is let out again.
         ...(audience
@@ -1255,8 +1280,9 @@ export async function setAgentBrain(
           effort: agent.brainEffort,
           speed: agent.brainSpeed,
           contextTokens: agent.contextTokens,
+          group: agent.brainGroupId,
         },
-        to: { brain, model, fallback, extraUsage, account, effort, speed, contextTokens },
+        to: { brain, model, fallback, extraUsage, account, effort, speed, contextTokens, group },
         ...(rightHand ? { planForOthers: { from: agent.planForOthers, to: planForOthers } } : {}),
         ...options.audit,
       },
@@ -1291,6 +1317,7 @@ export async function setAgentBrain(
     brainEffort: effort,
     brainSpeed: speed,
     contextTokens,
+    brainGroupId: group,
     planForOthers,
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
@@ -1316,7 +1343,74 @@ export async function setAgentBrain(
     account !== agent.brainAccountId || shownMachine !== machine
       ? await brainAccounts(deps.db, userId, orgId, shown, shownMachine)
       : accounts;
-  return view(shown, shownMachine, machines, fresh, userId);
+  return { ...view(shown, shownMachine, machines, fresh, userId), group: await groupView(deps.db, shown) };
+}
+
+/** `brains/groups` is loaded when called: it imports modules that import this one back (ADR 0180). */
+const loadGroups = () => import("./brains/groups");
+
+/** The agent's group as its settings show it: the group and the member a run would pick now. */
+async function groupView(
+  db: Database,
+  agent: Pick<Agent, "id" | "orgId" | "ownerUserId" | "machineId" | "brainGroupId">,
+): Promise<BrainGroupSummary | null> {
+  if (!agent.brainGroupId) return null;
+  const [group] = await db
+    .select({ id: schema.brainGroups.id, name: schema.brainGroups.name, strategy: schema.brainGroups.strategy })
+    .from(schema.brainGroups)
+    .where(and(eq(schema.brainGroups.orgId, agent.orgId), eq(schema.brainGroups.id, agent.brainGroupId)));
+  if (!group) return null;
+  const { pickGroupMember } = await loadGroups();
+  const pick = await pickGroupMember(db, agent);
+  const [account] = pick
+    ? await db
+        .select({ label: schema.machineAccounts.label })
+        .from(schema.machineAccounts)
+        .where(and(eq(schema.machineAccounts.orgId, agent.orgId), eq(schema.machineAccounts.id, pick.accountId)))
+    : [];
+  return {
+    id: group.id,
+    name: group.name,
+    strategy: group.strategy === "room" ? "room" : "order",
+    current: pick && account ? { accountId: pick.accountId, label: account.label, kind: pick.kind } : null,
+  };
+}
+
+/**
+ * The group the agent thinks with after this save (ADR 0180): kept when `input` is omitted, none on null, else a group
+ * of the workspace on the agent's own computer. The team's right hand takes none (it thinks with each person's plan).
+ * Whoever may save the agent's brain may choose: a member of the group that doesn't serve the agent's owner is skipped
+ * when a run picks.
+ */
+async function nextBrainGroup(
+  db: Database,
+  orgId: string,
+  agent: Pick<Agent, "machineId" | "brainGroupId">,
+  rightHand: boolean,
+  input: unknown,
+): Promise<string | null> {
+  if (input === undefined) return agent.brainGroupId;
+  if (input === null) return null;
+  if (typeof input !== "string" || !input) {
+    throw new ValidationError("group is a brain group's id, or null", "brain.invalid");
+  }
+  if (rightHand) {
+    throw new ValidationError(
+      "The team's right hand thinks with each person's plan, not a group",
+      "brain_group.right_hand",
+    );
+  }
+  const [row] = await db
+    .select({ machineId: schema.brainGroups.machineId })
+    .from(schema.brainGroups)
+    .where(and(eq(schema.brainGroups.orgId, orgId), eq(schema.brainGroups.id, input)));
+  if (!row) throw new NotFoundError("Group not found", "brain_group.not_found");
+  if (row.machineId !== agent.machineId) {
+    throw new ConflictError("That group belongs to another computer", "brain_group.other_computer", {
+      group: input,
+    });
+  }
+  return input;
 }
 
 /**
@@ -1730,6 +1824,8 @@ export interface AgentBrainSummary {
   speed?: "fast";
   /** An API brain on Automático: the maker its models come from (`agentBrainLines`), whose logo the app shows. */
   maker?: string;
+  /** The brain group it thinks with (ADR 0180): `account` and `usage` are of the member a run would pick now. */
+  group?: { id: string; name: string };
 }
 
 /**
@@ -1762,17 +1858,42 @@ export async function agentBrainSummaries(
     machineId: string | null;
     ownerUserId: string | null;
     brainAccountId?: string | null;
+    brainGroupId?: string | null;
     brainSpeed?: string;
     builtin?: string | null;
   }[],
 ): Promise<Map<string, AgentBrainSummary>> {
   const out = new Map<string, AgentBrainSummary>();
+  // An agent in a group shows the member thinking now (ADR 0180): its account and limits, not the ones saved on it.
+  const members = new Map<string, GroupMemberPick>();
+  const groupInfo = new Map<string, { id: string; name: string }>();
+  const grouped = agents.filter((a) => a.brainGroupId && a.machineId && !isRightHand(a));
+  if (grouped.length) {
+    const { pickGroupMember } = await loadGroups();
+    const found = await db
+      .select({ id: schema.brainGroups.id, name: schema.brainGroups.name })
+      .from(schema.brainGroups)
+      .where(
+        and(
+          eq(schema.brainGroups.orgId, orgId),
+          inArray(schema.brainGroups.id, [...new Set(grouped.map((a) => a.brainGroupId as string))]),
+        ),
+      );
+    for (const g of found) groupInfo.set(g.id, g);
+    for (const a of grouped) {
+      const pick = await pickGroupMember(db, { ...a, orgId, brainGroupId: a.brainGroupId as string });
+      if (pick) members.set(a.id, pick);
+    }
+  }
+  const accountOf = (a: (typeof agents)[number]) => members.get(a.id)?.accountId ?? a.brainAccountId;
   const computerIds = [
     ...new Set(agents.filter((a) => brainOf(a.brain) !== "model" && a.machineId).map((a) => a.machineId as string)),
   ];
   const accountIds = [
     ...new Set(
-      agents.filter((a) => brainOf(a.brain) !== "model" && a.brainAccountId).map((a) => a.brainAccountId as string),
+      agents
+        .filter((a) => (brainOf(a.brain) !== "model" || members.has(a.id)) && accountOf(a))
+        .map((a) => accountOf(a) as string),
     ),
   ];
   const [membership, machines, accounts] = await Promise.all([
@@ -1805,15 +1926,17 @@ export async function agentBrainSummaries(
   const accountById = new Map(accounts.map((r) => [r.id, r]));
   const manages = membership !== null && !readRefusal(membership.standing) && can(membership, "manage_agents");
   for (const a of agents) {
-    const kind = brainOf(a.brain);
+    const member = members.get(a.id);
+    const kind = member?.kind ?? brainOf(a.brain);
+    const brainModel = member ? member.model : a.brainModel;
     const machine = a.machineId ? live.get(a.machineId) : undefined;
     const computer = machine && (manages || a.ownerUserId === viewerId) ? machine.name : undefined;
-    const row = kind !== "model" && a.brainAccountId ? accountById.get(a.brainAccountId) : undefined;
+    const row = kind !== "model" && accountOf(a) ? accountById.get(accountOf(a) as string) : undefined;
     const provider = kind === "claude_code" ? (row?.provider ?? undefined) : undefined;
     const ownPlan = kind === "claude_code" ? machine?.executors?.claude?.plan : undefined;
     // With no account, the computer's own sign-in thinks only for its pairer's agents (ADR 0059 §3).
     const own =
-      kind !== "model" && !a.brainAccountId && machine?.pairer && machine.pairer === a.ownerUserId
+      kind !== "model" && !accountOf(a) && machine?.pairer && machine.pairer === a.ownerUserId
         ? {
             account: ownPlan
               ? `${defaultAccountLabel(kind)} ${ownPlan[0]?.toUpperCase()}${ownPlan.slice(1)}`
@@ -1824,14 +1947,13 @@ export async function agentBrainSummaries(
     const plan = row ? { account: row.label, usage: row.usage ?? undefined } : own;
     out.set(a.id, {
       kind,
-      model: brainModelLabel(kind, a.brainModel, provider),
+      model: brainModelLabel(kind, brainModel, provider),
       ...(kind !== "model" && computer ? { computer } : {}),
       ...(provider ? { provider } : {}),
       ...(plan ? { account: plan.account } : {}),
       ...(plan?.usage ? { usage: plan.usage } : {}),
-      ...(a.brainSpeed === "fast" &&
-      !isRightHand(a) &&
-      speedFits({ kind, provider: row?.provider, model: a.brainModel })
+      ...(a.brainGroupId && groupInfo.has(a.brainGroupId) ? { group: groupInfo.get(a.brainGroupId) } : {}),
+      ...(a.brainSpeed === "fast" && !isRightHand(a) && speedFits({ kind, provider: row?.provider, model: brainModel })
         ? { speed: "fast" as const }
         : {}),
     });
