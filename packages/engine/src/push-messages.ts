@@ -58,6 +58,11 @@ export interface PushTextInput {
   reason?: string | null;
   /** The workspace is personal (ADR 0159): the words for one person and their agents, where a team's would differ. */
   personal?: boolean;
+  /**
+   * The workspace's name, only when the actor's name alone is ambiguous to this person: another of their workspaces
+   * has an agent of the same name (`pushWorkspaceName` in `push.ts`). The actor reads "Lodi (Pessoal)".
+   */
+  workspace?: string | null;
 }
 
 const clip = (s: string, max: number) => {
@@ -77,7 +82,16 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
 
 function renderOne(locale: PushLocale, input: PushTextInput): { title: string; body: string } {
   const s = pushStrings(locale);
-  const actor = input.actorName?.trim() || (input.actorType === "agent" ? s.anAgent : s.someone);
+  const named = input.actorName?.trim();
+  const workspace = input.workspace?.trim();
+  // The same name in two of the person's workspaces: the workspace tells them apart (a name, in any language).
+  const actor = named
+    ? workspace
+      ? `${named} (${workspace})`
+      : named
+    : input.actorType === "agent"
+      ? s.anAgent
+      : s.someone;
   // A GIF or a sticker alone (ADR 0091) says what it was where its words would go.
   const sent = input.media ? { gif: s.sentGif, sticker: s.sentSticker, voice: s.sentVoice }[input.media] : "";
   const text = input.text?.trim() || sent;
