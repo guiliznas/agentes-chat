@@ -42,7 +42,7 @@ do agente". O membro escolhido gruda na conversa enquanto tiver folga, para não
 - Texto para o usuário passa por `packages/i18n` (`en.ts` e `pt-BR.ts`). O phone reutiliza essas chaves.
 - Comentários públicos citam o ADR novo (`0180`), nunca este plano.
 - Antes de dar por pronto: `bun run lint`, `bun run typecheck`, `bun run check:boundaries`, `bun test <arquivos tocados>`. No fim, `bun run ci:local`.
-- Conventional Commits com escopo (`feat(engine): …`). Push no fork a cada commit (`git push origin <sha>:refs/heads/feat/brain-groups`).
+- Conventional Commits com escopo (`feat(engine): …`). **Só commits locais**: nada de push, issue, PR ou comentário upstream até o dono liberar.
 
 ## Review Focus
 
@@ -63,10 +63,9 @@ do agente". O membro escolhido gruda na conversa enquanto tiver folga, para não
 - Modify: `docs/adr/README.md` (linha da tabela, depois da 0179)
 
 - [ ] **Step 1:** escrever o ADR no formato da 0176: `Status: Proposed`, `Amends: ADR 0041 (an agent may move between the accounts of a group its owner made, one per provider), ADR 0059 §156`. Seções Context, Decision (D1–D10, nas palavras do ADR) e Consequences. O ADR diz com todas as letras que duas contas do mesmo provedor nunca entram num grupo, e por quê.
-- [ ] **Step 2:** rascunhar o comentário na issue upstream #319, propondo D1–D10 e linkando o ADR. **Publicar só com o ok do usuário.**
-- [ ] **Step 3:** commit `docs(adr): 0180 brain groups, one account per provider` e push no fork.
+- [ ] **Step 2:** commit local `docs(adr): 0180 brain groups, one account per provider`.
 
-Portão: se o upstream recusar, o usuário decide entre seguir num fork próprio e parar aqui.
+Nada é publicado no upstream (issue #319, PR) por enquanto: o trabalho segue local até o dono decidir.
 
 ---
 
