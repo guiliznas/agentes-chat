@@ -37,6 +37,7 @@ export * from "./blocks";
 export * from "./brain-settings";
 export * from "./brains/claude-code";
 export * from "./brains/codex";
+export * from "./brains/groups";
 export * from "./brains/model";
 export * from "./brains/prompt";
 export * from "./brains/select";
