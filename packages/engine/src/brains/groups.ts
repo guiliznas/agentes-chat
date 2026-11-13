@@ -3,7 +3,7 @@ import { and, asc, type Database, desc, eq, inArray, isNotNull, isNull, schema }
 import { AUTO_MODEL } from "@agenteschat/providers";
 import { recordAudit } from "../audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
-import { servesOf } from "../machine-accounts";
+import { planRoom, servesOf } from "../machine-accounts";
 import { can, requirePermission } from "../organizations";
 import { isRightHand, type ThinkingAgent } from "../right-hand";
 import type { BrainKind } from "./types";
@@ -336,28 +336,22 @@ export interface GroupMemberPick {
  */
 export async function pickGroupMember(
   db: Database,
-  agent: Pick<typeof schema.agents.$inferSelect, "orgId" | "ownerUserId" | "machineId" | "brainGroupId"> & {
-    id?: string;
-  },
+  agent: Pick<typeof schema.agents.$inferSelect, "id" | "orgId" | "ownerUserId" | "machineId" | "brainGroupId">,
   opts: { threadRootId?: string; now?: number } = {},
 ): Promise<GroupMemberPick | null> {
   const { machineId, brainGroupId } = agent;
   if (!machineId || !brainGroupId) return null;
   const now = opts.now ?? Date.now();
-  const [group] = await db
-    .select({ strategy: schema.brainGroups.strategy })
-    .from(schema.brainGroups)
-    .where(
-      and(
-        eq(schema.brainGroups.orgId, agent.orgId),
-        eq(schema.brainGroups.id, brainGroupId),
-        eq(schema.brainGroups.machineId, machineId),
-      ),
-    );
-  if (!group) return null;
   const rows = await db
-    .select({ m: schema.brainGroupMembers, a: schema.machineAccounts })
-    .from(schema.brainGroupMembers)
+    .select({ strategy: schema.brainGroups.strategy, m: schema.brainGroupMembers, a: schema.machineAccounts })
+    .from(schema.brainGroups)
+    .innerJoin(
+      schema.brainGroupMembers,
+      and(
+        eq(schema.brainGroupMembers.orgId, schema.brainGroups.orgId),
+        eq(schema.brainGroupMembers.groupId, schema.brainGroups.id),
+      ),
+    )
     .innerJoin(
       schema.machineAccounts,
       and(
@@ -365,15 +359,28 @@ export async function pickGroupMember(
         eq(schema.machineAccounts.id, schema.brainGroupMembers.accountId),
       ),
     )
-    .where(and(eq(schema.brainGroupMembers.orgId, agent.orgId), eq(schema.brainGroupMembers.groupId, brainGroupId)))
+    .where(
+      and(
+        eq(schema.brainGroups.orgId, agent.orgId),
+        eq(schema.brainGroups.id, brainGroupId),
+        eq(schema.brainGroups.machineId, machineId),
+      ),
+    )
     .orderBy(asc(schema.brainGroupMembers.position));
-  // Not a static import: select.ts will import this file (ADR 0180), as right-hand.ts does to avoid the cycle.
-  const { planLimitOf, planIsOwners } = await import("./select");
-  const { planRoom } = await import("../machine-accounts");
+  const [first] = rows;
+  if (!first) return null;
+  const live = rows.filter(({ a }) => a.status === "active" && a.shared && a.machineId === machineId);
+  // select.ts imports this file (ADR 0180) and imports machine-accounts back, so `select` is loaded when called, not
+  // when this module is evaluated. `machine-accounts` is static: every use here is inside a function (live binding).
+  const { planLimitOf, plansAreOwners } = await import("./select");
+  const owned = await plansAreOwners(
+    db,
+    agent,
+    live.map(({ a }) => a.id),
+  );
   const eligible: { pick: GroupMemberPick; limit: { until: number | null } | null; room: number }[] = [];
-  for (const { m, a } of rows) {
-    if (a.status !== "active" || !a.shared || a.machineId !== machineId) continue;
-    if (!(await planIsOwners(db, agent, machineId, { id: a.id }))) continue;
+  for (const { m, a } of live) {
+    if (!owned.has(a.id)) continue;
     const kind = a.kind as BrainKind;
     eligible.push({
       pick: { accountId: a.id, kind, model: m.model, effort: m.effort, exhausted: false },
@@ -384,17 +391,17 @@ export async function pickGroupMember(
   if (eligible.length === 0) return null;
   const withRoom = eligible.filter((e) => e.limit === null);
   if (withRoom.length > 0) {
-    const lastId =
-      opts.threadRootId && agent.id ? await lastThreadAccount(db, agent.orgId, agent.id, opts.threadRootId) : null;
+    const lastId = opts.threadRootId ? await lastThreadAccount(db, agent.orgId, agent.id, opts.threadRootId) : null;
     const kept = lastId ? withRoom.find((e) => e.pick.accountId === lastId) : undefined;
     if (kept) return kept.pick;
-    if (group.strategy === "room") return withRoom.reduce((best, e) => (e.room > best.room ? e : best)).pick;
-    return (withRoom[0] as (typeof withRoom)[number]).pick;
+    if (first.strategy === "room") return withRoom.reduce((best, e) => (e.room > best.room ? e : best)).pick;
+    const [head] = withRoom;
+    return head ? head.pick : null;
   }
   // Unknown reset: last. Ties keep the position order (reduce is stable on strict `<`).
   const untilOf = (e: (typeof eligible)[number]) => e.limit?.until ?? Number.POSITIVE_INFINITY;
-  const first = eligible.reduce((best, e) => (untilOf(e) < untilOf(best) ? e : best));
-  return { ...first.pick, exhausted: true };
+  const soonest = eligible.reduce((best, e) => (untilOf(e) < untilOf(best) ? e : best));
+  return { ...soonest.pick, exhausted: true };
 }
 
 /** The account the conversation's latest run thought with (ADR 0180), null before any. */
@@ -410,7 +417,7 @@ async function lastThreadAccount(db: Database, orgId: string, agentId: string, t
         isNotNull(schema.agentRuns.brainAccountId),
       ),
     )
-    .orderBy(desc(schema.agentRuns.createdAt))
+    .orderBy(desc(schema.agentRuns.createdAt), desc(schema.agentRuns.id))
     .limit(1);
   return row?.id ?? null;
 }
@@ -420,11 +427,9 @@ async function lastThreadAccount(db: Database, orgId: string, agentId: string, t
  * for the right hand. The stored fields stay untouched, so leaving the group gives them back. No group, the right
  * hand, no computer or no usable member: the agent as it is.
  */
-export async function withGroupBrain<T extends ThinkingAgent & { id?: string; brainGroupId?: string | null }>(
-  db: Database,
-  agent: T,
-  opts: { threadRootId?: string; now?: number } = {},
-): Promise<T> {
+export async function withGroupBrain<
+  T extends ThinkingAgent & Pick<typeof schema.agents.$inferSelect, "id"> & { brainGroupId?: string | null },
+>(db: Database, agent: T, opts: { threadRootId?: string; now?: number } = {}): Promise<T> {
   if (!agent.brainGroupId || !agent.machineId || isRightHand(agent)) return agent;
   const pick = await pickGroupMember(
     db,

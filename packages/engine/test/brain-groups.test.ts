@@ -299,3 +299,40 @@ test("the right hand and an agent with no group are themselves", async () => {
   });
   expect(await withGroupBrain(w.db, { ...base, machineId: null }, {})).toMatchObject({ brain: "model" });
 });
+
+test("the conversation's member, now signed out, gives way to the strategy", async () => {
+  const w = await pickWorld();
+  const root = Bun.randomUUIDv7();
+  await w.db.insert(schema.agentRuns).values({
+    orgId: w.org,
+    agentId: w.agent.id,
+    channelId: Bun.randomUUIDv7(),
+    threadRootId: root,
+    triggerMessageId: root,
+    trigger: "mention",
+    hop: 1,
+    status: "done",
+    brainAccountId: w.gemini,
+  });
+  expect((await pickGroupMember(w.db, w.agent, { threadRootId: root }))?.accountId).toBe(w.gemini);
+  await w.db
+    .update(schema.machineAccounts)
+    .set({ status: "signed_out" })
+    .where(eq(schema.machineAccounts.id, w.gemini));
+  expect((await pickGroupMember(w.db, w.agent, { threadRootId: root }))?.accountId).toBe(w.claude);
+});
+
+test("a group on another computer than the agent's is ignored", async () => {
+  const w = await pickWorld();
+  expect(await pickGroupMember(w.db, { ...w.agent, machineId: w.otherMachineId }, {})).toBeNull();
+  const agent = {
+    ...w.agent,
+    machineId: w.otherMachineId,
+    brain: "model",
+    brainModel: "m",
+    brainEffort: null,
+    brainAccountId: null,
+    brainAccountLentBy: null,
+  };
+  expect((await withGroupBrain(w.db, agent, {})).brain).toBe("model");
+});

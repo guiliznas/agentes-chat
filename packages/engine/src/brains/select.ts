@@ -10,7 +10,7 @@ import {
   OPENCODE_PROTOCOL,
   type PlanUsage,
 } from "@agenteschat/adapters";
-import { and, desc, type Executor, eq, isNotNull, ne, or, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, inArray, isNotNull, ne, or, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
 import {
   autoPlanModel,
@@ -591,30 +591,42 @@ export async function planIsOwners(
   machineId: string,
   account: Pick<BrainAccount, "id"> | undefined,
 ): Promise<boolean> {
+  if (account) return (await plansAreOwners(db, agent, [account.id])).has(account.id);
   const owner = agent.ownerUserId;
   if (!owner) return false;
-  const { machineAccounts, machines, organizationMembers: members } = schema;
-  const rows = account
-    ? await db
-        .select({ id: machineAccounts.id })
-        .from(machineAccounts)
-        .innerJoin(
-          members,
-          and(eq(members.orgId, machineAccounts.orgId), eq(members.userId, machineAccounts.createdBy)),
-        )
-        .where(
-          and(
-            eq(machineAccounts.orgId, agent.orgId),
-            eq(machineAccounts.id, account.id),
-            or(eq(machineAccounts.createdBy, owner), eq(machineAccounts.serves, "everyone")),
-          ),
-        )
-    : await db
-        .select({ id: machines.id })
-        .from(machines)
-        .innerJoin(members, and(eq(members.orgId, machines.orgId), eq(members.userId, machines.pairedByUserId)))
-        .where(and(eq(machines.orgId, agent.orgId), eq(machines.id, machineId), eq(machines.pairedByUserId, owner)));
+  const { machines, organizationMembers: members } = schema;
+  const rows = await db
+    .select({ id: machines.id })
+    .from(machines)
+    .innerJoin(members, and(eq(members.orgId, machines.orgId), eq(members.userId, machines.pairedByUserId)))
+    .where(and(eq(machines.orgId, agent.orgId), eq(machines.id, machineId), eq(machines.pairedByUserId, owner)));
   return rows.length > 0;
+}
+
+/**
+ * `planIsOwners` for many accounts in one query (ADR 0180): the ids among `accountIds` that may think for this
+ * agent. The rule for an account lives only here.
+ */
+export async function plansAreOwners(
+  db: Executor,
+  agent: Pick<Agent, "orgId" | "ownerUserId">,
+  accountIds: string[],
+): Promise<Set<string>> {
+  const owner = agent.ownerUserId;
+  if (!owner || accountIds.length === 0) return new Set();
+  const { machineAccounts, organizationMembers: members } = schema;
+  const rows = await db
+    .select({ id: machineAccounts.id })
+    .from(machineAccounts)
+    .innerJoin(members, and(eq(members.orgId, machineAccounts.orgId), eq(members.userId, machineAccounts.createdBy)))
+    .where(
+      and(
+        eq(machineAccounts.orgId, agent.orgId),
+        inArray(machineAccounts.id, accountIds),
+        or(eq(machineAccounts.createdBy, owner), eq(machineAccounts.serves, "everyone")),
+      ),
+    );
+  return new Set(rows.map((r) => r.id));
 }
 
 /** The agent's effort when it thinks with its own brain (a mission's other brain: the CLI's default). */
