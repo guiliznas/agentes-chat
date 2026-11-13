@@ -314,7 +314,7 @@ export async function rightHandAwayRun(db: Executor, run: { orgId: string; agent
 /** Its computer turns' permission profile: the runner's locked-down `chat` (`LOCKED_BRAIN_PROTOCOL`). */
 export const RIGHT_HAND_TURN = { mode: "chat" } as const;
 
-type ThinkingAgent = Pick<Agent, "orgId" | "brainAccountId" | "machineId"> &
+export type ThinkingAgent = Pick<Agent, "orgId" | "brainAccountId" | "machineId"> &
   Partial<Pick<Agent, "builtin" | "ownerUserId" | "brain" | "brainModel" | "brainEffort" | "brainAccountLentBy">> &
   Partial<Pick<Agent, "planForOthers" | "brainFallback" | "brainExtraUsage" | "credentialId">>;
 

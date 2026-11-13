@@ -1,9 +1,12 @@
 import type { PlanUsage } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
+import { AUTO_MODEL } from "@agenteschat/providers";
 import { recordAudit } from "../audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { servesOf } from "../machine-accounts";
 import { can, requirePermission } from "../organizations";
+import { isRightHand, type ThinkingAgent } from "../right-hand";
+import type { BrainKind } from "./types";
 
 export type BrainGroupStrategy = "order" | "room";
 export const BRAIN_GROUP_STRATEGIES: readonly BrainGroupStrategy[] = ["order", "room"];
@@ -314,4 +317,133 @@ export async function deleteBrainGroup(db: Database, userId: string, orgId: stri
       details: { name: group.name, freedAgents: freed.map((a) => a.id) },
     });
   });
+}
+
+export interface GroupMemberPick {
+  accountId: string;
+  kind: BrainKind;
+  model: string | null;
+  effort: string | null;
+  /** Every eligible member is at its limit: this is the one whose limit ends first. */
+  exhausted: boolean;
+}
+
+/**
+ * The member of the agent's group that thinks now (ADR 0180), null when it has no group or no member can serve it.
+ * Eligible: account active, shared, on the agent's computer (as is the group) and usable by the agent's owner. A
+ * conversation keeps the member of its last run while that one has room; else `order` takes the first with room and
+ * `room` the one with the most left. All at their limit: the one back first, `exhausted`, for the plan-limit path.
+ */
+export async function pickGroupMember(
+  db: Database,
+  agent: Pick<typeof schema.agents.$inferSelect, "orgId" | "ownerUserId" | "machineId" | "brainGroupId"> & {
+    id?: string;
+  },
+  opts: { threadRootId?: string; now?: number } = {},
+): Promise<GroupMemberPick | null> {
+  const { machineId, brainGroupId } = agent;
+  if (!machineId || !brainGroupId) return null;
+  const now = opts.now ?? Date.now();
+  const [group] = await db
+    .select({ strategy: schema.brainGroups.strategy })
+    .from(schema.brainGroups)
+    .where(
+      and(
+        eq(schema.brainGroups.orgId, agent.orgId),
+        eq(schema.brainGroups.id, brainGroupId),
+        eq(schema.brainGroups.machineId, machineId),
+      ),
+    );
+  if (!group) return null;
+  const rows = await db
+    .select({ m: schema.brainGroupMembers, a: schema.machineAccounts })
+    .from(schema.brainGroupMembers)
+    .innerJoin(
+      schema.machineAccounts,
+      and(
+        eq(schema.machineAccounts.orgId, schema.brainGroupMembers.orgId),
+        eq(schema.machineAccounts.id, schema.brainGroupMembers.accountId),
+      ),
+    )
+    .where(and(eq(schema.brainGroupMembers.orgId, agent.orgId), eq(schema.brainGroupMembers.groupId, brainGroupId)))
+    .orderBy(asc(schema.brainGroupMembers.position));
+  // Not a static import: select.ts will import this file (ADR 0180), as right-hand.ts does to avoid the cycle.
+  const { planLimitOf, planIsOwners } = await import("./select");
+  const { planRoom } = await import("../machine-accounts");
+  const eligible: { pick: GroupMemberPick; limit: { until: number | null } | null; room: number }[] = [];
+  for (const { m, a } of rows) {
+    if (a.status !== "active" || !a.shared || a.machineId !== machineId) continue;
+    if (!(await planIsOwners(db, agent, machineId, { id: a.id }))) continue;
+    const kind = a.kind as BrainKind;
+    eligible.push({
+      pick: { accountId: a.id, kind, model: m.model, effort: m.effort, exhausted: false },
+      limit: planLimitOf(machineId, kind, a.id, a.usage, now),
+      room: planRoom(a.usage, now),
+    });
+  }
+  if (eligible.length === 0) return null;
+  const withRoom = eligible.filter((e) => e.limit === null);
+  if (withRoom.length > 0) {
+    const lastId =
+      opts.threadRootId && agent.id ? await lastThreadAccount(db, agent.orgId, agent.id, opts.threadRootId) : null;
+    const kept = lastId ? withRoom.find((e) => e.pick.accountId === lastId) : undefined;
+    if (kept) return kept.pick;
+    if (group.strategy === "room") return withRoom.reduce((best, e) => (e.room > best.room ? e : best)).pick;
+    return (withRoom[0] as (typeof withRoom)[number]).pick;
+  }
+  // Unknown reset: last. Ties keep the position order (reduce is stable on strict `<`).
+  const untilOf = (e: (typeof eligible)[number]) => e.limit?.until ?? Number.POSITIVE_INFINITY;
+  const first = eligible.reduce((best, e) => (untilOf(e) < untilOf(best) ? e : best));
+  return { ...first.pick, exhausted: true };
+}
+
+/** The account the conversation's latest run thought with (ADR 0180), null before any. */
+async function lastThreadAccount(db: Database, orgId: string, agentId: string, threadRootId: string) {
+  const [row] = await db
+    .select({ id: schema.agentRuns.brainAccountId })
+    .from(schema.agentRuns)
+    .where(
+      and(
+        eq(schema.agentRuns.orgId, orgId),
+        eq(schema.agentRuns.agentId, agentId),
+        eq(schema.agentRuns.threadRootId, threadRootId),
+        isNotNull(schema.agentRuns.brainAccountId),
+      ),
+    )
+    .orderBy(desc(schema.agentRuns.createdAt))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/**
+ * The agent with its group's member in place of its own `brain*` fields (ADR 0180), the way `withPersonalBrain` does
+ * for the right hand. The stored fields stay untouched, so leaving the group gives them back. No group, the right
+ * hand, no computer or no usable member: the agent as it is.
+ */
+export async function withGroupBrain<T extends ThinkingAgent & { id?: string; brainGroupId?: string | null }>(
+  db: Database,
+  agent: T,
+  opts: { threadRootId?: string; now?: number } = {},
+): Promise<T> {
+  if (!agent.brainGroupId || !agent.machineId || isRightHand(agent)) return agent;
+  const pick = await pickGroupMember(
+    db,
+    {
+      id: agent.id,
+      orgId: agent.orgId,
+      ownerUserId: agent.ownerUserId ?? null,
+      machineId: agent.machineId,
+      brainGroupId: agent.brainGroupId,
+    },
+    opts,
+  );
+  if (!pick) return agent;
+  return {
+    ...agent,
+    brain: pick.kind,
+    brainModel: pick.model ?? AUTO_MODEL,
+    brainEffort: pick.effort,
+    brainAccountId: pick.accountId,
+    brainAccountLentBy: null,
+  };
 }

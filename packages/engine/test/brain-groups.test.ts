@@ -1,7 +1,14 @@
 import { afterEach, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { createBrainGroup, deleteBrainGroup, listBrainGroups, updateBrainGroup } from "../src";
+import {
+  createBrainGroup,
+  deleteBrainGroup,
+  listBrainGroups,
+  pickGroupMember,
+  updateBrainGroup,
+  withGroupBrain,
+} from "../src";
 import { addMember, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -160,4 +167,135 @@ test("deleting a group frees the agents that used it", async () => {
   expect(after?.brainGroupId).toBeNull();
   const audits = await w.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, w.org));
   expect(audits.map((a) => a.action)).toContain("brain_group.delete");
+});
+
+// --- Which member thinks (ADR 0180) ---
+
+const usageAt = (usedPercent: number, resetsInMs = 3_600_000) => ({
+  windows: [{ kind: "five_hour" as const, usedPercent, resetsAt: new Date(Date.now() + resetsInMs).toISOString() }],
+  source: "probe" as const,
+  at: new Date().toISOString(),
+});
+
+async function pickWorld(strategy: "order" | "room" = "order") {
+  const w = await world();
+  const gemini = await w.account("Gemini", { kind: "antigravity" });
+  const group = await createBrainGroup(w.db, w.fx.owner.id, w.org, {
+    machineId: w.machineId,
+    name: "Time",
+    strategy,
+    members: [{ accountId: w.claude, model: "opus", effort: "high" }, { accountId: w.codex }, { accountId: gemini }],
+  });
+  const agent = {
+    id: w.fx.agent.id,
+    orgId: w.org,
+    ownerUserId: w.fx.owner.id,
+    machineId: w.machineId,
+    brainGroupId: group.id,
+  };
+  const use = (id: string, usage: ReturnType<typeof usageAt> | null) =>
+    w.db.update(schema.machineAccounts).set({ usage }).where(eq(schema.machineAccounts.id, id));
+  return { ...w, gemini, group, agent, use };
+}
+
+test("in order, the first member with room thinks; at its limit the next one does", async () => {
+  const w = await pickWorld();
+  expect(await pickGroupMember(w.db, w.agent, {})).toMatchObject({
+    accountId: w.claude,
+    kind: "claude_code",
+    model: "opus",
+    effort: "high",
+    exhausted: false,
+  });
+  await w.use(w.claude, usageAt(100));
+  expect(await pickGroupMember(w.db, w.agent, {})).toMatchObject({
+    accountId: w.codex,
+    kind: "codex",
+    model: null,
+    exhausted: false,
+  });
+});
+
+test("by room, the roomiest member thinks", async () => {
+  const w = await pickWorld("room");
+  await w.use(w.claude, usageAt(90));
+  await w.use(w.codex, usageAt(10));
+  await w.use(w.gemini, usageAt(50));
+  expect((await pickGroupMember(w.db, w.agent, {}))?.accountId).toBe(w.codex);
+});
+
+test("a conversation keeps its member while it has room", async () => {
+  const w = await pickWorld("room");
+  await w.use(w.claude, usageAt(90));
+  await w.use(w.codex, usageAt(60));
+  await w.use(w.gemini, usageAt(5));
+  const root = Bun.randomUUIDv7();
+  await w.db.insert(schema.agentRuns).values({
+    orgId: w.org,
+    agentId: w.agent.id,
+    channelId: Bun.randomUUIDv7(),
+    threadRootId: root,
+    triggerMessageId: root,
+    trigger: "mention",
+    hop: 1,
+    status: "done",
+    brainAccountId: w.codex,
+  });
+  expect((await pickGroupMember(w.db, w.agent, {}))?.accountId).toBe(w.gemini);
+  expect((await pickGroupMember(w.db, w.agent, { threadRootId: root }))?.accountId).toBe(w.codex);
+  await w.use(w.codex, usageAt(100));
+  expect((await pickGroupMember(w.db, w.agent, { threadRootId: root }))?.accountId).toBe(w.gemini);
+});
+
+test("a member signed out, removed or kept to its owner is skipped", async () => {
+  const w = await pickWorld();
+  const set = (id: string, v: Partial<typeof schema.machineAccounts.$inferInsert>) =>
+    w.db.update(schema.machineAccounts).set(v).where(eq(schema.machineAccounts.id, id));
+  await set(w.claude, { status: "signed_out" });
+  expect((await pickGroupMember(w.db, w.agent, {}))?.accountId).toBe(w.codex);
+  // Kept to its owner (someone else's agent can't use it).
+  await set(w.codex, { serves: "owner", createdBy: w.bia.id });
+  expect((await pickGroupMember(w.db, w.agent, {}))?.accountId).toBe(w.gemini);
+  // Removed.
+  await w.db.delete(schema.machineAccounts).where(eq(schema.machineAccounts.id, w.gemini));
+  expect(await pickGroupMember(w.db, w.agent, {})).toBeNull();
+  const agent = await withGroupBrain(
+    w.db,
+    { ...w.agent, brain: "model", brainModel: "m", brainEffort: null, brainAccountId: null, brainAccountLentBy: null },
+    {},
+  );
+  expect(agent.brain).toBe("model");
+});
+
+test("every member at its limit: the one back first, marked exhausted", async () => {
+  const w = await pickWorld();
+  await w.use(w.claude, usageAt(100, 3 * 3_600_000));
+  await w.use(w.codex, usageAt(100, 1 * 3_600_000));
+  await w.use(w.gemini, usageAt(100, 2 * 3_600_000));
+  expect(await pickGroupMember(w.db, w.agent, {})).toMatchObject({ accountId: w.codex, exhausted: true });
+});
+
+test("the right hand and an agent with no group are themselves", async () => {
+  const w = await pickWorld();
+  const base = {
+    ...w.agent,
+    brain: "model",
+    brainModel: "m",
+    brainEffort: null,
+    brainAccountId: null,
+    brainAccountLentBy: null,
+  };
+  const other = await withGroupBrain(w.db, { ...base, brainGroupId: null }, {});
+  expect(other.brain).toBe("model");
+  const hand = await withGroupBrain(w.db, { ...base, builtin: "right_hand" }, {});
+  expect(hand.brain).toBe("model");
+  const grouped = await withGroupBrain(w.db, base, {});
+  expect(grouped).toMatchObject({
+    brain: "claude_code",
+    brainModel: "opus",
+    brainEffort: "high",
+    brainAccountId: w.claude,
+    brainAccountLentBy: null,
+  });
+  expect(await withGroupBrain(w.db, { ...base, machineId: null }, {})).toMatchObject({ brain: "model" });
 });
