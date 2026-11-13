@@ -723,7 +723,11 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
   const members =
     groupIds.length > 0
       ? await db
-          .select({ groupId: schema.brainGroupMembers.groupId, id: schema.brainGroupMembers.accountId })
+          .select({
+            groupId: schema.brainGroupMembers.groupId,
+            id: schema.brainGroupMembers.accountId,
+            kind: schema.machineAccounts.kind,
+          })
           .from(schema.brainGroupMembers)
           .innerJoin(
             schema.machineAccounts,
@@ -744,7 +748,8 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
   const listed = rows.map((a): MachineAgent => {
     const hand = a.builtin === RIGHT_HAND;
     const own = hand ? lentAccount(a) : null;
-    const others = hand ? personal.map((p) => p.id) : members.filter((m) => m.groupId === a.groupId).map((m) => m.id);
+    const group = hand ? [] : members.filter((m) => m.groupId === a.groupId);
+    const others = hand ? personal.map((p) => p.id) : group.map((m) => m.id);
     const extra = [...new Set(others)].filter((id) => id !== (hand ? own : lentAccount(a)));
     // The right hand off any workspace plan here thinks only with people's own, and an agent on a group with none of
     // its own thinks with a member (ADR 0180): the first of those is its frame's account, the others stay lent too.
@@ -761,7 +766,10 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       ...(account ? { account } : {}),
       ...(extra.length > 0 ? { accounts: extra } : {}),
       // Where a sandbox of its CLI's own is what holds its turns, a containers service outside it would be a way out.
-      ...(a.builtin !== RIGHT_HAND && !isSandboxedBrain(a.brain) ? { containers: true } : {}),
+      // A group's member counts as its brain (ADR 0180): any sandboxed one here and there is no containers service.
+      ...(!hand && !isSandboxedBrain(a.brain) && !group.some((m) => isSandboxedBrain(m.kind))
+        ? { containers: true }
+        : {}),
     };
   });
   // The right hand's seats (ADR 0175) live on the workspace's own computer, each listed like an agent of its own.

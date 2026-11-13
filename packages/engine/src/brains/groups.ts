@@ -319,6 +319,32 @@ export async function deleteBrainGroup(db: Database, userId: string, orgId: stri
   });
 }
 
+export interface GroupPickOptions {
+  /** The conversation: it keeps the member of its last run while that one has room. */
+  threadRootId?: string;
+  /** This member while it is still eligible, even at its limit (a turn cut by the plan's limit). */
+  pinAccountId?: string;
+  now?: number;
+}
+
+/**
+ * How a run picks its group's member (ADR 0180): in its conversation, and on its own member when its turn was cut
+ * by the plan's limit, so the cut turn is sent again in that member's session (as the model fallback refuses to).
+ */
+export function groupPickFor(run: {
+  threadRootId?: string | null;
+  brainAccountId?: string | null;
+  transcript?: unknown;
+}): GroupPickOptions {
+  const cut =
+    (run.transcript as { interruptedTurn?: { cause?: string } } | null | undefined)?.interruptedTurn?.cause ===
+    "plan_limit";
+  return {
+    ...(run.threadRootId ? { threadRootId: run.threadRootId } : {}),
+    ...(cut && run.brainAccountId ? { pinAccountId: run.brainAccountId } : {}),
+  };
+}
+
 export interface GroupMemberPick {
   accountId: string;
   kind: BrainKind;
@@ -337,7 +363,7 @@ export interface GroupMemberPick {
 export async function pickGroupMember(
   db: Database,
   agent: Pick<typeof schema.agents.$inferSelect, "id" | "orgId" | "ownerUserId" | "machineId" | "brainGroupId">,
-  opts: { threadRootId?: string; now?: number } = {},
+  opts: GroupPickOptions = {},
 ): Promise<GroupMemberPick | null> {
   const { machineId, brainGroupId } = agent;
   if (!machineId || !brainGroupId) return null;
@@ -389,6 +415,9 @@ export async function pickGroupMember(
     });
   }
   if (eligible.length === 0) return null;
+  // A turn cut by its plan's limit parks on that member and is sent again there, never redone elsewhere.
+  const pinned = opts.pinAccountId ? eligible.find((e) => e.pick.accountId === opts.pinAccountId) : undefined;
+  if (pinned) return { ...pinned.pick, exhausted: pinned.limit !== null };
   const withRoom = eligible.filter((e) => e.limit === null);
   if (withRoom.length > 0) {
     const lastId = opts.threadRootId ? await lastThreadAccount(db, agent.orgId, agent.id, opts.threadRootId) : null;
@@ -422,6 +451,9 @@ async function lastThreadAccount(db: Database, orgId: string, agentId: string, t
   return row?.id ?? null;
 }
 
+/** Agents `withGroupBrain` already gave their member: the run's second look (`resolveBrain`) keeps that one. */
+const picked = new WeakSet<object>();
+
 /**
  * The agent with its group's member in place of its own `brain*` fields (ADR 0180), the way `withPersonalBrain` does
  * for the right hand. The stored fields stay untouched, so leaving the group gives them back. No group, the right
@@ -429,8 +461,8 @@ async function lastThreadAccount(db: Database, orgId: string, agentId: string, t
  */
 export async function withGroupBrain<
   T extends ThinkingAgent & Pick<typeof schema.agents.$inferSelect, "id"> & { brainGroupId?: string | null },
->(db: Database, agent: T, opts: { threadRootId?: string; now?: number } = {}): Promise<T> {
-  if (!agent.brainGroupId || !agent.machineId || isRightHand(agent)) return agent;
+>(db: Database, agent: T, opts: GroupPickOptions = {}): Promise<T> {
+  if (picked.has(agent) || !agent.brainGroupId || !agent.machineId || isRightHand(agent)) return agent;
   const pick = await pickGroupMember(
     db,
     {
@@ -443,7 +475,7 @@ export async function withGroupBrain<
     opts,
   );
   if (!pick) return agent;
-  return {
+  const substituted: T = {
     ...agent,
     brain: pick.kind,
     brainModel: pick.model ?? AUTO_MODEL,
@@ -451,4 +483,6 @@ export async function withGroupBrain<
     brainAccountId: pick.accountId,
     brainAccountLentBy: null,
   };
+  picked.add(substituted);
+  return substituted;
 }

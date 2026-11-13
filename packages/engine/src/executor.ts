@@ -63,7 +63,7 @@ import type { BlockSpecReader } from "./block-state";
 import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, someoneAnswers } from "./blocks";
 import { brainOf } from "./brain-settings";
 import { brainSessionId, missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
-import { withGroupBrain } from "./brains/groups";
+import { groupPickFor, withGroupBrain } from "./brains/groups";
 import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
 import {
@@ -1707,7 +1707,7 @@ async function executeRunInner(
     ? stored
     : isRightHand(stored)
       ? (await withPersonalBrain(db, stored, await rightHandPerson(db, stored, run))).agent
-      : await withGroupBrain(db, stored, run.threadRootId ? { threadRootId: run.threadRootId } : {});
+      : await withGroupBrain(db, stored, groupPickFor(run));
   // Claude Code defers our tools itself (its ToolSearch): a new run lists every tool the agent has, the same in every
   // run, instead of the groups a judge picks, so its cached prefix holds across runs and sessions (ADR 0043).
   if (needsContext && deps.toolsOnDemand && agent && brainOf(agent.brain) === "claude_code") {

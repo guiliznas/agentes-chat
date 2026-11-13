@@ -32,7 +32,7 @@ import { runnerUpdateWay } from "../runner-update";
 import type { AgentRun } from "../runs";
 import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
-import { withGroupBrain } from "./groups";
+import { groupPickFor, withGroupBrain } from "./groups";
 import { BRAIN_NAMES, BRAIN_PLAN_NAMES, type BrainAccount, type BrainKind, type BrainSession } from "./types";
 
 const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"];
@@ -703,16 +703,20 @@ async function sessionFor(
   options: { fresh?: boolean; promptKey?: string },
   now: Date,
 ): Promise<{ id: string; resume: boolean }> {
-  if (run.brainSessionId) {
+  // A run that thought on another CLI (a group's member of another kind, ADR 0180) starts this one's session afresh:
+  // that CLI's session never saw the other's turns.
+  const otherCli = run.brain != null && run.brain !== "model" && run.brain !== kind;
+  if (run.brainSessionId && !otherCli) {
     return { id: run.brainSessionId, resume: await sessionUsed(db, run, kind, run.brainSessionId) };
   }
   let id: string | null = null;
-  if (!options.fresh && !run.background) {
+  if (!options.fresh && !run.background && !otherCli) {
     const { agentRuns, usageRecords, messages } = schema;
     const [last] = await db
       .select({
         id: agentRuns.id,
         sessionId: agentRuns.brainSessionId,
+        brain: agentRuns.brain,
         at: sql<Date>`coalesce(${agentRuns.finishedAt}, ${agentRuns.updatedAt})`.mapWith(
           (v: string | Date) => new Date(v),
         ),
@@ -756,6 +760,9 @@ async function sessionFor(
       .limit(1);
     if (
       last?.sessionId &&
+      // The conversation's last session is another CLI's (a group switched members, ADR 0180): a fresh one here,
+      // with the whole conversation in its first prompt. Rows from before the brain was stored count as this one's.
+      (last.brain === null || last.brain === kind) &&
       now.getTime() - last.at.getTime() < SESSION_IDLE_MS &&
       last.input < SESSION_MAX_INPUT_TOKENS &&
       // A live session keeps the system prompt it started with: after an edit to the instructions (or anything
@@ -765,7 +772,9 @@ async function sessionFor(
       id = last.sessionId;
     }
   }
-  const sessionId = id ?? brainSessionId(agent.id, `${conversation}:${run.id}`, kind);
+  // Back on a CLI this run left: a new name, since the run's own one is the session that missed the other's turns.
+  const sessionId =
+    id ?? brainSessionId(agent.id, `${conversation}:${run.id}${otherCli ? `:${now.getTime()}` : ""}`, kind);
   await db.update(schema.agentRuns).set({ brainSessionId: sessionId }).where(eq(schema.agentRuns.id, run.id));
   return { id: sessionId, resume: id ? await sessionUsed(db, run, kind, sessionId) : false };
 }
@@ -797,7 +806,7 @@ export async function resolveBrain(
   const agent = await withGroupBrain(
     deps.db,
     await thinkingAgent(deps.db, given, await rightHandPerson(deps.db, given, run)),
-    run.threadRootId ? { threadRootId: run.threadRootId } : {},
+    groupPickFor(run),
   );
   const kind = brainFor(agent, run, mission);
   const base = mission ? { missionId: mission.missionId } : {};
