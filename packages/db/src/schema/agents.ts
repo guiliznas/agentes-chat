@@ -16,6 +16,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
+import { brainGroups } from "./brain-groups";
 import { machineAccounts, machines } from "./machines";
 import { organizationMembers, organizations } from "./tenancy";
 
@@ -219,6 +220,11 @@ export const agents = pgTable(
      */
     brainAccountId: uuid(),
     /**
+     * The group of accounts its computer brain thinks with instead of one (ADR 0180), on its machine; null: the
+     * account above. Cleared when the agent changes computer or brain kind, or the group goes.
+     */
+    brainGroupId: uuid(),
+    /**
      * Who gave it `brainAccountId` though that plan isn't theirs and isn't the agent's owner's (`use_others_plans`,
      * ADR 0059 §3 amended 2026-11-04): such a plan thinks for it while this is set, and its owner may take it back.
      * Set whenever the account changes (`setAgentBrain`), only read together with `brainAccountId`. No foreign key:
@@ -322,6 +328,9 @@ export const agents = pgTable(
       columns: [t.orgId, t.brainAccountId],
       foreignColumns: [machineAccounts.orgId, machineAccounts.id],
     }),
+    // No action, like the account above: code clears it before a group row goes (ADR 0180).
+    foreignKey({ columns: [t.orgId, t.brainGroupId], foreignColumns: [brainGroups.orgId, brainGroups.id] }),
+    index().on(t.orgId, t.brainGroupId),
   ],
 );
 

@@ -1,6 +1,7 @@
 export * from "./agents";
 export * from "./apps";
 export * from "./auth";
+export * from "./brain-groups";
 export * from "./browser";
 export * from "./chat";
 export * from "./connectors";
