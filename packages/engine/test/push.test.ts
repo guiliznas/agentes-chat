@@ -40,6 +40,7 @@ import {
   pushQuote,
   pushStrings,
   pushTicketsOf,
+  pushWorkspaceName,
   registerPushDevice,
   remindNotifications,
   renderPush,
@@ -219,6 +220,22 @@ describe("push text", () => {
       pushQuote({ text: `Fiz metade\n\n${note}`, meta: { brainInterrupted: { text: "Fiz metade", tools: [] } } }),
     ).toBe("Fiz metade");
     expect(pushQuote({ text: "_Interrupted by a server restart._", meta: { interrupted: { text: "" } } })).toBeNull();
+  });
+
+  test("an actor whose name repeats in another workspace of the person reads with its workspace", () => {
+    const mention = { kind: "mention", waiting: false, actorName: "Lodi", text: "olha isso" };
+    expect(renderPush("pt-BR", { ...mention, workspace: "Pessoal" }).title).toBe("Lodi (Pessoal) mencionou você");
+    expect(renderPush("en", { ...mention, workspace: "Pessoal" }).title).toBe("Lodi (Pessoal) mentioned you");
+    // A DM's title is the name alone: it gets the workspace too.
+    expect(renderPush("pt-BR", { kind: "dm", waiting: false, actorName: "Lodi", workspace: "Ziltro" }).title).toBe(
+      "Lodi (Ziltro)",
+    );
+    // No workspace (the usual case), or no name to tell apart: as before.
+    expect(renderPush("pt-BR", mention).title).toBe("Lodi mencionou você");
+    expect(renderPush("pt-BR", { ...mention, workspace: "  " }).title).toBe("Lodi mencionou você");
+    expect(
+      renderPush("pt-BR", { kind: "mention", waiting: false, actorType: "agent", workspace: "Pessoal" }).title,
+    ).toBe(renderPush("pt-BR", { kind: "mention", waiting: false, actorType: "agent" }).title);
   });
 
   test("high risk follows the approval card's rule", () => {
@@ -552,6 +569,86 @@ describe("push delivery", () => {
       source: { channelId: f.general.id },
     });
     expect(await pushJobs()).toEqual([]);
+  });
+});
+
+describe("push names the workspace when a name repeats across the person's workspaces", () => {
+  /** Another workspace with these agents, the person a member of it unless `member: false`. */
+  async function otherWorkspace(
+    userId: string,
+    name: string,
+    agentNames: { name: string; archived?: boolean; deleted?: boolean }[],
+    member = true,
+  ) {
+    const [org] = await f.db.insert(schema.organizations).values({ name }).returning();
+    const orgId = org?.id ?? "";
+    if (member) await f.db.insert(schema.organizationMembers).values({ orgId, userId, role: "member" });
+    for (const [i, a] of agentNames.entries()) {
+      await f.db.insert(schema.agents).values({
+        orgId,
+        name: a.name,
+        handle: `agent-${i}`,
+        model: "claude-sonnet-5-5",
+        archivedAt: a.archived || a.deleted ? new Date() : null,
+        deletedAt: a.deleted ? new Date() : null,
+      });
+    }
+    return orgId;
+  }
+
+  test("only a name another workspace of theirs uses: case, accents and spacing don't count", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, "Dev")).toBeNull();
+    await otherWorkspace(bia.id, "Pessoal", [{ name: "  DÉV " }, { name: "Téo" }]);
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, "Dev")).toBe("Acme");
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, "Theo")).toBeNull();
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, "teo")).toBe("Acme");
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, null)).toBeNull();
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, "   ")).toBeNull();
+  });
+
+  test("not when the namesake is archived or deleted, or lives in a workspace the person isn't in", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await otherWorkspace(bia.id, "Antigo", [
+      { name: "Dev", archived: true },
+      { name: "Dev", deleted: true },
+    ]);
+    await otherWorkspace(bia.id, "Alheio", [{ name: "Dev" }], false);
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, "Dev")).toBeNull();
+  });
+
+  test("a name repeated only inside this workspace isn't told apart by its own name", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db
+      .insert(schema.agents)
+      .values({ orgId: f.org.id, name: "Dev", handle: "dev-2", model: "claude-sonnet-5-5" });
+    expect(await pushWorkspaceName(f.db, f.org.id, bia.id, "Dev")).toBeNull();
+  });
+
+  test("the push itself: the actor reads with this workspace's name, only for whom the name repeats", async () => {
+    f = await setup();
+    const { bia, push, drain } = await withPhone();
+    const eve = await addMember(f.db, f.org.id, "member", "eve");
+    await registerPushDevice(f.db, eve.id, { token: TOKEN_BIA_EN, platform: "ios", locale: "pt-BR" });
+    // Bia has another workspace with an agent also called "Dev"; Eve doesn't.
+    await otherWorkspace(bia.id, "Pessoal", [{ name: "Dev" }]);
+    for (const userId of [bia.id, eve.id]) {
+      await notify(deps(), {
+        orgId: f.org.id,
+        userIds: [userId],
+        kind: "mention",
+        groupKey: `mention:${userId}`,
+        actor: { type: "agent", id: f.agent.id },
+        source: { channelId: f.general.id, label: "general" },
+        latest: { text: "pode revisar?" },
+      });
+    }
+    await drain();
+    const titles = Object.fromEntries(push.sent.map((p) => [p.to, p.title]));
+    expect(titles).toEqual({ [TOKEN_BIA]: "Dev (Acme) mencionou você", [TOKEN_BIA_EN]: "Dev mencionou você" });
   });
 });
 
