@@ -63,6 +63,7 @@ import type { BlockSpecReader } from "./block-state";
 import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, someoneAnswers } from "./blocks";
 import { brainOf } from "./brain-settings";
 import { brainSessionId, missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
+import { withGroupBrain } from "./brains/groups";
 import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
 import {
@@ -1700,11 +1701,13 @@ async function executeRunInner(
   /** What the run's policy refused of the tools the agent's scopes grant: who is behind it held them back. */
   const heldBack: string[] = [];
   const stored = await getAgentCached(db, run.orgId, run.agentId);
-  // The right hand thinks with the AI of the person whose DM this is, when they chose their own (ADR 0137 §11).
-  const agent =
-    stored && isRightHand(stored)
+  // The right hand thinks with the AI of the person whose DM this is, when they chose their own (ADR 0137 §11); an
+  // agent on a brain group, with the member its group picks for this conversation (ADR 0180), as `resolveBrain` does.
+  const agent = !stored
+    ? stored
+    : isRightHand(stored)
       ? (await withPersonalBrain(db, stored, await rightHandPerson(db, stored, run))).agent
-      : stored;
+      : await withGroupBrain(db, stored, run.threadRootId ? { threadRootId: run.threadRootId } : {});
   // Claude Code defers our tools itself (its ToolSearch): a new run lists every tool the agent has, the same in every
   // run, instead of the groups a judge picks, so its cached prefix holds across runs and sessions (ADR 0043).
   if (needsContext && deps.toolsOnDemand && agent && brainOf(agent.brain) === "claude_code") {
@@ -2870,9 +2873,11 @@ async function executeRunInner(
   }
   if (brainPlan.kind !== "claude_code") onDemandForOtherBrain(transcript);
   // The run's effective brain (ADR 0053 §10): shared code reads it, never the agent's stored brain.
-  if (run.brain !== brainPlan.kind) {
-    await recordRunBrain(db, run.id, brainPlan.kind);
-    run = { ...run, brain: brainPlan.kind };
+  // Its account too, every turn: a group's next turn in this conversation keeps that member (ADR 0180).
+  const brainAccountId = brainPlan.kind === "model" ? null : (brainPlan.account?.id ?? null);
+  if (run.brain !== brainPlan.kind || (run.brainAccountId ?? null) !== brainAccountId) {
+    await recordRunBrain(db, run.id, brainPlan.kind, brainAccountId);
+    run = { ...run, brain: brainPlan.kind, brainAccountId };
     // A routine's ledger keeps the brain that ran it.
     const routineRunId = run.background ? routineRunIdOf(triggerMessage?.meta) : null;
     if (routineRunId) {
@@ -3241,8 +3246,8 @@ async function executeRunInner(
       brain = createBrain(deps, thinker, run, "model", turnToken, () => transcript as Transcript);
       onDemandForOtherBrain(t);
       await saveTranscript(db, t);
-      await recordRunBrain(db, run.id, "model");
-      run = { ...run, brain: "model" };
+      await recordRunBrain(db, run.id, "model", null);
+      run = { ...run, brain: "model", brainAccountId: null };
       await addRunStep(db, run, "context", { brainFallback: { from, code: u.code, message: u.message } });
       return "fallback";
     }

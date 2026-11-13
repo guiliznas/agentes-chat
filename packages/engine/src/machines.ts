@@ -673,6 +673,7 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       brain: agents.brain,
       account: agents.brainAccountId,
       builtin: agents.builtin,
+      groupId: agents.brainGroupId,
       locale: users.locale,
     })
     .from(agents)
@@ -685,6 +686,11 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
         // user holds those sign-ins while it thinks.
         or(
           eq(agents.machineId, machineId),
+          // An agent on a brain group with a member here (ADR 0180): its user holds that member's sign-in.
+          sql`exists (select 1 from ${schema.brainGroupMembers} gm join ${schema.machineAccounts} ma
+            on ma.org_id = gm.org_id and ma.id = gm.account_id
+            where gm.org_id = ${agents.orgId} and gm.group_id = ${agents.brainGroupId}
+              and ma.machine_id = ${machineId}::uuid)`,
           and(
             eq(agents.builtin, RIGHT_HAND),
             or(
@@ -712,11 +718,37 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
         )
         .where(and(eq(schema.rightHandBrains.orgId, orgId), eq(schema.machineAccounts.machineId, machineId)))
     : [];
+  const groupIds = [...new Set(rows.flatMap((a) => (a.builtin !== RIGHT_HAND && a.groupId ? [a.groupId] : [])))];
+  // A group's members on this computer, in its order (ADR 0180): the right hand is never on one.
+  const members =
+    groupIds.length > 0
+      ? await db
+          .select({ groupId: schema.brainGroupMembers.groupId, id: schema.brainGroupMembers.accountId })
+          .from(schema.brainGroupMembers)
+          .innerJoin(
+            schema.machineAccounts,
+            and(
+              eq(schema.machineAccounts.orgId, schema.brainGroupMembers.orgId),
+              eq(schema.machineAccounts.id, schema.brainGroupMembers.accountId),
+            ),
+          )
+          .where(
+            and(
+              eq(schema.brainGroupMembers.orgId, orgId),
+              inArray(schema.brainGroupMembers.groupId, groupIds),
+              eq(schema.machineAccounts.machineId, machineId),
+            ),
+          )
+          .orderBy(schema.brainGroupMembers.position)
+      : [];
   const listed = rows.map((a): MachineAgent => {
-    const own = a.builtin === RIGHT_HAND ? lentAccount(a) : null;
-    const extra = a.builtin === RIGHT_HAND ? [...new Set(personal.map((p) => p.id))].filter((id) => id !== own) : [];
-    // The right hand off any workspace plan here thinks only with people's own: the first is its frame's account.
-    const account = a.builtin === RIGHT_HAND ? (own ?? extra.shift() ?? null) : lentAccount(a);
+    const hand = a.builtin === RIGHT_HAND;
+    const own = hand ? lentAccount(a) : null;
+    const others = hand ? personal.map((p) => p.id) : members.filter((m) => m.groupId === a.groupId).map((m) => m.id);
+    const extra = [...new Set(others)].filter((id) => id !== (hand ? own : lentAccount(a)));
+    // The right hand off any workspace plan here thinks only with people's own, and an agent on a group with none of
+    // its own thinks with a member (ADR 0180): the first of those is its frame's account, the others stay lent too.
+    const account = hand ? (own ?? extra.shift() ?? null) : (lentAccount(a) ?? extra.shift() ?? null);
     return {
       id: a.id,
       handle: a.handle,

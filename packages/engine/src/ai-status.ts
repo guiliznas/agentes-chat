@@ -3,6 +3,7 @@ import { ensureOpenRouterModels, isAutoModel, routerModelOf } from "@agenteschat
 import type { Agent } from "./agents";
 import { autoModelFor, autoProvider } from "./auto-model";
 import { brainOf } from "./brain-settings";
+import { withGroupBrain } from "./brains/groups";
 import { brainAccountFor, computerBrainUnavailable, mayFallBack, NO_AI_CODES } from "./brains/select";
 import { BRAIN_PLAN_NAMES, type BrainKind, type ComputerBrainKind, isComputerBrain } from "./brains/types";
 import type { ModelGateway } from "./gateway";
@@ -80,7 +81,7 @@ type AiAgent = Pick<
   Agent,
   "orgId" | "model" | "credentialId" | "brain" | "brainFallback" | "brainAccountId" | "machineId"
 > &
-  Partial<Pick<Agent, "builtin" | "ownerUserId" | "planForOthers">>;
+  Partial<Pick<Agent, "id" | "builtin" | "ownerUserId" | "planForOthers" | "brainGroupId">>;
 
 /** The run being checked: a mission's turn thinks with the mission's brain, and background work never falls back. */
 type AiRun = Pick<AgentRun, "id" | "orgId" | "agentId" | "threadRootId" | "triggerMessageId" | "background">;
@@ -120,7 +121,15 @@ export async function agentAiState(
   background = false,
 ): Promise<AgentAi> {
   const person = run ? await rightHandPerson(deps.db, given, run) : (viewer ?? null);
-  const agent = await thinkingAgent(deps.db, given, person);
+  const thinking = await thinkingAgent(deps.db, given, person);
+  // On a brain group: the member it would think with now (ADR 0180), so a group with one that can is not "no AI".
+  const agent = thinking.id
+    ? await withGroupBrain(
+        deps.db,
+        { ...thinking, id: thinking.id },
+        run?.threadRootId ? { threadRootId: run.threadRootId } : {},
+      )
+    : thinking;
   // The workspace's plan while it serves only its owner: it thinks for nobody else, so for no work nobody is behind
   // either (its run refuses that as `plan_unattended`). A person it doesn't serve had no plan that does
   // (`servingPlanFor`): the line names whose the plans are.
@@ -239,6 +248,7 @@ const agentFields = {
   builtin: schema.agents.builtin,
   planForOthers: schema.agents.planForOthers,
   ownerUserId: schema.agents.ownerUserId,
+  brainGroupId: schema.agents.brainGroupId,
 };
 
 const activeAgents = (db: Executor, orgId: string) =>

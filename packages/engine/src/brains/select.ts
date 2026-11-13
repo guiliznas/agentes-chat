@@ -32,6 +32,7 @@ import { runnerUpdateWay } from "../runner-update";
 import type { AgentRun } from "../runs";
 import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
+import { withGroupBrain } from "./groups";
 import { BRAIN_NAMES, BRAIN_PLAN_NAMES, type BrainAccount, type BrainKind, type BrainSession } from "./types";
 
 const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"];
@@ -67,9 +68,15 @@ export function brainFor(
 export const runBrainOf = (run: { brain?: string | null }, agent?: { brain?: string | null } | null): BrainKind =>
   kindOf(run.brain ?? agent?.brain);
 
-/** Stores the brain a run thinks with now (`agent_runs.brain`). */
-export async function recordRunBrain(db: Executor, runId: string, kind: BrainKind) {
-  await db.update(schema.agentRuns).set({ brain: kind }).where(eq(schema.agentRuns.id, runId));
+/**
+ * Stores the brain a run thinks with now (`agent_runs.brain`) and, when given, the account (`brain_account_id`, null:
+ * none): a group's conversation keeps the member its last run thought with (ADR 0180).
+ */
+export async function recordRunBrain(db: Executor, runId: string, kind: BrainKind, accountId?: string | null) {
+  await db
+    .update(schema.agentRuns)
+    .set({ brain: kind, ...(accountId !== undefined ? { brainAccountId: accountId } : {}) })
+    .where(eq(schema.agentRuns.id, runId));
 }
 
 /**
@@ -786,7 +793,12 @@ export async function resolveBrain(
 ): Promise<BrainPlan> {
   const mission: MissionTurn | null = await missionTurnFor(deps.db, run).catch(() => null);
   // The right hand: the AI of the person whose DM this is, else the workspace's; on a plan, its computer and owner.
-  const agent = await thinkingAgent(deps.db, given, await rightHandPerson(deps.db, given, run));
+  // An agent on a brain group: the member its group picks for this conversation (ADR 0180).
+  const agent = await withGroupBrain(
+    deps.db,
+    await thinkingAgent(deps.db, given, await rightHandPerson(deps.db, given, run)),
+    run.threadRootId ? { threadRootId: run.threadRootId } : {},
+  );
   const kind = brainFor(agent, run, mission);
   const base = mission ? { missionId: mission.missionId } : {};
   if (kind === "model") return { kind, ...base };
