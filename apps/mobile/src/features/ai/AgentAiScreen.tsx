@@ -400,7 +400,8 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />
-                {kind &&
+                {/* On a group it goes whatever is saved under it, the API model too (ADR 0180). */}
+                {(kind || onGroup) &&
                 view.canEdit &&
                 (view.account !== null || ownRow || onGroup) &&
                 dir.agents.some((a) => a.id !== agentId) ? (

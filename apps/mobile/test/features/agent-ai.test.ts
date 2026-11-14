@@ -1307,9 +1307,23 @@ describe("brain groups on the phone (ADR 0180)", () => {
       speedFits: true,
     } as unknown as AgentBrain;
     const base = setupOfBrain(view);
-    expect(setupWithGroup(base, { group: onGroup })).toEqual({ ...base, group: "bg" } as typeof base);
-    expect(setupWithGroup(base, { group: null })).toBe(base);
-    expect(setupWithGroup(null, { group: onGroup })).toBeNull();
+    // The group goes alone (ADR 0180), as the web's: never the account, model or effort saved under it.
+    expect(setupWithGroup(base, { ...view, group: onGroup })).toEqual({
+      brain: "claude_code",
+      model: null,
+      group: "bg",
+    });
+    expect(setupWithGroup(base, { ...view, autonomy: "never", group: onGroup })).toEqual({
+      brain: "claude_code",
+      model: null,
+      group: "bg",
+      autonomy: "never",
+    });
+    expect(setupWithGroup(base, { ...view, group: null })).toBe(base);
+    // Saved over the API model (no computer setup of its own): still the group.
+    const api = { ...view, brain: "model" as const, computer: null } as unknown as AgentBrain;
+    expect(setupOfBrain(api)).toBeNull();
+    expect(setupWithGroup(null, { ...api, group: onGroup })).toEqual({ brain: "model", model: null, group: "bg" });
     // A group's effort and speed are its members' (ADR 0180 §10): never said as the setup's.
     const now = {
       effort: "high" as const,
@@ -1330,6 +1344,8 @@ describe("brain groups on the phone (ADR 0180)", () => {
     ).toBe("Trabalha no PC");
     const setup = await read("../../src/features/ai/AgentSetupScreen.tsx");
     expect(setup).toContain("setupWithGroup(setupOfBrain(view), view)");
+    // Offered on a group saved over the API model too.
+    expect(await read("../../src/features/ai/AgentAiScreen.tsx")).toContain("{(kind || onGroup) &&");
     const screen = await read("../../src/features/ai/AgentAiScreen.tsx");
     expect(screen).toContain('t(onGroup ? "brainGroups.agent.copyLine" : "agentPage.work.brain.copy.rowLine")');
   });

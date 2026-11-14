@@ -280,11 +280,17 @@ export function setupWords(
 }
 
 /**
- * "Usar em outros agentes" on a group (ADR 0180), as the web's: the group goes too, and the server skips an agent on
- * another computer (`other_computer`, said on its row).
+ * "Usar em outros agentes" on a group (ADR 0180), as the web's: the group goes alone, whatever is saved under it (the
+ * API model too), so each agent keeps its own brain, model and account; the server skips an agent on another computer
+ * (`other_computer`, said on its row). The Autonomia goes with it when it is in the view.
  */
-export const setupWithGroup = (setup: AgentSetup | null, view: Partial<Pick<AgentBrain, "group">>) =>
-  setup && view.group ? { ...setup, group: view.group.id } : setup;
+export const setupWithGroup = (
+  setup: AgentSetup | null,
+  view: Pick<AgentBrain, "brain"> & Partial<Pick<AgentBrain, "group" | "autonomy">>,
+): AgentSetup | null =>
+  view.group
+    ? { brain: view.brain, model: null, group: view.group.id, ...(view.autonomy ? { autonomy: view.autonomy } : {}) }
+    : setup;
 
 /**
  * What the phone's Criar agente sends for who thinks (ADR 0094): the last setup's API model and key at creation, and
