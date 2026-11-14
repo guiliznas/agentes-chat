@@ -11557,7 +11557,7 @@
     "deleted": "{{name}} supprimé.",
     "agent": {
       "now": "Réfléchit avec {{name}} en ce moment",
-      "noneNow": "Aucun compte du groupe ne peut réfléchir pour l’instant",
+      "noneNow": "Aucun compte du groupe ne peut réfléchir pour l’instant : comme à la limite, l’API répond si elle le peut, sinon il attend",
       "limitTitle": "Tous les comptes de {{group}} sont à leur limite",
       "limitHelp": "Le groupe continue avec le premier compte qui revient.",
       "order": "Ordre du groupe",

@@ -11437,7 +11437,7 @@ export const ptBR = {
     agent: {
       /** Under the group in use: the member a run would pick now; `name`: "Claude", "ChatGPT"… */
       now: "Pensando com {{name}} agora",
-      noneNow: "Nenhuma conta do grupo pode pensar agora",
+      noneNow: "Nenhuma conta do grupo pode pensar agora: como no limite, a API responde se puder, senão espera",
       /** Every member at its limit; `group`: the group's name. */
       limitTitle: "As contas do grupo {{group}} estão no limite",
       limitHelp: "O grupo segue com a primeira conta que voltar.",

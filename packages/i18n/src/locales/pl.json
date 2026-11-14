@@ -11977,7 +11977,7 @@
     "deleted": "Usunięto {{name}}.",
     "agent": {
       "now": "Teraz myśli z {{name}}",
-      "noneNow": "Żadne konto w grupie nie może teraz myśleć",
+      "noneNow": "Żadne konto w grupie nie może teraz myśleć: jak przy limicie odpowiada API, jeśli może, a jeśli nie, czeka",
       "limitTitle": "Wszystkie konta w {{group}} są na limicie",
       "limitHelp": "Grupa działa dalej z pierwszym kontem, które wróci.",
       "order": "Kolejność w grupie",

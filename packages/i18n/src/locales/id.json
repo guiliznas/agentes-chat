@@ -10740,7 +10740,7 @@
     "deleted": "{{name}} dihapus.",
     "agent": {
       "now": "Sedang berpikir dengan {{name}}",
-      "noneNow": "Tidak ada akun grup yang bisa berpikir sekarang",
+      "noneNow": "Tidak ada akun grup yang bisa berpikir sekarang: seperti saat batas, API menjawab jika boleh, jika tidak, ia menunggu",
       "limitTitle": "Semua akun di {{group}} sudah mencapai batas",
       "limitHelp": "Grup lanjut dengan akun pertama yang kembali.",
       "order": "Urutan grup",

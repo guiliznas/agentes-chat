@@ -11138,7 +11138,7 @@
     "deleted": "{{name}} gelöscht.",
     "agent": {
       "now": "Denkt gerade mit {{name}}",
-      "noneNow": "Kein Konto der Gruppe kann gerade denken",
+      "noneNow": "Kein Konto der Gruppe kann gerade denken: wie am Limit antwortet die API, wenn sie darf, sonst wartet es",
       "limitTitle": "Alle Konten in {{group}} sind am Limit",
       "limitHelp": "Die Gruppe macht mit dem ersten Konto weiter, das zurück ist.",
       "order": "Reihenfolge der Gruppe",

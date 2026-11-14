@@ -11201,7 +11201,7 @@
     "deleted": "{{name}} verwijderd.",
     "agent": {
       "now": "Denkt nu met {{name}}",
-      "noneNow": "Geen account van de groep kan nu denken",
+      "noneNow": "Geen account van de groep kan nu denken: net als bij de limiet antwoordt de API als dat mag, anders wacht het",
       "limitTitle": "Alle accounts in {{group}} zitten aan hun limiet",
       "limitHelp": "De groep gaat verder met het eerste account dat terug is.",
       "order": "Volgorde van de groep",

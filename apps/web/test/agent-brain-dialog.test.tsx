@@ -1206,7 +1206,11 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
     expect(brainScreen(d)).toBe("Quem pensa pela Ada");
     expect(inUse(d)).toMatchObject({
       title: "Dia a dia",
-      lines: ["Claude → ChatGPT · em ordem", "Nenhuma conta do grupo pode pensar agora"],
+      // What happens then (ADR 0180 §7): the rule of a group at its limit, never the agent's saved AI.
+      lines: [
+        "Claude → ChatGPT · em ordem",
+        "Nenhuma conta do grupo pode pensar agora: como no limite, a API responde se puder, senão espera",
+      ],
     });
   });
 

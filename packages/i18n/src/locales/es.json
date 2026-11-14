@@ -11488,7 +11488,7 @@
     "deleted": "{{name}} eliminado.",
     "agent": {
       "now": "Pensando con {{name}} ahora",
-      "noneNow": "Ninguna cuenta del grupo puede pensar ahora",
+      "noneNow": "Ninguna cuenta del grupo puede pensar ahora: como en el límite, responde la API si puede, si no, espera",
       "limitTitle": "Todas las cuentas de {{group}} están en el límite",
       "limitHelp": "El grupo sigue con la primera cuenta que vuelva.",
       "order": "Orden del grupo",

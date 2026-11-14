@@ -11077,7 +11077,7 @@
     "deleted": "{{name}} silindi.",
     "agent": {
       "now": "Şu an {{name}} ile düşünüyor",
-      "noneNow": "Gruptaki hiçbir hesap şu an düşünemiyor",
+      "noneNow": "Gruptaki hiçbir hesap şu an düşünemiyor: limitte olduğu gibi, izin varsa API yanıtlar, yoksa bekler",
       "limitTitle": "{{group}} içindeki tüm hesaplar limitte",
       "limitHelp": "Grup, ilk geri gelen hesapla devam eder.",
       "order": "Grubun sırası",

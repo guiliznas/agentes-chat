@@ -27170,7 +27170,7 @@
     "value": "Thinking with {{name}} now"
   },
   "brainGroups.agent.noneNow": {
-    "value": "No account in the group can think now"
+    "value": "No account in the group can think now: as at its limit, the API answers if it may, else it waits"
   },
   "brainGroups.agent.limitTitle": {
     "value": "Every account in {{group}} is at its limit"

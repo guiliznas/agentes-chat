@@ -11386,7 +11386,11 @@ export const en = {
     agent: {
       /** Under the group in use: the member a run would pick now; `name`: "Claude", "ChatGPT"… */
       now: "Thinking with {{name}} now",
-      noneNow: "No account in the group can think now",
+      /**
+       * No member can think for the agent (signed out, unshared, no longer serving its owner): as at the group's limit,
+       * its fallback to the workspace's API key answers when it is on, else it waits (ADR 0180 §7).
+       */
+      noneNow: "No account in the group can think now: as at its limit, the API answers if it may, else it waits",
       /** Every member at its limit; `group`: the group's name. */
       limitTitle: "Every account in {{group}} is at its limit",
       limitHelp: "The group goes on with the first account back.",
