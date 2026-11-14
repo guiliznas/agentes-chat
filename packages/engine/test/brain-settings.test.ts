@@ -255,8 +255,8 @@ const ANAS = "0193dddd-0000-4000-8000-0000000000a1";
 const BIAS = "0193dddd-0000-4000-8000-0000000000b1";
 
 /** Ana's computer, with Claude Code on it, and her agent Dev there on the API; Bia a member, Caio an admin. */
-async function world() {
-  const fx = await setup();
+async function world(options: { rightHand?: boolean } = {}) {
+  const fx = await setup(options);
   f = fx;
   const paired = await pairMachine({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, {
     name: "mac",
@@ -834,8 +834,8 @@ test("a model its plan's list dropped since: a save that repeats it goes through
 
 describe("a brain group (ADR 0180)", () => {
   /** Ana's agent on her Mac with Claude Code; a group of two shared accounts on the Mac, and a Linux computer. */
-  async function grouped() {
-    const w = await world();
+  async function grouped(options: { rightHand?: boolean } = {}) {
+    const w = await world(options);
     const { fx, machineId } = w;
     const shared = async (id: string, kind: string, label: string) => {
       await fx.db.insert(schema.machineAccounts).values({
@@ -868,7 +868,7 @@ describe("a brain group (ADR 0180)", () => {
   }
 
   test("an agent takes a group of its computer, and drops it when it moves", async () => {
-    const { fx, row, audits, group, claude, linuxId, save } = await grouped();
+    const { fx, row, audits, group, linuxId, save } = await grouped();
     await save({ brain: "claude_code" });
     const view = await save({ group: group.id });
     expect(view.group).toMatchObject({ id: group.id, name: "Time" });
@@ -882,27 +882,35 @@ describe("a brain group (ADR 0180)", () => {
     expect(await row()).toMatchObject({ brainGroupId: group.id });
     // A group that doesn't exist, or one of another computer, is refused.
     await expect(save({ group: Bun.randomUUIDv7() })).rejects.toMatchObject({ code: "brain_group.not_found" });
+    const linuxAccount = Bun.randomUUIDv7();
+    await fx.db.insert(schema.machineAccounts).values({
+      id: linuxAccount,
+      orgId: fx.org.id,
+      machineId: linuxId,
+      kind: "claude_code",
+      label: "Claude Linux",
+      status: "active",
+      createdBy: fx.owner.id,
+      shared: true,
+    });
     const other = await createBrainGroup(fx.db, fx.owner.id, fx.org.id, {
       machineId: linuxId,
       name: "Outro",
-      members: [],
-    }).catch(() => null);
-    if (other) await expect(save({ group: other.id })).rejects.toMatchObject({ code: "brain_group.other_computer" });
+      members: [{ accountId: linuxAccount }],
+    });
+    await expect(save({ group: other.id })).rejects.toMatchObject({ code: "brain_group.other_computer" });
     // Moving the agent to another computer lets go of the group, as of its account.
     await setAgentComputerTarget({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.agent.id, linuxId);
     expect(await row()).toMatchObject({ machineId: linuxId, brainGroupId: null, brainAccountId: null });
     // It can't take the first computer's group any more.
     await expect(save({ group: group.id })).rejects.toMatchObject({ code: "brain_group.other_computer" });
-    expect(claude).toBeTruthy();
   });
 
   test("the team's right hand takes no group", async () => {
-    const { fx, deps, group } = await grouped();
-    const hand = await fx.db
-      .select()
-      .from(schema.agents)
-      .where(eq(schema.agents.orgId, fx.org.id))
-      .then((rows) => rows.find((a) => a.builtin === "right_hand"));
+    const { fx, deps, group } = await grouped({ rightHand: true });
+    const rows = await fx.db.select().from(schema.agents).where(eq(schema.agents.orgId, fx.org.id));
+    const hand = rows.find((a) => a.builtin === "right_hand");
+    expect(hand).toBeDefined();
     if (!hand) return;
     await expect(
       setAgentBrain(deps, fx.owner.id, fx.org.id, hand.id, { scope: "workspace", group: group.id }),

@@ -5,6 +5,7 @@ import {
   type AgentSetupInput,
   applyAgentSetup,
   createAgent,
+  createBrainGroup,
   createSetupToolSource,
   ForbiddenError,
   getNewAgentSetup,
@@ -177,6 +178,34 @@ describe("Usar em outros agentes", () => {
     });
     // Again: they already think so.
     const again = await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.dev] });
+    expect(again).toEqual([{ agentId: w.dev, status: "same" }]);
+  });
+
+  test("a brain group goes to the agents on its computer; an agent on another computer keeps its own", async () => {
+    const w = await world();
+    const { fx, deps } = w;
+    const group = await createBrainGroup(fx.db, fx.owner.id, fx.org.id, {
+      machineId: w.mac,
+      name: "Time",
+      members: [{ accountId: ANAS }],
+    });
+    const result = await applyAgentSetup(deps, fx.owner.id, fx.org.id, {
+      setup: { ...ANA_CLAUDE(w.mac), group: group.id },
+      agentIds: [w.dev, w.theo, w.lia],
+    });
+    expect(result.map((r) => [r.agentId, r.status, r.reason])).toEqual([
+      [w.dev, "applied", undefined],
+      [w.theo, "applied", undefined],
+      [w.lia, "skipped", "other_computer"],
+    ]);
+    expect(await w.row(w.dev)).toMatchObject({ brainGroupId: group.id });
+    expect(await w.row(w.theo)).toMatchObject({ brainGroupId: group.id });
+    expect(await w.row(w.lia)).toMatchObject({ brainGroupId: null });
+    // Again: they already think so.
+    const again = await applyAgentSetup(deps, fx.owner.id, fx.org.id, {
+      setup: { ...ANA_CLAUDE(w.mac), group: group.id },
+      agentIds: [w.dev],
+    });
     expect(again).toEqual([{ agentId: w.dev, status: "same" }]);
   });
 

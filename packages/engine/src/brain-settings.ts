@@ -1880,8 +1880,15 @@ export async function agentBrainSummaries(
         ),
       );
     for (const g of found) groupInfo.set(g.id, g);
+    // Agents of one group and owner get the same pick (no conversation in mind): one lookup each, run together.
+    const picks = new Map<string, Promise<GroupMemberPick | null>>();
     for (const a of grouped) {
-      const pick = await pickGroupMember(db, { ...a, orgId, brainGroupId: a.brainGroupId as string });
+      const key = `${a.brainGroupId}:${a.machineId}:${a.ownerUserId}`;
+      if (!picks.has(key)) picks.set(key, pickGroupMember(db, { ...a, orgId, brainGroupId: a.brainGroupId as string }));
+    }
+    await Promise.all(picks.values());
+    for (const a of grouped) {
+      const pick = await picks.get(`${a.brainGroupId}:${a.machineId}:${a.ownerUserId}`);
       if (pick) members.set(a.id, pick);
     }
   }
