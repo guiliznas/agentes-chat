@@ -11200,12 +11200,13 @@
     "deleted": "{{name}} verwijderd.",
     "agent": {
       "now": "Denkt nu met {{name}}",
-      "noneNow": "Geen account van de groep heeft nu ruimte",
+      "noneNow": "Geen account van de groep kan nu denken",
       "limitTitle": "Alle accounts in {{group}} zitten aan hun limiet",
       "limitHelp": "De groep gaat verder met het eerste account dat terug is.",
       "order": "Volgorde van de groep",
       "pickerNote": "Elk account van de groep denkt met zijn eigen model.",
-      "open": "Groep bekijken"
+      "open": "Groep bekijken",
+      "copyLine": "Dezelfde groep en de autonomie"
     }
   },
   "brain": {

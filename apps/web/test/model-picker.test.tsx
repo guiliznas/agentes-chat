@@ -164,6 +164,9 @@ test("on a brain group (ADR 0180) the picker shows the group and the account thi
   // Each member thinks with its own model: no tiles or models to switch the agent's account with.
   expect(panel.querySelectorAll(".mp__tile, .mp__model")).toHaveLength(0);
   await click(within(panel).getByRole("button", { name: "Ver o grupo" }));
-  expect(screen().getByRole("dialog", { name: /^(Quem pensa pela Ada|Trocar a conta da Ada)$/ })).toBeTruthy();
+  // It lands on the first screen, the group in use with who thinks now.
+  const d = screen().getByRole("dialog", { name: "Quem pensa pela Ada" });
+  expect(d.querySelector(".arrival-lede__title")?.textContent).toBe("Quem pensa pela Ada");
+  expect(d.querySelector(".bd-use .arrival-have__title")?.textContent).toBe("Dia a dia");
   expect(state.calls.some((c) => c.method === "agents.setBrain")).toBe(false);
 });

@@ -477,14 +477,9 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   const usage: PlanUsage | null = view.group ? (groupNowMember?.usage ?? null) : (currentRow?.usage ?? null);
   const groupFull =
     groupMembers.length > 0 && groupMembers.every((m) => m.usage && planState(m.usage).state === "limited");
-  // No member able to think now (`current` null) reads as used up until the group's list says each one's limits: the
-  // dialog opens on its limit before that list is in.
-  const groupListed = groupRows.some((r) => r.current);
-  const limitedNow = view.group
-    ? view.group.current === null && (!groupListed || groupFull)
-    : usage
-      ? planState(usage).state === "limited"
-      : false;
+  // A group is spent only when the list says every member is at its limit by its own usage; a member signed out or
+  // gone isn't a limit (ADR 0180 §7). `BrainDialog` mounts once that list is in, so the first screen is decided on it.
+  const limitedNow = view.group ? groupFull : usage ? planState(usage).state === "limited" : false;
   // At its limit, its owner's free accounts of the same plan with room, never another agent's (`limitOffers`).
   const offers =
     limitedNow && kind !== "model" && own
@@ -547,7 +542,12 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
           : option?.models.find((m) => m.value === (view.effectiveModel ?? option?.defaultModel)),
   );
   const shownContext = savedContext !== null && contextOptions.includes(savedContext) ? savedContext : null;
-  const moreLine = advancedContents(t, { kind, autoModel: isAuto(modelNow), speed: speedOn });
+  // On a group the effort and the speed are each member's (ADR 0180 §10): the line names only what stays the agent's.
+  const moreLine = advancedContents(t, {
+    kind,
+    autoModel: isAuto(modelNow) || !own,
+    speed: speedOn && own,
+  });
   // The computers this brain runs on: a choice of its own only where there are several.
   const runsOn = kind === "model" ? [] : machines.filter((m) => m.options.some((o) => o.kind === kind && o.available));
 

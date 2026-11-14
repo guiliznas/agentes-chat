@@ -1,5 +1,5 @@
 import type { AgentBrain, AgentBrainInput, AgentSetup, BrainKind, MachineAccount } from "@agenteschat/client";
-import { keys, useAgents, useApi, useSetComputerTarget, useUpdateAgent } from "@agenteschat/client";
+import { keys, useAgents, useApi, useBrainGroups, useSetComputerTarget, useUpdateAgent } from "@agenteschat/client";
 import type { BrainScreen } from "@agenteschat/client/lib/agent-edit";
 import { autonomyWords, setupOutcome } from "@agenteschat/client/lib/agent-setup";
 import { signInPlan } from "@agenteschat/client/lib/ai-accounts";
@@ -122,9 +122,13 @@ const EFFORTS: readonly EffortLevel[] = EFFORT_LEVELS;
  * outro modelo" opens the model). One this person can't change opens the first screen.
  */
 export function BrainDialog({ onClose, at }: { onClose: () => void; at?: BrainScreen }) {
+  const { org } = useOrg();
   const work = useWork();
+  // On a brain group the first screen hangs on its members' limits (ADR 0180 §7): the groups' list is waited for too.
+  const groups = useBrainGroups(org.id, Boolean(work.brain.data?.group));
   // Every screen starts from what is saved: the dialog mounts once it is loaded.
   if (!work.brain.data || !work.computer.data) return null;
+  if (work.brain.data.group && groups.isPending) return null;
   return <BrainFlow view={work.brain.data} onClose={onClose} at={at} />;
 }
 
@@ -509,8 +513,9 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
     const input: AgentBrainInput = {};
     if (s.kind !== "model") {
       const was = isAuto(view.effort) ? AUTO : s.effort;
-      if (!isAuto(s.modelNow) && m.effort !== was) input.effort = m.effort;
-      if (s.speedOn && m.speed !== view.speed) input.speed = m.speed;
+      // On a group the effort and the speed are each member's (ADR 0180 §10): none of them saves here.
+      if (!s.group && !isAuto(s.modelNow) && m.effort !== was) input.effort = m.effort;
+      if (!s.group && s.speedOn && m.speed !== view.speed) input.speed = m.speed;
       if (m.fallback !== view.fallback) input.fallback = m.fallback;
       if (m.onlyOwner !== view.onlyOwner) input.onlyOwner = m.onlyOwner;
       if (m.extraUsage !== view.extraUsage) input.extraUsage = m.extraUsage;
@@ -561,7 +566,12 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
   };
 
   // ── "Usar em outros agentes" (ADR 0094): what is saved, each agent taking it by its own rules ──
-  const brainName = s.savedCard === "key" ? s.modelName : thinksWith(t, s.savedCard, s.modelName);
+  // On a group the others take the group (ADR 0180), named as it is: its members bring their own models.
+  const brainName = s.group
+    ? s.group.name
+    : s.savedCard === "key"
+      ? s.modelName
+      : thinksWith(t, s.savedCard, s.modelName);
   const where = s.homeOf(s.savedCard);
   const carried = withAutonomy ? view.autonomy : undefined;
   const autonomy = carried ? { autonomy: carried } : {};
@@ -587,6 +597,8 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
             contextTokens: s.shownContext,
             fallback: view.fallback,
             onlyOwner: view.onlyOwner,
+            // Its group goes too; the server skips an agent on another computer (`other_computer`), said on its row.
+            ...(s.group ? { group: s.group.id } : {}),
             ...autonomy,
           }
         : null;
@@ -594,11 +606,12 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
     brainName,
     ...advancedParts(t, i18n.language, {
       kind: s.kind,
-      autoModel: isAuto(s.modelNow),
+      // A group's effort and speed are its members' (ADR 0180 §10): never said as the setup's.
+      autoModel: isAuto(s.modelNow) || s.group !== null,
       apiKey: s.apiKey,
       now: {
         effort: s.effort,
-        speed: s.speedOn ? view.speed : "standard",
+        speed: s.speedOn && !s.group ? view.speed : "standard",
         contextTokens: s.shownContext,
         onlyOwner: view.onlyOwner,
         fallback: view.fallback,
@@ -609,8 +622,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
   // It thinks with nothing yet (a plan with no sign-in there): nothing to take elsewhere.
   const thinksWithNothing =
     s.kind !== "model" && s.currentRow?.kind === "plan" && view.accountsSupported && view.computer !== null;
-  // On a group what is saved under it isn't what thinks: nothing to take elsewhere from here (ADR 0180).
-  const copyOn = setup !== null && hasOthers && !thinksWithNothing && !s.group;
+  const copyOn = setup !== null && hasOthers && !thinksWithNothing;
   const copyTo = async (agentIds: string[], opens: { agent: string; owner: string }[]) => {
     if (!setup) return;
     // Letting more people talk to agents on other people's plans asks once, before anything saves.
@@ -993,6 +1005,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
       return (
         <div className="bd-lines">
           {s.kind !== "model" &&
+            !s.group &&
             line(
               "effort",
               t("agentPage.work.brain.effort"),
@@ -1012,6 +1025,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
               ),
             )}
           {s.speedOn &&
+            !s.group &&
             line(
               "speed",
               t("agentPage.work.brain.speed"),
@@ -1072,7 +1086,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
           {copyOn && (
             <BrainLine
               label={t("agentPage.work.brain.copy.row")}
-              value={t("agentPage.work.brain.copy.rowLine")}
+              value={t(s.group ? "brainGroups.agent.copyLine" : "agentPage.work.brain.copy.rowLine")}
               opensDialog
               onOpen={() => setCopying(true)}
             />

@@ -11556,12 +11556,13 @@
     "deleted": "{{name}} supprimé.",
     "agent": {
       "now": "Réfléchit avec {{name}} en ce moment",
-      "noneNow": "Aucun compte du groupe n’a de marge pour l’instant",
+      "noneNow": "Aucun compte du groupe ne peut réfléchir pour l’instant",
       "limitTitle": "Tous les comptes de {{group}} sont à leur limite",
       "limitHelp": "Le groupe continue avec le premier compte qui revient.",
       "order": "Ordre du groupe",
       "pickerNote": "Chaque compte du groupe réfléchit avec son propre modèle.",
-      "open": "Voir le groupe"
+      "open": "Voir le groupe",
+      "copyLine": "Le même groupe et l’autonomie"
     }
   },
   "brain": {

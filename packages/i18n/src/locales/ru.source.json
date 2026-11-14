@@ -27167,7 +27167,7 @@
     "value": "Thinking with {{name}} now"
   },
   "brainGroups.agent.noneNow": {
-    "value": "No account in the group has room now"
+    "value": "No account in the group can think now"
   },
   "brainGroups.agent.limitTitle": {
     "value": "Every account in {{group}} is at its limit"
@@ -27183,6 +27183,9 @@
   },
   "brainGroups.agent.open": {
     "value": "See the group"
+  },
+  "brainGroups.agent.copyLine": {
+    "value": "The same group and autonomy"
   },
   "brain.group.line.order": {
     "value": "{{names}} · in order"

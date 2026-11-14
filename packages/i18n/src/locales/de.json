@@ -11137,12 +11137,13 @@
     "deleted": "{{name}} gelöscht.",
     "agent": {
       "now": "Denkt gerade mit {{name}}",
-      "noneNow": "Kein Konto der Gruppe hat gerade Luft",
+      "noneNow": "Kein Konto der Gruppe kann gerade denken",
       "limitTitle": "Alle Konten in {{group}} sind am Limit",
       "limitHelp": "Die Gruppe macht mit dem ersten Konto weiter, das zurück ist.",
       "order": "Reihenfolge der Gruppe",
       "pickerNote": "Jedes Konto der Gruppe denkt mit seinem eigenen Modell.",
-      "open": "Gruppe ansehen"
+      "open": "Gruppe ansehen",
+      "copyLine": "Dieselbe Gruppe und die Autonomie"
     }
   },
   "brain": {

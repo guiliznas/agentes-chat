@@ -11487,12 +11487,13 @@
     "deleted": "{{name}} eliminado.",
     "agent": {
       "now": "Pensando con {{name}} ahora",
-      "noneNow": "Ninguna cuenta del grupo tiene margen ahora",
+      "noneNow": "Ninguna cuenta del grupo puede pensar ahora",
       "limitTitle": "Todas las cuentas de {{group}} están en el límite",
       "limitHelp": "El grupo sigue con la primera cuenta que vuelva.",
       "order": "Orden del grupo",
       "pickerNote": "Cada cuenta del grupo piensa con su propio modelo.",
-      "open": "Ver el grupo"
+      "open": "Ver el grupo",
+      "copyLine": "El mismo grupo y la autonomía"
     }
   },
   "brain": {

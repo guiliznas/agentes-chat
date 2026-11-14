@@ -236,7 +236,7 @@ function GroupBody({
             icon="layers"
             onClick={() => {
               onClose();
-              openPanel(agent.id, "settings", "brain:switch");
+              openPanel(agent.id, "settings", "brain");
             }}
           >
             {t("brainGroups.agent.open")}

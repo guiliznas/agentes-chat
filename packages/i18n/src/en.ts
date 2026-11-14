@@ -11384,7 +11384,7 @@ export const en = {
     agent: {
       /** Under the group in use: the member a run would pick now; `name`: "Claude", "ChatGPT"… */
       now: "Thinking with {{name}} now",
-      noneNow: "No account in the group has room now",
+      noneNow: "No account in the group can think now",
       /** Every member at its limit; `group`: the group's name. */
       limitTitle: "Every account in {{group}} is at its limit",
       limitHelp: "The group goes on with the first account back.",
@@ -11393,6 +11393,8 @@ export const en = {
       /** The model picker in place, on a group. */
       pickerNote: "Each account in the group thinks with its own model.",
       open: "See the group",
+      /** "Usar em outros agentes" on a group: what the others take. */
+      copyLine: "The same group and autonomy",
     },
   },
   brain: {

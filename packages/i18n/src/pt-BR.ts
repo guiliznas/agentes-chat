@@ -11435,7 +11435,7 @@ export const ptBR = {
     agent: {
       /** Under the group in use: the member a run would pick now; `name`: "Claude", "ChatGPT"… */
       now: "Pensando com {{name}} agora",
-      noneNow: "Nenhuma conta do grupo tem folga agora",
+      noneNow: "Nenhuma conta do grupo pode pensar agora",
       /** Every member at its limit; `group`: the group's name. */
       limitTitle: "As contas do grupo {{group}} estão no limite",
       limitHelp: "O grupo segue com a primeira conta que voltar.",
@@ -11444,6 +11444,8 @@ export const ptBR = {
       /** The model picker in place, on a group. */
       pickerNote: "Cada conta do grupo pensa com o próprio modelo.",
       open: "Ver o grupo",
+      /** "Usar em outros agentes" on a group: what the others take. */
+      copyLine: "O mesmo grupo e a autonomia",
     },
   },
   brain: {

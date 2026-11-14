@@ -19,6 +19,7 @@ import {
 } from "./ai-picker";
 import {
   ADA_ID,
+  ATLAS_ID,
   createFakeApi,
   fakeAgentBrain,
   fakeMachinesOf,
@@ -1072,9 +1073,14 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
    * Ada on Claude Code on the MacBook with the given groups; `thinking`: the group it already thinks with. The brain's
    * `group` is the fake server's, which `setBrain` `{ group }` changes.
    */
-  async function withGroups(groups: BrainGroup[], thinking?: string) {
+  async function withGroups(
+    groups: BrainGroup[],
+    thinking?: string,
+    tweak?: (state: ReturnType<typeof seedState>, api: ReturnType<typeof createFakeApi>) => void,
+  ) {
     const state = seedState();
     const api = createFakeApi(state);
+    tweak?.(state, api);
     pairMac(api, true);
     await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
     fakeMachinesOf.get(api)?.setBrainGroups(groups);
@@ -1138,6 +1144,103 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
       { group: "bg_daily" },
       { brain: "claude_code", account: null, model: null, group: null },
     ]);
+  });
+
+  test("Mais opções on a group: no effort or speed, the member's own (ADR 0180 §10); its line says only what stays the agent's", async () => {
+    const { state } = await withGroups([daily], "bg_daily");
+    const d = await brainDialog();
+    expect(brainLines(d)).toEqual([{ label: "Mais opções", value: "Janela de contexto e quem atende" }]);
+    await toScreen(d, "Mais opções");
+    const labels = brainLines(d).map((l) => l.label);
+    expect(labels).toContain("Janela de contexto");
+    expect(labels).not.toContain("Esforço");
+    expect(labels).not.toContain("Velocidade");
+    // What the others would take is the group, not a model or an effort of its own.
+    expect(brainLines(d).find((l) => l.label === "Usar em outros agentes")?.value).toBe("O mesmo grupo e a autonomia");
+    // "Voltar ao padrão" then Concluído saves nothing of the effort or speed either.
+    const defaults = within(d).getByRole("button", { name: "Voltar ao padrão" }) as HTMLButtonElement;
+    if (!defaults.disabled) await click(defaults);
+    await done(d);
+    await settle(4);
+    for (const call of brainCalls(state)) {
+      expect(call).not.toHaveProperty("effort");
+      expect(call).not.toHaveProperty("speed");
+    }
+  });
+
+  test("while the groups are loading the dialog says nothing yet; then, every member at its limit, it opens on the group's order", async () => {
+    const full: BrainGroup = {
+      ...daily,
+      members: [member("acct_claude", "Trabalho", "claude_code", 100), member("acct_codex", "Pessoal", "codex", 100)],
+    };
+    let release = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    await withGroups([full], "bg_daily", (_state, api) => {
+      const list = api.brainGroups.list;
+      api.brainGroups.list = async (...args) => {
+        await gate;
+        return list(...args);
+      };
+    });
+    await click(screen().getByRole("button", { name: "Mudar quem pensa" }));
+    await settle(4);
+    // No "every account is at its limit" before the members' limits are known, and no empty order.
+    expect(screen().queryByRole("dialog", { name: /^(As contas do grupo|Quem pensa)/ })).toBeNull();
+    await act(async () => release());
+    await settle(6);
+    const d = screen().getByRole("dialog", { name: "As contas do grupo Dia a dia estão no limite" });
+    expect(brainRows(d).filter((r) => r.group === "Ordem do grupo")).toHaveLength(2);
+  });
+
+  test("no member can think for another reason (signed out): the first screen, never 'at its limit'", async () => {
+    const out: BrainGroup = {
+      ...daily,
+      members: daily.members.map((m) => ({ ...m, status: "signed_out" })),
+    };
+    await withGroups([out], "bg_daily");
+    const d = await brainDialog();
+    expect(brainScreen(d)).toBe("Quem pensa pela Ada");
+    expect(inUse(d)).toMatchObject({
+      title: "Dia a dia",
+      lines: ["Claude → ChatGPT · em ordem", "Nenhuma conta do grupo pode pensar agora"],
+    });
+  });
+
+  test("Usar em outros agentes on a group copies the group; an agent on another computer is skipped, said why", async () => {
+    const LIA_ID = "00000000-0000-4000-8000-0000000000a9";
+    const { state } = await withGroups([daily], "bg_daily", (st) => {
+      const [, atlas] = st.agents;
+      if (!atlas) throw new Error("no Atlas");
+      st.agents.push({ ...atlas, id: LIA_ID, name: "Lia", handle: "lia" });
+      // As the server answers (`agent-setup`): a group goes only to agents on its computer.
+      st.setupResults = { [LIA_ID]: { status: "skipped", reason: "other_computer", params: { computer: "PC" } } };
+    });
+    const copyCalls = () => state.calls.filter((c) => c.method === "agents.applySetup").map((c) => c.args[1]);
+    const d = await brainDialog();
+    await toScreen(d, "Mais opções");
+    await toScreen(d, "Usar em outros agentes");
+    await settle(4);
+    const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
+    expect(c.textContent).toContain("Dia a dia");
+    expect(copyCalls()).toEqual([
+      {
+        setup: expect.objectContaining({ group: "bg_daily", machineId: "machine_1" }),
+        agentIds: expect.any(Array),
+        preview: true,
+      },
+    ]);
+    const lia = within(c).getByRole("checkbox", { name: /^Lia/ });
+    expect(lia.closest("label")?.textContent).toContain("Trabalha no PC");
+    expect(lia.hasAttribute("disabled")).toBe(true);
+    await click(within(c).getByRole("checkbox", { name: /^Todos/ }));
+    await click(within(c).getByRole("button", { name: "Usar em 1 agente" }));
+    await settle(6);
+    expect(copyCalls().at(-1)).toEqual({
+      setup: expect.objectContaining({ group: "bg_daily" }),
+      agentIds: [ATLAS_ID],
+    });
   });
 
   test("every member at its limit: the limit screen shows the group's order, each with its limit, never other accounts", async () => {

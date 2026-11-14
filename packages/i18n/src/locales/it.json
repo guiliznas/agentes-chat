@@ -11570,12 +11570,13 @@
     "deleted": "{{name}} eliminato.",
     "agent": {
       "now": "Sta pensando con {{name}} ora",
-      "noneNow": "Nessun account del gruppo ha margine ora",
+      "noneNow": "Nessun account del gruppo può pensare ora",
       "limitTitle": "Tutti gli account di {{group}} sono al limite",
       "limitHelp": "Il gruppo prosegue con il primo account che torna.",
       "order": "Ordine del gruppo",
       "pickerNote": "Ogni account del gruppo pensa con il proprio modello.",
-      "open": "Vedi il gruppo"
+      "open": "Vedi il gruppo",
+      "copyLine": "Lo stesso gruppo e l’autonomia"
     }
   },
   "brain": {

@@ -10749,12 +10749,13 @@
     "deleted": "已删除 {{name}}。",
     "agent": {
       "now": "正在用 {{name}} 思考",
-      "noneNow": "群组里目前没有还有余量的账号",
+      "noneNow": "群组里目前没有能思考的账号",
       "limitTitle": "{{group}} 中的所有账号都已到上限",
       "limitHelp": "群组会用第一个恢复的账号继续。",
       "order": "群组顺序",
       "pickerNote": "群组中的每个账号都用自己的模型思考。",
-      "open": "查看群组"
+      "open": "查看群组",
+      "copyLine": "相同的群组和自主权"
     }
   },
   "brain": {

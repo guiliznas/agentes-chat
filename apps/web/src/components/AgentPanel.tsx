@@ -31,10 +31,12 @@ export function AgentPanel({
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const name = dir.agentById.get(agentId)?.name ?? "";
-  // "brain:<screen>" (the model picker's "Mais opções"): "Quem pensa" opens on that screen.
+  // "brain:<screen>" (the model picker's "Mais opções"): "Quem pensa" opens on that screen; "brain" (the picker's "Ver o
+  // grupo", ADR 0180): on its first one.
   const brainAt = tab === "settings" && item?.startsWith("brain:") ? (item.slice(6) as BrainScreen) : undefined;
+  const brainOpen = tab === "settings" && (item === "brain" || brainAt !== undefined);
   const [place, setPlace] = useState<{ tab: AgentTab; section?: AgentSection }>(() =>
-    brainAt ? { tab: "settings", section: "brain" } : { tab: tab ?? "overview" },
+    brainOpen ? { tab: "settings", section: "brain" } : { tab: tab ?? "overview" },
   );
   const [closeRequest, setCloseRequest] = useState(0);
   const request = () => setCloseRequest((n) => n + 1);
@@ -58,7 +60,7 @@ export function AgentPanel({
           agentId={agentId}
           tab={place.tab}
           section={place.section}
-          {...(brainAt ? { brainAt } : { item })}
+          {...(brainAt ? { brainAt } : brainOpen ? {} : { item })}
           onNavigate={(tab, section) => setPlace({ tab, section })}
           onClose={onClose}
           closeRequest={closeRequest}
