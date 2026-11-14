@@ -1,7 +1,9 @@
 import type {
+  Agent,
   AgentBrain,
   AgentBrainInput,
   AiAccounts,
+  BrainGroup,
   BrainKind,
   Credential,
   Edition,
@@ -41,6 +43,8 @@ import {
 } from "@agenteschat/client/lib/no-ai";
 import { brainPlan } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, keyLine } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { planState } from "@agenteschat/ui/plan-state";
 import type { TFunction } from "i18next";
 
 /*
@@ -144,14 +148,46 @@ export function modelSections(rows: ModelRow[]): { maker?: string; rows: ModelRo
  * staying Automático, as the web's cards do.
  */
 export function accountInput(
-  view: Pick<AgentBrain, "brain" | "account" | "accounts" | "effectiveModel">,
+  view: Pick<AgentBrain, "brain" | "account" | "accounts" | "effectiveModel"> & Partial<Pick<AgentBrain, "group">>,
   a: Pick<MachineAccount, "id" | "kind" | "provider"> | null,
-): Pick<AgentBrainInput, "account" | "model"> {
+): Pick<AgentBrainInput, "account" | "model" | "group"> {
   const kind = accountKindOf(view.brain);
   const next = a ? planOfAccount(a) : kind ? planOfAccount({ kind, provider: null }) : null;
-  if (next === aiChoiceOf(view)) return { account: a?.id ?? null };
-  return { account: a?.id ?? null, model: isAuto(view.effectiveModel) ? AUTO : null };
+  // ADR 0180 §6: off a group, what is picked takes over again; the group goes with the same save.
+  const offGroup = view.group ? { group: null } : {};
+  if (next === aiChoiceOf(view)) return { account: a?.id ?? null, ...offGroup };
+  return { account: a?.id ?? null, model: isAuto(view.effectiveModel) ? AUTO : null, ...offGroup };
 }
+
+/** A brain group picked (ADR 0180): only the group; the account and model under it stay, what leaving goes back to. */
+export const groupInput = (groupId: string): Pick<AgentBrainInput, "group"> => ({ group: groupId });
+
+/**
+ * The brain groups the agent's page offers (ADR 0180), as the web's "Quem pensa": those of its computer with members
+ * (another computer's is refused, `brain_group.other_computer`); none to the right hand (§9) nor its scoped AIs.
+ */
+export function agentGroups(
+  groups: readonly BrainGroup[] | undefined,
+  view: Pick<AgentBrain, "computer"> & Partial<Pick<AgentBrain, "scope">>,
+  agent: Pick<Agent, "builtin"> | undefined,
+): BrainGroup[] {
+  if (!groupsOffered(view, agent) || view.computer === null) return [];
+  const on = view.computer.machineId;
+  return (groups ?? []).filter((g) => g.machineId === on && g.members.length > 0);
+}
+
+/** Whether the agent's page offers groups at all (`agentGroups`), so the list is loaded only then. */
+export const groupsOffered = (
+  view: Pick<AgentBrain, "computer"> & Partial<Pick<AgentBrain, "scope">>,
+  agent: Pick<Agent, "builtin"> | undefined,
+) => !isRightHand(agent) && view.scope === undefined && view.computer !== null;
+
+/**
+ * Every member of a group at its limit by its own usage (ADR 0180 §7): only then is the group spent. A member whose
+ * usage isn't known yet, or signed out, isn't at its limit.
+ */
+export const groupSpent = (members: readonly Pick<BrainGroup["members"][number], "usage">[]) =>
+  members.length > 0 && members.every((m) => m.usage !== null && planState(m.usage).state === "limited");
 
 type ThinkingView = Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account">;
 

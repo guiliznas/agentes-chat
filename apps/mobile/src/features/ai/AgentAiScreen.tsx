@@ -1,5 +1,13 @@
-import type { AgentBrain, AgentBrainInput, BrainScope, MachineAccount } from "@agenteschat/client";
-import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } from "@agenteschat/client";
+import type { AgentBrain, AgentBrainInput, BrainGroup, BrainScope, MachineAccount } from "@agenteschat/client";
+import {
+  keys,
+  useAgentBrain,
+  useAiAccounts,
+  useApi,
+  useBrainGroups,
+  useMachines,
+  useModels,
+} from "@agenteschat/client";
 import {
   accountChoices,
   offersSignInAgain,
@@ -9,9 +17,10 @@ import {
 } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedContents, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
+import { groupLine } from "@agenteschat/client/lib/brain-groups";
 import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
+import { aiChoiceOf, planLabel, planOfAccount, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { modelLimitText } from "@agenteschat/client/lib/plan-usage";
 import { brainPlan, geminiPersonal, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
@@ -51,6 +60,10 @@ import {
   accountRow,
   accountSaved,
   agentAccounts,
+  agentGroups,
+  groupInput,
+  groupSpent,
+  groupsOffered,
   modelInput,
   modelRows,
   modelSections,
@@ -70,6 +83,11 @@ import { AiRow, Note, PlanHoldNote, usePlanHold } from "./parts";
  * its own). Each choice saves at once. Another AI, or one more login of an account other agents think with where it
  * may have one per agent ("Também usada por Theo"), goes through Connect an AI. Its owner and admins open it; only its
  * owner picks an account or lets other people talk to it on the plan (`canUsePlans`).
+ *
+ * ADR 0180: its computer's brain groups are listed under the accounts, each one way to think like an account. A group
+ * saves only the group (the account under it stays, what leaving goes back to); an account picked then leaves it
+ * (`group: null`). On a group each member has its own model and effort (§10): no "Modelo" row, and the usage is the
+ * member's thinking now, spent only when every member is at its limit (§7). None to the right hand (§9).
  */
 
 /** Opens an agent's AI. */
@@ -154,8 +172,27 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     });
   const computer = computerNameOf(t, org?.name ?? "", view?.computer?.name ?? "", isPersonal(org));
   const mayPick = view !== undefined && !busy;
+  // Its computer's brain groups (ADR 0180); the one in use lists its members' usage, so it waits for the list too.
+  const groupsOn = allowed && view !== undefined && groupsOffered(view, agent);
+  const groupsList = useBrainGroups(orgId, groupsOn);
+  const groups = view ? agentGroups(groupsList.data, view, agent) : [];
+  const onGroup = view?.group != null;
+  const inUse = view?.group ? groups.find((gr) => gr.id === view.group?.id) : undefined;
+  const nowMember = inUse?.members.find((m) => m.accountId === view?.group?.current?.accountId);
+  const memberName = (m: Pick<BrainGroup["members"][number], "kind" | "provider">) =>
+    planLabel(t, planOfAccount({ kind: m.kind as MachineAccount["kind"], provider: m.provider }));
+  /** "Pensando com Claude agora", or that none of its accounts can think now. */
+  const groupNow = view?.group
+    ? view.group.current
+      ? t("brainGroups.agent.now", { name: memberName(nowMember ?? { ...view.group.current, provider: null }) })
+      : t("brainGroups.agent.noneNow")
+    : null;
+  const chooseGroup = (gr: BrainGroup) => {
+    if (!view || !mayPick || view.group?.id === gr.id) return;
+    void save(groupInput(gr.id), t("agentPage.work.saved.brain", { ...g, brain: gr.name }));
+  };
   const choose = (a: MachineAccount | null) => {
-    if (!view || !mayPick || (a?.id ?? null) === view.account) return;
+    if (!view || !mayPick || (!view.group && (a?.id ?? null) === view.account)) return;
     const input = accountInput(view, a);
     const done = (saved: AgentBrain) => accountSaved(t, i18n.language, name, a, input, saved);
     const others = a ? takenFrom(a, name) : [];
@@ -167,10 +204,11 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     ]);
   };
 
-  const usage = view && kind ? thinkingUsage(view, kind) : undefined;
-  const limited = usage ? planState(usage).state === "limited" : false;
-  const modelLimit = modelLimitText(t, i18n.language, usage, current?.provider, model?.value);
-  const offers = limited && kind && view ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
+  // On a group, the limits of the member thinking now; it is at its limit only when every member is.
+  const usage = onGroup ? (nowMember?.usage ?? undefined) : view && kind ? thinkingUsage(view, kind) : undefined;
+  const limited = onGroup ? groupSpent(inUse?.members ?? []) : usage ? planState(usage).state === "limited" : false;
+  const modelLimit = onGroup ? null : modelLimitText(t, i18n.language, usage, current?.provider, model?.value);
+  const offers = limited && kind && view && !onGroup ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
   const signedOut = current != null && signInOf(current) === "signed_out" && current.mine;
   const signInAgain = current != null && offersSignInAgain(current) && current.mine;
   // A coding plan's key that its endpoint refused: a new key, on that plan's page.
@@ -225,7 +263,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     <GroupedRow
                       leading={<ProviderLogo id={kind} size="sm" />}
                       label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer, kind)}
-                      checked={view.account === null}
+                      checked={!onGroup && view.account === null}
                       disabled={!mayPick}
                       onPress={() => choose(null)}
                     />
@@ -234,7 +272,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     <AiRow
                       key={c.login.id}
                       row={accountRow(t, c, name)}
-                      checked={c.login.id === view.account}
+                      checked={!onGroup && c.login.id === view.account}
                       disabled={!mayPick}
                       onPress={() => (c.also ? connect(c.login, true) : choose(c.login))}
                     />
@@ -264,7 +302,38 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 {accountNote ? <GroupedFooter>{accountNote}</GroupedFooter> : null}
               </>
             ) : null}
-            {kind ? (
+            {groups.length > 0 || view.group ? (
+              <>
+                <GroupedHeader>{t("brainGroups.title")}</GroupedHeader>
+                <GroupedList>
+                  {groups.map((gr) => {
+                    const here = view.group?.id === gr.id;
+                    // The member a run would pick now; else its first, whose mark it wears.
+                    const lead = (here ? nowMember : undefined) ?? gr.members[0];
+                    return (
+                      <GroupedRow
+                        key={gr.id}
+                        leading={lead ? <ProviderLogo id={lead.provider ?? lead.kind} size="sm" /> : undefined}
+                        label={gr.name}
+                        sub={groupLine(t, gr)}
+                        {...(here && groupNow ? { belowText: groupNow } : {})}
+                        checked={here}
+                        disabled={!mayPick || !view.canEdit}
+                        onPress={() => chooseGroup(gr)}
+                      />
+                    );
+                  })}
+                  {/* The group it thinks with has its row even before the list is in (or once it can't see it). */}
+                  {view.group && !inUse ? (
+                    <GroupedRow icon="brain" label={view.group.name} {...(groupNow ? { sub: groupNow } : {})} checked />
+                  ) : null}
+                </GroupedList>
+                {limited && view.group ? (
+                  <GroupedFooter>{t("brainGroups.agent.limitTitle", { group: view.group.name })}</GroupedFooter>
+                ) : null}
+              </>
+            ) : null}
+            {kind && !onGroup ? (
               <>
                 <GroupedHeader>{t("agentPage.work.brain.planModel")}</GroupedHeader>
                 <GroupedList>
@@ -307,7 +376,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       onPress={() => void save({ extraUsage: !view.extraUsage }, t("usageCard.extraTitle"))}
                     />
                   ) : null}
-                  {limited && view.canUsePlans && view.canManageAccounts ? (
+                  {limited && !onGroup && view.canUsePlans && view.canManageAccounts ? (
                     <GroupedRow
                       icon="plus"
                       label={t("aiAccounts.usage.offer.connect")}
@@ -322,15 +391,17 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               <GroupedList>
                 <GroupedRow
                   label={t("agentPage.work.brain.advanced.title")}
+                  // On a group the effort and the speed are each member's (ADR 0180 §10): the line names what stays.
                   sub={advancedContents(t, {
                     kind: view.brain,
-                    autoModel: isAuto(view.effectiveModel),
-                    speed: viewSpeedFits(view),
+                    autoModel: isAuto(view.effectiveModel) || onGroup,
+                    speed: viewSpeedFits(view) && !onGroup,
                   })}
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />
                 {kind &&
+                !onGroup &&
                 view.canEdit &&
                 (view.account !== null || ownRow) &&
                 dir.agents.some((a) => a.id !== agentId) ? (

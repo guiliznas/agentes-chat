@@ -1,21 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
+import type { AgentBrain, BrainGroup, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
 import { setupPlanQuestion } from "@agenteschat/client/lib/audience";
 import { CURSOR_KEY_PLAN, geminiPersonal, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
 import { markOf } from "@agenteschat/ui/brand/marks";
 import type { TFunction } from "i18next";
+import { membersInput, moveSlot, slotsOf, startSlots } from "../../src/features/ai/groups";
 import {
   accountInput,
   accountKindOf,
   accountRow,
   accountSaved,
   agentAccounts,
+  agentGroups,
   existingRows,
   flowBack,
+  groupInput,
+  groupSpent,
   modelInput,
   modelRows,
   modelSections,
@@ -955,8 +959,9 @@ describe("the agent's AI", () => {
     const advanced = await Bun.file(
       new URL("../../src/features/ai/AgentAdvancedScreen.tsx", import.meta.url).pathname,
     ).text();
-    // Velocidade as on the web: only where it fits, read-only for who can't edit, saved at once.
-    expect(advanced).toContain("{viewSpeedFits(view) ? (");
+    // Velocidade as on the web: only where it fits (never on a brain group, ADR 0180 §10), read-only for who can't
+    // edit, saved at once.
+    expect(advanced).toContain("{viewSpeedFits(view) && !onGroup ? (");
     expect(advanced).toContain('t("agentPage.work.brain.speedText")');
     expect(advanced).toContain("disabled={!view.canEdit}");
     expect(advanced).toContain('speed: viewSpeedFits(view) ? view.speed : "standard"');
@@ -1142,5 +1147,133 @@ describe("Outro provedor on the phone", () => {
     );
     expect(form).toContain('<IconButton icon="plus" label={t("endpoint.add")}');
     expect(form).toContain("withoutModel(d, m.id)");
+  });
+});
+
+describe("brain groups on the phone (ADR 0180)", () => {
+  const read = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();
+  const member: BrainGroup["members"][number] = {
+    accountId: "cl",
+    label: "Pessoal",
+    kind: "claude_code",
+    provider: null,
+    model: null,
+    effort: null,
+    status: "active",
+    usage: null,
+  };
+  const group = (id: string, over: Partial<BrainGroup> = {}): BrainGroup => ({
+    id,
+    machineId: "m1",
+    name: id,
+    strategy: "order",
+    members: [member],
+    usedBy: [],
+    canEdit: true,
+    ...over,
+  });
+  const onGroup = {
+    id: "bg",
+    name: "Diário",
+    strategy: "order" as const,
+    current: { accountId: "cl", label: "Pessoal", kind: "claude_code" as const },
+  };
+
+  test("picking an account on a group leaves it (group: null); off a group nothing about groups is sent", () => {
+    const claude = account("cl");
+    const work = account("cl2");
+    const view = (g: AgentBrain["group"]) => ({
+      brain: "claude_code" as const,
+      account: "cl",
+      accounts: [claude, work],
+      effectiveModel: "opus",
+      group: g,
+    });
+    expect(accountInput(view(onGroup), work)).toEqual({ account: "cl2", group: null });
+    // The account saved under the group is picked again: the group still goes.
+    expect(accountInput(view(onGroup), claude)).toEqual({ account: "cl", group: null });
+    expect(accountInput(view(onGroup), null)).toEqual({ account: null, group: null });
+    expect(accountInput(view(null), work)).toEqual({ account: "cl2" });
+    // A group sends only the group: the account and model under it stay as saved.
+    expect(groupInput("bg")).toEqual({ group: "bg" });
+  });
+
+  test("its page offers only its computer's groups with members, and none to the right hand or a scope", () => {
+    const groups = [group("here"), group("there", { machineId: "m2" }), group("empty", { members: [] })];
+    const view = { computer: { machineId: "m1", name: "Mac", online: true } };
+    expect(agentGroups(groups, view, { builtin: null }).map((g) => g.id)).toEqual(["here"]);
+    expect(agentGroups(groups, view, { builtin: "right_hand" })).toEqual([]);
+    expect(agentGroups(groups, { ...view, scope: "workspace" }, { builtin: null })).toEqual([]);
+    expect(agentGroups(groups, { computer: null }, { builtin: null })).toEqual([]);
+    expect(agentGroups(undefined, view, { builtin: null })).toEqual([]);
+  });
+
+  test("a group is spent only when every member is at its limit by its own usage", () => {
+    const m = (u: PlanUsage | null) => ({ ...member, usage: u });
+    expect(groupSpent([m(usage(100)), m(usage(100))])).toBe(true);
+    expect(groupSpent([m(usage(100)), m(usage(40))])).toBe(false);
+    // Not known yet is not at the limit, and no members says nothing.
+    expect(groupSpent([m(usage(100)), m(null)])).toBe(false);
+    expect(groupSpent([])).toBe(false);
+  });
+
+  test("a new group starts with one account per provider of that computer, the first of each; members go in order", () => {
+    const on = (id: string, over: Partial<MachineAccount> = {}) => ({
+      ...account(id, { shared: true, ...over }),
+      machineId: "m1",
+      computer: "Mac",
+    });
+    const accounts = [
+      on("cl"),
+      on("cl2"),
+      on("oc", { provider: "opencode" }),
+      { ...on("far"), machineId: "m2" },
+      on("cx", { kind: "codex", shared: false }),
+    ];
+    const slots = startSlots(accounts, "m1", "u1");
+    expect(slots).toEqual([
+      { provider: "claude_code", accountId: "cl", model: null, effort: null },
+      { provider: "opencode", accountId: "oc", model: null, effort: null },
+    ]);
+    expect(moveSlot(slots, 1, -1).map((s) => s.accountId)).toEqual(["oc", "cl"]);
+    expect(moveSlot(slots, 0, -1)).toEqual(slots);
+    expect(membersInput(slots.slice(0, 1).map((s) => ({ ...s, model: "opus", effort: "high" })))).toEqual([
+      { accountId: "cl", model: "opus", effort: "high" },
+    ]);
+    expect(slotsOf(group("g", { members: [{ ...member, model: "opus", effort: "low" }] }))).toEqual([
+      { provider: "claude_code", accountId: "cl", model: "opus", effort: "low" },
+    ]);
+  });
+
+  test("the agent's AI lists its computer's groups like accounts, a group picked saves only the group", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const screen = await read("../../src/features/ai/AgentAiScreen.tsx");
+    expect(screen).toContain('<GroupedHeader>{t("brainGroups.title")}</GroupedHeader>');
+    expect(screen).toContain("agentGroups(groupsList.data, view, agent)");
+    expect(screen).toContain("void save(groupInput(gr.id),");
+    // Picking the account saved under the group still leaves the group.
+    expect(screen).toContain("(!view.group && (a?.id ?? null) === view.account)");
+    // Each member thinks with its own model: no Modelo row on a group, nor offers of other accounts at the limit.
+    expect(screen).toContain("{kind && !onGroup ? (");
+    const advanced = await read("../../src/features/ai/AgentAdvancedScreen.tsx");
+    expect(advanced).toContain("{kind && !onGroup ? (");
+    expect(advanced).toContain("viewSpeedFits(view) && !onGroup");
+    const t = await translator("pt-BR");
+    expect(t("brainGroups.agent.now", { name: "Claude" })).toBe("Pensando com Claude agora");
+  });
+
+  test("IA e uso lists the groups, each opening its own screen to change or delete it; a new one too", async () => {
+    const accounts = await read("../../src/features/ai/AiAccountsScreen.tsx");
+    expect(accounts).toContain("<BrainGroupsSection");
+    const section = await read("../../src/features/ai/BrainGroupScreen.tsx");
+    expect(section).toContain("groupLine(t, g)");
+    expect(section).toContain("router.push(`/brain-group/");
+    expect(section).toContain("setSlots(startSlots(accounts, m, meId));");
+    expect(section).toContain('t("brainGroups.deleteConfirm")');
+    expect(section).toContain("<EffortRamp");
+    const route = await read("../../app/(app)/brain-group/[id].tsx");
+    expect(route).toContain("<BrainGroupScreen");
+    const layout = await read("../../app/(app)/_layout.tsx");
+    expect(layout).toContain('<Stack.Screen name="brain-group/[id]"');
   });
 });

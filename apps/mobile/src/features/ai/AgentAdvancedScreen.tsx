@@ -40,6 +40,7 @@ import { Note, PlanReplies } from "./parts";
  * brain) and who it answers
  * ("Atende outras pessoas", answering through the API while its
  * computer is away). Each choice saves at once, like the rest of "Pensa com"; "Voltar ao padrão" puts them all back.
+ * On a brain group the effort and the speed are each member's (ADR 0180 §10): neither shows nor saves here.
  */
 
 /** Opens an agent's advanced settings. */
@@ -55,6 +56,12 @@ export const advancedOf = (view: AgentBrain, options?: readonly ContextLimit[]):
     onlyOwner: view.onlyOwner,
     fallback: view.fallback,
   };
+};
+
+/** On a group the effort and speed aren't the agent's (ADR 0180 §10): "Voltar ao padrão" judges the rest only. */
+const memberOwnAsDefault = (kind: AgentBrain["brain"], now: Advanced): Advanced => {
+  const to = advancedDefaults(kind, now);
+  return { ...now, effort: to.effort, speed: to.speed };
 };
 
 export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
@@ -84,6 +91,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const current =
     view && kind ? agentAccounts(view, kind, agent?.ownerUserId, name).find((a) => a.id === view.account) : undefined;
   const autoModel = view?.brain === "model" ? isAuto(agent?.model) : isAuto(view?.effectiveModel);
+  const onGroup = view?.group != null;
   // The sizes under the window of the model it thinks with ("Automático": any of its line).
   const options = !view
     ? []
@@ -110,7 +118,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
       qc.setQueryData(keys.agentBrain(orgId, agentId), next);
       const line = advancedSummary(t, i18n.language, {
         kind: next.brain,
-        autoModel,
+        autoModel: autoModel || onGroup,
         apiKey,
         now: advancedOf(next, options),
       });
@@ -131,8 +139,8 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
       ...(view.brain === "model"
         ? {}
         : {
-            ...(autoModel ? {} : { effort: to.effort }),
-            ...(to.speed !== now.speed ? { speed: to.speed } : {}),
+            ...(autoModel || onGroup ? {} : { effort: to.effort }),
+            ...(to.speed !== now.speed && !onGroup ? { speed: to.speed } : {}),
             ...(to.onlyOwner !== view.onlyOwner ? { onlyOwner: to.onlyOwner } : {}),
             fallback: to.fallback,
           }),
@@ -152,7 +160,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
           <Note icon="x">{t("common.loadFailed")}</Note>
         ) : (
           <>
-            {kind ? (
+            {kind && !onGroup ? (
               <View style={styles.gap}>
                 <GroupedList>
                   {autoModel ? (
@@ -176,7 +184,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
                 </GroupedList>
               </View>
             ) : null}
-            {viewSpeedFits(view) ? (
+            {viewSpeedFits(view) && !onGroup ? (
               <>
                 <GroupedHeader
                   hint={{
@@ -271,7 +279,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
               <GroupedList>
                 <GroupedRow
                   label={t("agentPage.work.brain.advanced.defaults")}
-                  disabled={!may || isAdvancedDefault(view.brain, now)}
+                  disabled={!may || isAdvancedDefault(view.brain, onGroup ? memberOwnAsDefault(view.brain, now) : now)}
                   onPress={putBack}
                 />
               </GroupedList>

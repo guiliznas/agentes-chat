@@ -47,6 +47,7 @@ import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
+import { BrainGroupsSection } from "./BrainGroupScreen";
 import { openKeyForAll } from "./KeyForAllScreen";
 import { openConnectAi } from "./NoAiCard";
 import { alertKeyRefused, Note, PlanHoldNote, usePlanHold } from "./parts";
@@ -337,6 +338,8 @@ export function AiAccountsScreen() {
             />
           </View>
         )}
+        {/* ADR 0180: the groups of the accounts above, each one way for an agent to think. */}
+        {hold ? null : <BrainGroupsSection />}
         {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
         <PersonalParts />
       </ScrollView>
