@@ -107,6 +107,26 @@ test("a group takes one account of each provider on its computer", async () => {
   expect((await listBrainGroups(w.db, w.bia.id, w.org)).map((g) => g.name)).toEqual(["Time"]);
 });
 
+test("a removed computer's groups are not listed, and no group is made there", async () => {
+  const w = await world();
+  await createBrainGroup(w.db, w.fx.owner.id, w.org, {
+    machineId: w.machineId,
+    name: "Time",
+    members: [{ accountId: w.claude }],
+  });
+  await w.db.update(schema.machines).set({ deletedAt: new Date() }).where(eq(schema.machines.id, w.machineId));
+  expect(await listBrainGroups(w.db, w.fx.owner.id, w.org)).toEqual([]);
+  expect(
+    await codeOf(
+      createBrainGroup(w.db, w.fx.owner.id, w.org, {
+        machineId: w.machineId,
+        name: "Outro",
+        members: [{ accountId: w.codex }],
+      }),
+    ),
+  ).toBe("brain_group.other_computer");
+});
+
 test("only shared accounts that serve the person join a group", async () => {
   const w = await world();
   const login = await w.account("Login", { shared: false, kind: "codex" });

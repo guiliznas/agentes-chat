@@ -197,15 +197,24 @@ async function editableGroup(db: Database, userId: string, orgId: string, groupI
   return group;
 }
 
-/** The org's brain groups (ADR 0180), oldest first. Anyone in the org sees them. */
+/** The org's brain groups (ADR 0180), oldest first, but a removed computer's. Anyone in the org sees them. */
 export async function listBrainGroups(db: Database, userId: string, orgId: string): Promise<BrainGroupView[]> {
   await requirePermission(db, userId, orgId, "read");
-  const groups = await db
-    .select()
+  const rows = await db
+    .select({ g: schema.brainGroups })
     .from(schema.brainGroups)
-    .where(eq(schema.brainGroups.orgId, orgId))
+    .innerJoin(
+      schema.machines,
+      and(eq(schema.machines.orgId, schema.brainGroups.orgId), eq(schema.machines.id, schema.brainGroups.machineId)),
+    )
+    .where(and(eq(schema.brainGroups.orgId, orgId), isNull(schema.machines.deletedAt)))
     .orderBy(asc(schema.brainGroups.createdAt), asc(schema.brainGroups.id));
-  return viewsOf(db, orgId, userId, groups);
+  return viewsOf(
+    db,
+    orgId,
+    userId,
+    rows.map((r) => r.g),
+  );
 }
 
 /** Creates a group on one computer from accounts that serve the person (ADR 0180). Audited (`brain_group.create`). */
@@ -221,7 +230,10 @@ export async function createBrainGroup(
   const [machine] = await db
     .select({ id: schema.machines.id })
     .from(schema.machines)
-    .where(and(eq(schema.machines.orgId, orgId), eq(schema.machines.id, input.machineId)));
+    .where(
+      and(eq(schema.machines.orgId, orgId), eq(schema.machines.id, input.machineId), isNull(schema.machines.deletedAt)),
+    );
+  // A removed computer takes no group (its own stay out of the list).
   if (!machine) throw new NotFoundError("Computer not found", "brain_group.other_computer");
   const members = await loadMembers(db, userId, orgId, machine.id, input.members, null);
   const group = await db.transaction(async (tx) => {
