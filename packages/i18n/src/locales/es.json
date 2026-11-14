@@ -11466,6 +11466,7 @@
     "membersAbout": "Se prueban de arriba abajo. Una conversación sigue con su cuenta mientras tenga margen.",
     "membersNeeded": "Añade al menos una cuenta.",
     "accountOf": "Cuenta de {{provider}}",
+    "accountChanged": "Otra cuenta: modelo y esfuerzo vuelven a Automático.",
     "add": "Añadir {{name}}",
     "remove": "Quitar {{name}}",
     "moveUp": "Subir {{name}}",

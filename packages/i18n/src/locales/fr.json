@@ -11535,6 +11535,7 @@
     "membersAbout": "Essayés de haut en bas. Une conversation garde son compte tant qu'il a de la marge.",
     "membersNeeded": "Ajoute au moins un compte.",
     "accountOf": "Compte {{provider}}",
+    "accountChanged": "Autre compte : modèle et effort repassent en Automatique.",
     "add": "Ajouter {{name}}",
     "remove": "Retirer {{name}}",
     "moveUp": "Monter {{name}}",

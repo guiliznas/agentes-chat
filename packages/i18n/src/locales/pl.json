@@ -11954,6 +11954,7 @@
     "membersAbout": "Próbowane od góry. Rozmowa zostaje przy swoim koncie, dopóki ma zapas.",
     "membersNeeded": "Dodaj co najmniej jedno konto.",
     "accountOf": "Konto {{provider}}",
+    "accountChanged": "Inne konto: model i wysiłek wracają do Automatycznie.",
     "add": "Dodaj {{name}}",
     "remove": "Usuń {{name}}",
     "moveUp": "Przesuń w górę: {{name}}",

@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentBrain,
   AgentBrainInput,
+  AgentSetup,
   AiAccounts,
   BrainGroup,
   BrainKind,
@@ -176,11 +177,14 @@ export function agentGroups(
   return (groups ?? []).filter((g) => g.machineId === on && g.members.length > 0);
 }
 
-/** Whether the agent's page offers groups at all (`agentGroups`), so the list is loaded only then. */
+/**
+ * Whether the agent's page offers groups at all (`agentGroups`), so the list is loaded only then. An agent not in yet
+ * (the directory loading) may be the right hand: none until it is known.
+ */
 export const groupsOffered = (
   view: Pick<AgentBrain, "computer"> & Partial<Pick<AgentBrain, "scope">>,
   agent: Pick<Agent, "builtin"> | undefined,
-) => !isRightHand(agent) && view.scope === undefined && view.computer !== null;
+) => agent !== undefined && !isRightHand(agent) && view.scope === undefined && view.computer !== null;
 
 /**
  * Every member of a group at its limit by its own usage (ADR 0180 §7): only then is the group spent. A member whose
@@ -259,18 +263,28 @@ export function existingRows(
 export function setupWords(
   t: TFunction,
   language: string,
-  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account" | "autonomy">,
+  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account" | "autonomy"> &
+    Partial<Pick<AgentBrain, "group">>,
   o: { apiKey: boolean; now: Advanced },
 ): string {
+  // On a group the others take the group, named as it is; its effort and speed are its members' (ADR 0180 §10).
+  const group = view.group ?? null;
   const parts = advancedParts(t, language, {
     kind: view.brain,
-    autoModel: isAuto(view.effectiveModel),
+    autoModel: isAuto(view.effectiveModel) || group !== null,
     apiKey: o.apiKey,
-    now: o.now,
+    now: group ? { ...o.now, speed: "standard" } : o.now,
   });
   const autonomy = view.autonomy ? autonomyWords(t, view.autonomy) : null;
-  return [thinksNow(t, view), ...parts, autonomy].filter(Boolean).join(" · ");
+  return [group ? group.name : thinksNow(t, view), ...parts, autonomy].filter(Boolean).join(" · ");
 }
+
+/**
+ * "Usar em outros agentes" on a group (ADR 0180), as the web's: the group goes too, and the server skips an agent on
+ * another computer (`other_computer`, said on its row).
+ */
+export const setupWithGroup = (setup: AgentSetup | null, view: Partial<Pick<AgentBrain, "group">>) =>
+  setup && view.group ? { ...setup, group: view.group.id } : setup;
 
 /**
  * What the phone's Criar agente sends for who thinks (ADR 0094): the last setup's API model and key at creation, and

@@ -11180,6 +11180,7 @@
     "membersAbout": "Van boven naar beneden geprobeerd. Een gesprek blijft bij zijn account zolang er ruimte is.",
     "membersNeeded": "Voeg minstens één account toe.",
     "accountOf": "{{provider}}-account",
+    "accountChanged": "Ander account: model en inspanning terug naar Automatisch.",
     "add": "{{name}} toevoegen",
     "remove": "{{name}} weghalen",
     "moveUp": "{{name}} omhoog",

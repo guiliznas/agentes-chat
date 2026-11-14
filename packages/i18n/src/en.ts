@@ -11359,6 +11359,8 @@ export const en = {
     membersNeeded: "Add at least one account.",
     /** The select of another account of the same provider; `provider`: "Claude", "ChatGPT"… */
     accountOf: "{{provider}} account",
+    /** Another account picked for a provider: the member's model and effort go back to the agent's (ADR 0180). */
+    accountChanged: "Another account: model and effort back to Automatic.",
     add: "Add {{name}}",
     remove: "Take {{name}} out",
     moveUp: "Move {{name}} up",

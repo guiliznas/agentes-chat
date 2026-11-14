@@ -27109,6 +27109,9 @@
   "brainGroups.accountOf": {
     "value": "{{provider}} account"
   },
+  "brainGroups.accountChanged": {
+    "value": "Another account: model and effort back to Automatic."
+  },
   "brainGroups.add": {
     "value": "Add {{name}}"
   },

@@ -11056,6 +11056,7 @@
     "membersAbout": "Yukarıdan aşağıya denenir. Bir sohbet, payı kaldıkça kendi hesabında kalır.",
     "membersNeeded": "En az bir hesap ekle.",
     "accountOf": "{{provider}} hesabı",
+    "accountChanged": "Başka hesap: model ve çaba Otomatik'e döner.",
     "add": "{{name}} ekle",
     "remove": "{{name}} çıkar",
     "moveUp": "{{name}} yukarı",

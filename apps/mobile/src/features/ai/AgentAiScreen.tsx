@@ -401,13 +401,13 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   onPress={() => openAgentAdvanced(agentId)}
                 />
                 {kind &&
-                !onGroup &&
                 view.canEdit &&
-                (view.account !== null || ownRow) &&
+                (view.account !== null || ownRow || onGroup) &&
                 dir.agents.some((a) => a.id !== agentId) ? (
                   <GroupedRow
                     label={t("agentPage.work.brain.copy.row")}
-                    sub={t("agentPage.work.brain.copy.rowLine")}
+                    // On a group the others take the group (ADR 0180).
+                    sub={t(onGroup ? "brainGroups.agent.copyLine" : "agentPage.work.brain.copy.rowLine")}
                     chevron
                     onPress={() => openAgentSetup(agentId)}
                   />

@@ -25,7 +25,7 @@ import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { advancedOf } from "./AgentAdvancedScreen";
-import { setupWords } from "./logic";
+import { setupWithGroup, setupWords } from "./logic";
 import { Note } from "./parts";
 
 /*
@@ -52,7 +52,8 @@ export function AgentSetupScreen({ agentId }: { agentId: string }) {
   // "Levar a autonomia" off: the others keep their own.
   const [withAutonomy, setWithAutonomy] = useState(true);
   const view = brain.data && !withAutonomy ? { ...brain.data, autonomy: undefined } : brain.data;
-  const setup = view ? setupOfBrain(view) : null;
+  // On a brain group the group goes too (ADR 0180); an agent on another computer is skipped, said on its row.
+  const setup = view ? setupWithGroup(setupOfBrain(view), view) : null;
   const others = dir.agents.filter((a) => a.id !== agentId);
   const preview = useSetupPreview(
     orgId,

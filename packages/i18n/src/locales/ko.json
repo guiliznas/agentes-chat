@@ -10661,6 +10661,7 @@
     "membersAbout": "위에서부터 차례로 시도합니다. 대화는 여유가 있는 동안 같은 계정을 씁니다.",
     "membersNeeded": "계정을 하나 이상 추가하세요.",
     "accountOf": "{{provider}} 계정",
+    "accountChanged": "다른 계정: 모델과 사고 수준이 자동으로 돌아갑니다.",
     "add": "{{name}} 추가",
     "remove": "{{name}} 빼기",
     "moveUp": "{{name}} 위로",

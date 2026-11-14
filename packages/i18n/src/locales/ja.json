@@ -10667,6 +10667,7 @@
     "membersAbout": "上から順に試します。会話は余裕があるかぎり同じアカウントを使います。",
     "membersNeeded": "アカウントを1つ以上追加してください。",
     "accountOf": "{{provider}} のアカウント",
+    "accountChanged": "別のアカウント：モデルと思考レベルは自動に戻ります。",
     "add": "{{name}} を追加",
     "remove": "{{name}} を外す",
     "moveUp": "{{name}} を上へ",

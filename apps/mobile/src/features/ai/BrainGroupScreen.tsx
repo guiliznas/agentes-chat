@@ -15,6 +15,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { brainModelChoices, planOf } from "@agenteschat/client/lib/plans";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
+import { usePreventRemove } from "expo-router";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -211,6 +212,9 @@ function GroupForm({
   const [strategy, setStrategy] = useState<BrainGroupStrategy>(group?.strategy ?? "order");
   const [slots, setSlots] = useState<Slot[]>(() => (group ? slotsOf(group) : startSlots(accounts, machineId, meId)));
   const [picking, setPicking] = useState<Picking | null>(null);
+  // The model picker is a step of the form (as Conectar uma IA's pages): the native back (the button and the edge
+  // swipe) closes it, the group not saved yet kept; only "Usar" keeps what it picked.
+  usePreventRemove(picking !== null, () => setPicking(null));
   const busy = create.isPending || update.isPending || remove.isPending;
   const candidates = groupCandidates(accounts, machineId, meId);
 
@@ -316,7 +320,11 @@ function GroupForm({
           : []),
         ...others.map((a) => ({
           label: a.label,
-          onPress: () => patch(slot.provider, { accountId: a.accountId, model: null, effort: null }),
+          onPress: () => {
+            // Models don't carry between accounts (ADR 0180 §10): back to Automático, and it says so.
+            patch(slot.provider, { accountId: a.accountId, model: null, effort: null });
+            if (slot.model !== null) toast({ title: t("brainGroups.accountChanged"), icon: "info" });
+          },
         })),
         {
           label: t("brainGroups.remove", { name: label }),

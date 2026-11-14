@@ -10720,6 +10720,7 @@
     "membersAbout": "Dicoba dari atas ke bawah. Percakapan tetap memakai akunnya selama masih ada ruang.",
     "membersNeeded": "Tambahkan setidaknya satu akun.",
     "accountOf": "Akun {{provider}}",
+    "accountChanged": "Akun lain: model dan upaya kembali ke Otomatis.",
     "add": "Tambah {{name}}",
     "remove": "Keluarkan {{name}}",
     "moveUp": "Naikkan {{name}}",

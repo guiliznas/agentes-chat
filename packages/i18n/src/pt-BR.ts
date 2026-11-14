@@ -11410,6 +11410,8 @@ export const ptBR = {
     membersNeeded: "Adicione pelo menos uma conta.",
     /** The select of another account of the same provider; `provider`: "Claude", "ChatGPT"… */
     accountOf: "Conta do {{provider}}",
+    /** Another account picked for a provider: the member's model and effort go back to the agent's (ADR 0180). */
+    accountChanged: "Outra conta: modelo e esforço voltam para Automático.",
     add: "Adicionar {{name}}",
     remove: "Tirar {{name}}",
     moveUp: "Subir {{name}}",

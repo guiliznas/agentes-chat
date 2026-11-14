@@ -11117,6 +11117,7 @@
     "membersAbout": "Von oben nach unten versucht. Eine Unterhaltung bleibt bei ihrem Konto, solange es Spielraum hat.",
     "membersNeeded": "Füge mindestens ein Konto hinzu.",
     "accountOf": "{{provider}}-Konto",
+    "accountChanged": "Anderes Konto: Modell und Aufwand wieder auf Automatisch.",
     "add": "{{name}} hinzufügen",
     "remove": "{{name}} entfernen",
     "moveUp": "{{name}} nach oben",

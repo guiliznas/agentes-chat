@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentBrain, BrainGroup, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
-import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
+import { newAgentStart, setupOfBrain, setupResultLine } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
 import { setupPlanQuestion } from "@agenteschat/client/lib/audience";
 import { CURSOR_KEY_PLAN, geminiPersonal, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
@@ -25,6 +25,7 @@ import {
   modelSections,
   newAgentAi,
   pickedAi,
+  setupWithGroup,
   setupWords,
   takenFrom,
   thinkingUsage,
@@ -1206,6 +1207,8 @@ describe("brain groups on the phone (ADR 0180)", () => {
     expect(agentGroups(groups, { ...view, scope: "workspace" }, { builtin: null })).toEqual([]);
     expect(agentGroups(groups, { computer: null }, { builtin: null })).toEqual([]);
     expect(agentGroups(undefined, view, { builtin: null })).toEqual([]);
+    // While the directory loads the agent is unknown, maybe the right hand: no group shows and then goes.
+    expect(agentGroups(groups, view, undefined)).toEqual([]);
   });
 
   test("a group is spent only when every member is at its limit by its own usage", () => {
@@ -1275,5 +1278,59 @@ describe("brain groups on the phone (ADR 0180)", () => {
     expect(route).toContain("<BrainGroupScreen");
     const layout = await read("../../app/(app)/_layout.tsx");
     expect(layout).toContain('<Stack.Screen name="brain-group/[id]"');
+  });
+
+  test("the group screen's model picker is a step of the form: back closes it, the form kept; another account says so", async () => {
+    const screen = await read("../../src/features/ai/BrainGroupScreen.tsx");
+    // The native back (the button and the edge swipe) leaves the picker for the form, never the unsaved group.
+    expect(screen).toContain("usePreventRemove(picking !== null, () => setPicking(null));");
+    expect(screen).toContain('toast({ title: t("brainGroups.accountChanged"), icon: "info" });');
+    const t = await translator("pt-BR");
+    expect(t("brainGroups.accountChanged")).toBe("Outra conta: modelo e esforço voltam para Automático.");
+  });
+
+  test("Usar em outros agentes on a group copies the group, said by its name; another computer's agent is skipped", async () => {
+    const t = await translator("pt-BR");
+    const view = {
+      brain: "claude_code" as const,
+      effectiveModel: "opus",
+      model: "opus",
+      options: [],
+      accounts: [],
+      account: "cl",
+      computer: { machineId: "m1", name: "Mac", online: true },
+      effort: "high" as const,
+      speed: "fast" as const,
+      contextTokens: null,
+      fallback: true,
+      onlyOwner: true,
+      speedFits: true,
+    } as unknown as AgentBrain;
+    const base = setupOfBrain(view);
+    expect(setupWithGroup(base, { group: onGroup })).toEqual({ ...base, group: "bg" } as typeof base);
+    expect(setupWithGroup(base, { group: null })).toBe(base);
+    expect(setupWithGroup(null, { group: onGroup })).toBeNull();
+    // A group's effort and speed are its members' (ADR 0180 §10): never said as the setup's.
+    const now = {
+      effort: "high" as const,
+      speed: "fast" as const,
+      contextTokens: null,
+      onlyOwner: true,
+      fallback: true,
+    };
+    expect(setupWords(t, "pt-BR", { ...view, group: onGroup }, { apiKey: true, now })).toBe("Diário");
+    expect(
+      setupResultLine(
+        t,
+        { agentId: "a2", status: "skipped", reason: "other_computer", params: { computer: "PC" } },
+        {
+          now: "",
+        },
+      ),
+    ).toBe("Trabalha no PC");
+    const setup = await read("../../src/features/ai/AgentSetupScreen.tsx");
+    expect(setup).toContain("setupWithGroup(setupOfBrain(view), view)");
+    const screen = await read("../../src/features/ai/AgentAiScreen.tsx");
+    expect(screen).toContain('t(onGroup ? "brainGroups.agent.copyLine" : "agentPage.work.brain.copy.rowLine")');
   });
 });

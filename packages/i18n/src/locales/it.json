@@ -11549,6 +11549,7 @@
     "membersAbout": "Provati dall'alto in basso. Una conversazione resta con il suo account finché ha margine.",
     "membersNeeded": "Aggiungi almeno un account.",
     "accountOf": "Account {{provider}}",
+    "accountChanged": "Altro account: modello e impegno tornano su Automatico.",
     "add": "Aggiungi {{name}}",
     "remove": "Togli {{name}}",
     "moveUp": "Sposta su {{name}}",
