@@ -2,8 +2,10 @@ import type { PlanUsage } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
 import type { Agent } from "./agents";
 import { brainOf } from "./brain-settings";
+import type { GroupMemberPick } from "./brains/groups";
 import { planLimitOf } from "./brains/select";
 import { isComputerBrain } from "./brains/types";
+import { isRightHand } from "./right-hand";
 import { monthStartUtc, orgDefaultAgentBudget } from "./usage";
 import { nextMonthStart } from "./usage-pause";
 
@@ -28,7 +30,8 @@ export type OutOfOfficeAgent = Pick<
   | "brainAccountId"
   | "machineId"
   | "monthlyBudgetNanoUsd"
->;
+> &
+  Partial<Pick<Agent, "ownerUserId" | "brainGroupId" | "builtin">>;
 
 export interface OutOfOfficeOptions {
   now?: Date;
@@ -53,7 +56,13 @@ export async function outOfOffice(
   if (list.length === 0) return out;
   const now = options.now ?? new Date();
   const ms = now.getTime();
-  const computer = list.filter((a) => isComputerBrain(brainOf(a.brain)) && a.machineId);
+  // On a brain group (ADR 0180) the member its group picks now thinks, not the saved brain: it is what is out or not.
+  const picks = await groupPicks(db, orgId, list, ms);
+  const thinking = list.map((a) => {
+    const pick = picks.get(a.id);
+    return pick ? { ...a, brain: pick.kind, brainAccountId: pick.accountId } : a;
+  });
+  const computer = thinking.filter((a) => isComputerBrain(brainOf(a.brain)) && a.machineId);
   const [accounts, machines, spent, orgBudget] = await Promise.all([
     accountUsages(db, orgId, computer),
     machineUsages(db, orgId, computer),
@@ -65,18 +74,23 @@ export async function outOfOffice(
     return (spent.get(a.id) ?? 0) >= budget;
   };
   const budgetOut: OutOfOffice = { reason: "budget", until: new Date(nextMonthStart(ms)) };
-  for (const a of list) {
+  for (const a of thinking) {
     const kind = brainOf(a.brain);
-    if (!isComputerBrain(kind)) {
+    // A group with no member that can think for it is as one whose members are all at their limit (ADR 0180 §7).
+    const memberless = picks.get(a.id) === null;
+    if (!memberless && !isComputerBrain(kind)) {
       if (budgetSpent(a)) out.set(a.id, budgetOut);
       continue;
     }
     if (!a.machineId) continue;
-    // The agent's own account thinks when it has one on its computer (`brainAccountFor`), else the computer's sign-in.
-    const account = a.brainAccountId ? accounts.get(a.brainAccountId) : undefined;
-    const usable = account && account.machineId === a.machineId && account.kind === kind ? account : undefined;
-    const usage = usable ? usable.usage : (machines.get(a.machineId)?.[kind] ?? null);
-    const limited = planLimitOf(a.machineId, kind, usable?.id, usage, ms);
+    let limited: { until: number | null } | null = { until: null };
+    if (!memberless && isComputerBrain(kind)) {
+      // The agent's own account thinks when it has one on its computer (`brainAccountFor`), else the computer's sign-in.
+      const account = a.brainAccountId ? accounts.get(a.brainAccountId) : undefined;
+      const usable = account && account.machineId === a.machineId && account.kind === kind ? account : undefined;
+      const usage = usable ? usable.usage : (machines.get(a.machineId)?.[kind] ?? null);
+      limited = planLimitOf(a.machineId, kind, usable?.id, usage, ms);
+    }
     if (!limited) continue;
     const plan: OutOfOffice = { reason: "plan", until: limited.until !== null ? new Date(limited.until) : null };
     // A conversation falls back to the model brain (ADR 0032 §5): out only when that can't answer either.
@@ -88,6 +102,41 @@ export async function outOfOffice(
     const hasModel = await options.hasModel(a).catch(() => true);
     if (!hasModel) out.set(a.id, plan);
     else if (budgetSpent(a)) out.set(a.id, budgetOut);
+  }
+  return out;
+}
+
+/**
+ * The member each agent on a brain group thinks with now (ADR 0180), by agent id: null when no member can think for it.
+ * No conversation in mind. Agents of one group, computer and owner share one pick. Agents with no group (or the right
+ * hand, which takes none) are left out.
+ */
+async function groupPicks(db: Database, orgId: string, list: OutOfOfficeAgent[], now: number) {
+  const out = new Map<string, GroupMemberPick | null>();
+  const grouped = list.filter((a) => a.brainGroupId && a.machineId && !isRightHand(a));
+  if (grouped.length === 0) return out;
+  // Loaded when called: `brains/groups` imports modules that import this one back.
+  const { pickGroupMember } = await import("./brains/groups");
+  const picks = new Map<string, Promise<GroupMemberPick | null>>();
+  for (const a of grouped) {
+    const key = `${a.brainGroupId}:${a.machineId}:${a.ownerUserId ?? ""}`;
+    if (!picks.has(key)) {
+      picks.set(
+        key,
+        pickGroupMember(
+          db,
+          {
+            id: a.id,
+            orgId,
+            ownerUserId: a.ownerUserId ?? null,
+            machineId: a.machineId,
+            brainGroupId: a.brainGroupId ?? null,
+          },
+          { now },
+        ),
+      );
+    }
+    out.set(a.id, await (picks.get(key) as Promise<GroupMemberPick | null>));
   }
   return out;
 }
@@ -171,6 +220,9 @@ export async function outOfOfficeIds(
       brainAccountId: agents.brainAccountId,
       machineId: agents.machineId,
       monthlyBudgetNanoUsd: agents.monthlyBudgetNanoUsd,
+      ownerUserId: agents.ownerUserId,
+      brainGroupId: agents.brainGroupId,
+      builtin: agents.builtin,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds)));

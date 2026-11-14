@@ -157,6 +157,8 @@ export async function loadAgentStatuses(
         brainAccountId: agents.brainAccountId,
         machineId: agents.machineId,
         monthlyBudgetNanoUsd: agents.monthlyBudgetNanoUsd,
+        ownerUserId: agents.ownerUserId,
+        brainGroupId: agents.brainGroupId,
         heldAt: agents.operatorHoldAt,
         statusText: agents.statusText,
         statusEmoji: agents.statusEmoji,
