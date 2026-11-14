@@ -10746,7 +10746,16 @@
     "deleteAgents_other": "{{agents}} 将改回用自己的账号思考。",
     "deleteNone": "没有智能体使用这个分组。",
     "deleteConfirm": "删除",
-    "deleted": "已删除 {{name}}。"
+    "deleted": "已删除 {{name}}。",
+    "agent": {
+      "now": "正在用 {{name}} 思考",
+      "noneNow": "群组里目前没有还有余量的账号",
+      "limitTitle": "{{group}} 中的所有账号都已到上限",
+      "limitHelp": "群组会用第一个恢复的账号继续。",
+      "order": "群组顺序",
+      "pickerNote": "群组中的每个账号都用自己的模型思考。",
+      "open": "查看群组"
+    }
   },
   "brain": {
     "group": {

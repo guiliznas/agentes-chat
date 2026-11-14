@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
-import type { AgentBrain, AiComputer, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AiComputer, BrainGroup, MachineAccount } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
@@ -17,7 +17,16 @@ import {
   pickRow,
   toScreen,
 } from "./ai-picker";
-import { ADA_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  createFakeApi,
+  fakeAgentBrain,
+  fakeMachinesOf,
+  LODI_ID,
+  ORG_ID,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -1005,5 +1014,170 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     await settle(6);
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", account: "acct_d" }]);
     expect(brainScreen(d)).toBe("Pronto");
+  });
+});
+
+describe("Quem pensa with a brain group (ADR 0180)", () => {
+  const used = (usedPercent: number) => ({
+    windows: [
+      {
+        kind: "five_hour" as const,
+        usedPercent,
+        resetsAt: new Date(Date.now() + 2 * 3_600_000).toISOString(),
+      },
+    ],
+    source: "probe" as const,
+    at: new Date().toISOString(),
+  });
+  const member = (accountId: string, label: string, kind: "claude_code" | "codex", usedPercent = 10) => ({
+    accountId,
+    label,
+    kind,
+    provider: null,
+    model: null,
+    effort: null,
+    status: "active",
+    usage: used(usedPercent),
+  });
+  /** Claude, then ChatGPT, on the MacBook Ada works on. */
+  const daily: BrainGroup = {
+    id: "bg_daily",
+    machineId: "machine_1",
+    name: "Dia a dia",
+    strategy: "order",
+    members: [member("acct_claude", "Trabalho", "claude_code"), member("acct_codex", "Pessoal", "codex")],
+    usedBy: [],
+    canEdit: true,
+  };
+  /** A group of another computer: an agent thinks only with one of its own computer's. */
+  const mini: BrainGroup = { ...daily, id: "bg_mini", machineId: "machine_2", name: "Do Mac mini" };
+  const work: MachineAccount = {
+    id: "acct_claude",
+    kind: "claude_code",
+    label: "Trabalho",
+    email: "walt@acme.com",
+    plan: "Team",
+    status: "active",
+    ownerId: "u-walter",
+    ownerName: "Walter Nogueira",
+    mine: true,
+    usedBy: [],
+    usage: used(10),
+    provider: null,
+    keyHint: null,
+    shared: true,
+  };
+
+  /**
+   * Ada on Claude Code on the MacBook with the given groups; `thinking`: the group it already thinks with. The brain's
+   * `group` is the fake server's, which `setBrain` `{ group }` changes.
+   */
+  async function withGroups(groups: BrainGroup[], thinking?: string) {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    fakeMachinesOf.get(api)?.setBrainGroups(groups);
+    if (thinking) await api.agents.setBrain(ORG_ID, ADA_ID, { group: thinking });
+    state.calls.length = 0;
+    const stored = api.agents.brain;
+    api.agents.brain = async (orgId, agentId, scope) => ({
+      ...fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", accounts: [work] }),
+      group: (await stored(orgId, agentId, scope)).group,
+    });
+    return open(state, api);
+  }
+
+  test("a group of its computer is a way to think like an account: picked, it saves only the group, and the first screen shows it with the account thinking now", async () => {
+    const { state } = await withGroups([daily, mini]);
+    let d = await brainDialog();
+    await toScreen(d, "Trocar de conta");
+    const groups = brainRows(d).filter((r) => r.group === "Grupos");
+    // The other computer's group isn't offered: the server would refuse it (`brain_group.other_computer`).
+    expect(groups.map((r) => [r.title, r.lines])).toEqual([["Dia a dia", ["Claude → ChatGPT · em ordem"]]]);
+    await pickRow(d, "Dia a dia");
+    expect(mainButton(d)?.textContent).toBe("Trocar para Dia a dia");
+    await confirmScreen(d);
+    await settle(6);
+    expect(brainCalls(state)).toEqual([{ group: "bg_daily" }]);
+    expect(brainScreen(d)).toBe("Pronto");
+    await done(d);
+    d = await brainDialog();
+    // The group in use, its members in order and the one a run would pick now; the account it had stays behind it.
+    expect(inUse(d)).toMatchObject({
+      title: "Dia a dia",
+      lines: ["Claude → ChatGPT · em ordem", "Pensando com Claude agora"],
+    });
+    // The model belongs to each member (ADR 0180 §10): no model of the agent's own to change here.
+    expect(brainLines(d).map((l) => l.label)).toEqual(["Mais opções"]);
+  });
+
+  test("on a group, an account picked takes over again: it sends group null with the account", async () => {
+    const { state } = await withGroups([daily], "bg_daily");
+    const d = await brainDialog();
+    expect(inUse(d)?.title).toBe("Dia a dia");
+    await toScreen(d, "Trocar de conta");
+    // The account the group keeps behind it is a way to think again, not the one in use.
+    expect(brainRows(d).find((r) => r.group === "Em uso")?.title).toBe("Dia a dia");
+    await pickRow(d, notInUse("Trabalho"));
+    await confirmScreen(d);
+    await settle(6);
+    expect(brainCalls(state)).toEqual([{ brain: "claude_code", account: "acct_claude", group: null }]);
+  });
+
+  test("Desfazer after picking a group puts its own brain back, the group off", async () => {
+    const { state } = await withGroups([daily]);
+    const d = await brainDialog();
+    await toScreen(d, "Trocar de conta");
+    await pickRow(d, "Dia a dia");
+    await confirmScreen(d);
+    await settle(6);
+    await toScreen(d, "Desfazer");
+    await settle(6);
+    expect(brainCalls(state)).toEqual([
+      { group: "bg_daily" },
+      { brain: "claude_code", account: null, model: null, group: null },
+    ]);
+  });
+
+  test("every member at its limit: the limit screen shows the group's order, each with its limit, never other accounts", async () => {
+    const full: BrainGroup = {
+      ...daily,
+      members: [member("acct_claude", "Trabalho", "claude_code", 100), member("acct_codex", "Pessoal", "codex", 100)],
+    };
+    await withGroups([full], "bg_daily");
+    const d = await brainDialog(/^As contas do grupo/);
+    expect(brainScreen(d)).toBe("As contas do grupo Dia a dia estão no limite");
+    const order = brainRows(d).filter((r) => r.group === "Ordem do grupo");
+    expect(order.map((r) => [r.title, r.room])).toEqual([
+      ["Claude", "100%"],
+      ["ChatGPT", "100%"],
+    ]);
+    expect(brainRows(d).some((r) => r.group === "Com mais folga agora")).toBe(false);
+    expect(shownText(d)).toContain("O grupo segue com a primeira conta que voltar.");
+  });
+
+  test("the right hand takes no group (ADR 0180 §9): its Trocar a conta lists none", async () => {
+    const state = withRightHand(seedState(), { brain: { kind: "claude_code", model: "Sonnet" } });
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setBrainGroups([daily]);
+    api.agents.brain = async (_org, id, scope) =>
+      fakeAgentBrain(id, {
+        scope: scope ?? "mine",
+        brain: "claude_code",
+        account: "acct_claude",
+        accounts: [work],
+        onlyOwner: true,
+        canUsePlans: true,
+        canEdit: true,
+        workspaceAi: { brain: "model", ownerId: null, servesYou: true, key: { provider: "openai", label: "OpenAI" } },
+      });
+    await renderApp(`/org/${ORG_ID}/agents/${LODI_ID}`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: /^IA de quem não tem plano próprio/ }));
+    const d = screen().getByRole("dialog", { name: "Quem pensa pelo Lodi no workspace" });
+    await click(within(d).getByRole("button", { name: "Trocar de conta" }));
+    const switching = screen().getByRole("dialog", { name: "Trocar a conta do Lodi" });
+    expect(brainRows(switching).some((r) => r.title === "Dia a dia")).toBe(false);
   });
 });

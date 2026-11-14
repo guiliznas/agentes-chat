@@ -11431,6 +11431,20 @@ export const ptBR = {
     deleteNone: "Nenhum agente usa este grupo.",
     deleteConfirm: "Apagar",
     deleted: "{{name}} apagado.",
+    /** An agent's "Quem pensa" and model picker on a group. */
+    agent: {
+      /** Under the group in use: the member a run would pick now; `name`: "Claude", "ChatGPT"… */
+      now: "Pensando com {{name}} agora",
+      noneNow: "Nenhuma conta do grupo tem folga agora",
+      /** Every member at its limit; `group`: the group's name. */
+      limitTitle: "As contas do grupo {{group}} estão no limite",
+      limitHelp: "O grupo segue com a primeira conta que voltar.",
+      /** Over the members in the order a run tries them. */
+      order: "Ordem do grupo",
+      /** The model picker in place, on a group. */
+      pickerNote: "Cada conta do grupo pensa com o próprio modelo.",
+      open: "Ver o grupo",
+    },
   },
   brain: {
     /** A brain group (ADR 0180) in one line: `names` are its providers in the order a run tries them. */

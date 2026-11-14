@@ -10736,7 +10736,16 @@
     "deleteAgents_other": "{{agents}} kembali berpikir dengan akunnya sendiri.",
     "deleteNone": "Tidak ada agen yang memakai grup ini.",
     "deleteConfirm": "Hapus",
-    "deleted": "{{name}} dihapus."
+    "deleted": "{{name}} dihapus.",
+    "agent": {
+      "now": "Sedang berpikir dengan {{name}}",
+      "noneNow": "Tidak ada akun grup yang masih longgar sekarang",
+      "limitTitle": "Semua akun di {{group}} sudah mencapai batas",
+      "limitHelp": "Grup lanjut dengan akun pertama yang kembali.",
+      "order": "Urutan grup",
+      "pickerNote": "Tiap akun grup berpikir dengan modelnya sendiri.",
+      "open": "Lihat grup"
+    }
   },
   "brain": {
     "group": {

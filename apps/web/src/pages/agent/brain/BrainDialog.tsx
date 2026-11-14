@@ -95,6 +95,8 @@ interface Before {
   key: string | undefined;
   apiModel: string;
   onlyOwner: boolean;
+  /** The brain group it thought with (ADR 0180); null: its own brain. */
+  group: string | null;
 }
 
 /** A switch made here: to what, what each agent had, and what to say. */
@@ -146,7 +148,8 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
   const [signingIn, setSigningIn] = useState(false);
   const s = useBrainState(view, { added, signingIn });
 
-  const mayModel = s.kind === "model" ? can("model") : can("brain");
+  // On a group each member has its own model (ADR 0180 §10): the agent's own isn't what thinks.
+  const mayModel = s.group ? false : s.kind === "model" ? can("model") : can("brain");
   // The way through the screens: back pops one, a save lands on the first again. At its limit it opens on the way out,
   // unless a link asked for a screen of its own.
   const [trail, setTrail] = useState<Screen[]>(() => {
@@ -219,10 +222,19 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
   const switchSel = picked !== undefined ? selected : sortHave(selectable)[0];
   const limitSel = s.offers.find((r) => r.id === picked) ?? s.offers[0];
 
+  // Off a group, what is picked takes over again (ADR 0180 §6): the group goes with the same save.
+  const offGroup = view.group ? { group: null } : {};
+
   /** This agent onto `row`, in the right order: its computer, then who thinks. */
   const saveRow = async (row: BrainRow): Promise<AgentBrain | null> => {
+    // A group of its computer: only the group, the agent's own brain kept under it to go back to.
+    if (row.kind === "group" && row.brainGroup)
+      return api.agents.setBrain(org.id, agent.id, { group: row.brainGroup.id });
     if (row.kind === "key") {
-      const result = view.brain !== "model" ? await api.agents.setBrain(org.id, agent.id, { brain: "model" }) : null;
+      const result =
+        view.brain !== "model" || view.group
+          ? await api.agents.setBrain(org.id, agent.id, { brain: "model", ...offGroup })
+          : null;
       if (row.keyId !== undefined) {
         const key = row.keyId === DEFAULT_KEY ? null : row.keyId;
         if (key !== (saved.key ?? null)) {
@@ -251,6 +263,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
         : row.kind === "own"
           ? { account: null }
           : {}),
+      ...offGroup,
     });
   };
 
@@ -266,6 +279,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
         key: saved.key,
         apiModel: saved.model,
         onlyOwner: view.onlyOwner,
+        group: view.group?.id ?? null,
       };
       // What each of the others had, read before anything changes ("Desfazer" puts it back).
       const theirs = await Promise.all(
@@ -362,14 +376,17 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
       if (row.kind === "key" && row.keyId !== undefined)
         await update.mutateAsync({ credentialId: b.key ?? null, model: b.apiModel });
       const share = b.onlyOwner !== switched.onlyOwnerAfter ? { onlyOwner: b.onlyOwner } : {};
+      // The group it had, or none, back too (ADR 0180).
+      const after = row.kind === "group" ? (row.brainGroup?.id ?? null) : null;
+      const group = b.group !== after ? { group: b.group } : {};
       // From one key to another the brain never changed: only the key and the model go back.
-      if (b.brain !== "model" || row.brain !== "model")
+      if (b.brain !== "model" || row.brain !== "model" || b.group !== after)
         await api.agents.setBrain(
           org.id,
           agent.id,
           b.brain === "model"
-            ? { brain: "model", ...share }
-            : { brain: b.brain, account: b.account, model: b.model, ...share },
+            ? { brain: "model", ...share, ...group }
+            : { brain: b.brain, account: b.account, model: b.model, ...share, ...group },
         );
       for (const o of others)
         await api.agents
@@ -592,7 +609,8 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
   // It thinks with nothing yet (a plan with no sign-in there): nothing to take elsewhere.
   const thinksWithNothing =
     s.kind !== "model" && s.currentRow?.kind === "plan" && view.accountsSupported && view.computer !== null;
-  const copyOn = setup !== null && hasOthers && !thinksWithNothing;
+  // On a group what is saved under it isn't what thinks: nothing to take elsewhere from here (ADR 0180).
+  const copyOn = setup !== null && hasOthers && !thinksWithNothing && !s.group;
   const copyTo = async (agentIds: string[], opens: { agent: string; owner: string }[]) => {
     if (!setup) return;
     // Letting more people talk to agents on other people's plans asks once, before anything saves.
@@ -657,14 +675,14 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
   const day = useDawn(!asleep);
   const markOf: AiChoice | undefined =
     screen === "switch" || screen === "all"
-      ? (switchSel?.choice ?? s.savedCard)
+      ? (switchSel?.choice ?? s.markNow)
       : screen === "limit"
-        ? (limitSel?.choice ?? s.savedCard)
+        ? (limitSel?.choice ?? s.markNow)
         : screen === "team"
-          ? (aim?.choice ?? s.savedCard)
+          ? (aim?.choice ?? s.markNow)
           : screen === "done"
-            ? (switched?.row.choice ?? s.savedCard)
-            : s.savedCard;
+            ? (switched?.row.choice ?? s.markNow)
+            : s.markNow;
   const addAcc = adding?.also ?? adding?.again;
   const title =
     screen === "switch"
@@ -674,7 +692,9 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
         : screen === "team"
           ? t("agentPage.work.brain.v2.teamTitle")
           : screen === "limit"
-            ? t("agentPage.work.brain.v2.limitTitle", g)
+            ? s.group
+              ? t("brainGroups.agent.limitTitle", { group: s.group.name })
+              : t("agentPage.work.brain.v2.limitTitle", g)
             : screen === "model"
               ? t("agentPage.work.brain.v2.modelTitle", g)
               : screen === "more"
@@ -699,7 +719,10 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
           )}
           <div className="bd-use">
             <p className="arrival-opts__label">{t("agentPage.work.brain.account")}</p>
-            {s.currentRow && <HaveRow item={s.currentRow} checked still />}
+            {/* A group says who thinks now under its members (ADR 0180), the windows below being that member's. */}
+            {s.currentRow && (
+              <HaveRow item={s.currentRow} checked still {...(s.groupNow ? { word: s.groupNow } : {})} />
+            )}
             {s.usage && <PlanWindows usage={s.usage} />}
           </div>
           {arrived && (
@@ -707,19 +730,19 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
               {t("agentPage.work.brain.add.done", { account: arrived.label, computer: s.computerName })}
             </SettingNote>
           )}
-          {s.kind !== "model" && !view.canUsePlans && ownerFirst && (
+          {s.kind !== "model" && !s.group && !view.canUsePlans && ownerFirst && (
             <SettingNote icon="info">{t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })}</SettingNote>
           )}
-          {savedSide?.text && <SettingNote icon={savedSide.icon}>{savedSide.text}</SettingNote>}
-          {modelLimit && (
+          {!s.group && savedSide?.text && <SettingNote icon={savedSide.icon}>{savedSide.text}</SettingNote>}
+          {!s.group && modelLimit && (
             <SettingNote icon="alert" live>
               {modelLimit}
             </SettingNote>
           )}
-          {s.savedCard === "gemini" && geminiPersonal(s.currentAccount) && (
+          {!s.group && s.savedCard === "gemini" && geminiPersonal(s.currentAccount) && (
             <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
           )}
-          {offTool && offOn ? (
+          {s.group ? null : offTool && offOn ? (
             <ToolOffNote machine={offOn} tool={offTool === "claude_code" ? "claude" : offTool}>
               {t("brain.reasons.tool_offOne", { program: t(`brain.card.${offTool}`), computer: offOn.name })}
             </ToolOffNote>
@@ -727,25 +750,27 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
             toolOffHere && <ToolsOffHereNote />
           )}
           <div className="bd-lines">
-            <BrainLine
-              label={t("agentPage.work.brain.planModel")}
-              lead={
-                isAuto(s.modelNow) ? (
-                  <Icon name="bulb" size={16} />
-                ) : s.modelMaker ? (
-                  <ProviderLogo id={s.modelMaker} size="xs" />
-                ) : undefined
-              }
-              value={s.modelName}
-              onOpen={
-                mayModel
-                  ? () => {
-                      setModelPick(undefined);
-                      go("model");
-                    }
-                  : undefined
-              }
-            />
+            {!s.group && (
+              <BrainLine
+                label={t("agentPage.work.brain.planModel")}
+                lead={
+                  isAuto(s.modelNow) ? (
+                    <Icon name="bulb" size={16} />
+                  ) : s.modelMaker ? (
+                    <ProviderLogo id={s.modelMaker} size="xs" />
+                  ) : undefined
+                }
+                value={s.modelName}
+                onOpen={
+                  mayModel
+                    ? () => {
+                        setModelPick(undefined);
+                        go("model");
+                      }
+                    : undefined
+                }
+              />
+            )}
             <BrainLine label={t("agentPage.work.brain.v2.more")} value={s.moreLine} onOpen={openMore} />
           </div>
           {s.kind === "model" && !can("model") && <SettingNote icon="lock">{adminsOnly}</SettingNote>}
@@ -816,6 +841,62 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
             <p className="arrival-opts__label">{t("agentPage.work.brain.v2.target")}</p>
             {aim && <HaveRow item={aim} checked still />}
           </div>
+        </>
+      );
+    }
+    if (screen === "limit" && s.group) {
+      // Every member at its limit (ADR 0180 §7): the first back, and the group's order with each one's limit.
+      const backs = s.groupMembers.flatMap((mb) => {
+        const until = mb.usage ? planState(mb.usage).until : null;
+        return until ? [{ mb, until }] : [];
+      });
+      const first = backs.sort((a, b) => Date.parse(a.until) - Date.parse(b.until))[0];
+      return (
+        <>
+          <div className="bd-step">
+            {first && (
+              <p>
+                {t("agentPage.work.brain.v2.limitBack", {
+                  account: s.memberName(first.mb),
+                  when: usageWhen(t, i18n.language, first.until),
+                })}
+              </p>
+            )}
+            <span>{t("brainGroups.agent.limitHelp")}</span>
+          </div>
+          <div className="bd-use bd-order">
+            <p className="arrival-opts__label">{t("brainGroups.agent.order")}</p>
+            {s.groupMembers.map((mb) => (
+              <HaveRow
+                key={mb.accountId}
+                item={{
+                  id: mb.accountId,
+                  title: s.memberName(mb),
+                  about: mb.label,
+                  whose: mb.label,
+                  group: { key: "order", label: "" },
+                  mark: <ProviderLogo id={mb.provider ?? mb.kind} size="xs" />,
+                  usage: mb.usage,
+                }}
+                checked={false}
+                still
+              />
+            ))}
+          </div>
+          {can("brain") && (
+            <button
+              type="button"
+              className="arrival-have__link arrival-have__link--other"
+              onClick={() => {
+                setPicked(undefined);
+                go("switch");
+              }}
+            >
+              <Icon name="layers" size={16} />
+              <span>{t("agentPage.work.brain.v2.switch")}</span>
+              <Icon name="chevronRight" size={16} />
+            </button>
+          )}
         </>
       );
     }

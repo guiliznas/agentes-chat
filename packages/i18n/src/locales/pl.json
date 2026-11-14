@@ -11973,7 +11973,16 @@
     "deleteAgents_other": "{{agents}} wracają do myślenia na własnych kontach.",
     "deleteNone": "Żaden agent nie używa tej grupy.",
     "deleteConfirm": "Usuń",
-    "deleted": "Usunięto {{name}}."
+    "deleted": "Usunięto {{name}}.",
+    "agent": {
+      "now": "Teraz myśli z {{name}}",
+      "noneNow": "Żadne konto w grupie nie ma teraz zapasu",
+      "limitTitle": "Wszystkie konta w {{group}} są na limicie",
+      "limitHelp": "Grupa działa dalej z pierwszym kontem, które wróci.",
+      "order": "Kolejność w grupie",
+      "pickerNote": "Każde konto w grupie myśli własnym modelem.",
+      "open": "Zobacz grupę"
+    }
   },
   "brain": {
     "group": {

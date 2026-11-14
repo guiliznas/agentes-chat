@@ -92,6 +92,10 @@
 .arrival-have__row[data-still] {
   cursor: default;
 }
+/* A brain group's order at its limit (ADR 0180): every member only shown, none the one in use, so none is ringed. */
+.bd-order .arrival-have__row[data-still] {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
 /* Picking another row: its ring comes on softly (at once under reduced motion, like every change here). */
 @media (prefers-reduced-motion: no-preference) {
   .bd .arrival-have__row {

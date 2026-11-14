@@ -11484,7 +11484,16 @@
     "deleteAgents_other": "{{agents}} vuelven a pensar con su propia cuenta.",
     "deleteNone": "Ningún agente usa este grupo.",
     "deleteConfirm": "Eliminar",
-    "deleted": "{{name}} eliminado."
+    "deleted": "{{name}} eliminado.",
+    "agent": {
+      "now": "Pensando con {{name}} ahora",
+      "noneNow": "Ninguna cuenta del grupo tiene margen ahora",
+      "limitTitle": "Todas las cuentas de {{group}} están en el límite",
+      "limitHelp": "El grupo sigue con la primera cuenta que vuelva.",
+      "order": "Orden del grupo",
+      "pickerNote": "Cada cuenta del grupo piensa con su propio modelo.",
+      "open": "Ver el grupo"
+    }
   },
   "brain": {
     "group": {

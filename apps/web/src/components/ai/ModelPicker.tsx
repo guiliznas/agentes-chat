@@ -1,4 +1,4 @@
-import type { Agent, AgentBrain, Message } from "@agenteschat/client";
+import type { Agent, AgentBrain, MachineAccountKind, Message } from "@agenteschat/client";
 import {
   keys,
   useAgentBrain,
@@ -19,6 +19,7 @@ import {
   type PickerBefore,
   type PickerModel,
 } from "@agenteschat/client/lib/brain-picker";
+import { planLabel, planMark, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { modelStandInKey, planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planOf } from "@agenteschat/client/lib/plans";
@@ -180,7 +181,70 @@ export function ModelStandInLine({
 function ModelPickerPanel({ agent, onClose }: { agent: Agent; onClose: () => void }) {
   const brain = useAgentBrain(useOrg().org.id, agent.id);
   if (!brain.data) return <div className="mp__loading" aria-busy="true" />;
+  if (brain.data.group) return <GroupBody agent={agent} group={brain.data.group} onClose={onClose} />;
   return <PickerBody agent={agent} view={brain.data} onClose={onClose} />;
+}
+
+/**
+ * On a brain group (ADR 0180) the agent's own account and model are kept under it, and each member thinks with its
+ * own model (§10): picking one here would change what doesn't think. The picker says the group and who thinks now, and
+ * leads to "Quem pensa", where the group is changed or left.
+ */
+function GroupBody({
+  agent,
+  group,
+  onClose,
+}: {
+  agent: Agent;
+  group: NonNullable<AgentBrain["group"]>;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const openPanel = useOpenAgentPanel();
+  const now = group.current;
+  const plan = now ? planOfAccount({ kind: now.kind as MachineAccountKind, provider: null }) : null;
+  return (
+    <div className="mp__body">
+      <TeamScene className="mp__sky" agents={[{ id: agent.id, name: agent.name }]} lead={agent.id}>
+        {plan && (
+          <>
+            <span className="team-scene__trail" data-state="done">
+              {[0, 1, 2, 3, 4].map((n) => (
+                <i key={n} style={{ "--n": n } as CSSProperties} />
+              ))}
+            </span>
+            <span className="team-scene__mark">
+              <ProviderLogo id={planMark(plan)} size="tile" />
+            </span>
+          </>
+        )}
+      </TeamScene>
+      <div className="mp__head">
+        <div className="mp__who">
+          <b>{group.name}</b>
+          <span className="mp__plan">
+            {plan ? t("brainGroups.agent.now", { name: planLabel(t, plan) }) : t("brainGroups.agent.noneNow")}
+          </span>
+        </div>
+      </div>
+      <div className="mp__foot">
+        <small>{t("brainGroups.agent.pickerNote")}</small>
+        {openPanel && (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="layers"
+            onClick={() => {
+              onClose();
+              openPanel(agent.id, "settings", "brain:switch");
+            }}
+          >
+            {t("brainGroups.agent.open")}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function PickerBody({ agent, view, onClose }: { agent: Agent; view: AgentBrain; onClose: () => void }) {

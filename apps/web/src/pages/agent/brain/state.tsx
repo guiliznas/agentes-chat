@@ -1,7 +1,15 @@
-import type { AgentBrain, BrainKind, MachineAccount, MachineAccountKind, PlanUsage } from "@agenteschat/client";
+import type {
+  AgentBrain,
+  BrainGroup,
+  BrainKind,
+  MachineAccount,
+  MachineAccountKind,
+  PlanUsage,
+} from "@agenteschat/client";
 import {
   useAiAccounts,
   useAiStatus,
+  useBrainGroups,
   useComputerSetup,
   useCredentials,
   useModels,
@@ -21,6 +29,7 @@ import {
   signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
 import { advancedContents, effortLevel, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
+import { groupLine } from "@agenteschat/client/lib/brain-groups";
 import { computerNameOf, setupView } from "@agenteschat/client/lib/computer";
 import { contextChoices, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { holdText } from "@agenteschat/client/lib/errors";
@@ -47,6 +56,7 @@ import {
   planOf,
 } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, keyLine, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Icon, type IconName, ProviderLogo, planState } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
@@ -72,9 +82,12 @@ const OWN_KINDS: readonly MachineAccountKind[] = ["claude_code", "codex", "curso
 /** What picking a row does: it is the one in use, it thinks at once, it is taken from another agent, it signs in. */
 export type RowAct = "current" | "use" | "move" | "also" | "again" | "locked";
 
+/** A group's member as a row says it: "Claude", "ChatGPT", "GLM Coding"… (ADR 0180). */
+type GroupMember = Pick<BrainGroup["members"][number], "accountId" | "label" | "kind" | "provider" | "usage">;
+
 /** One way the agent can think, as the account lists draw it (`HaveItem`) with what saving it needs. */
 export interface BrainRow extends HaveItem {
-  kind: "account" | "own" | "key" | "plan";
+  kind: "account" | "own" | "key" | "plan" | "group";
   choice: AiChoice;
   brain: BrainKind;
   /** An account row's login. */
@@ -88,6 +101,8 @@ export interface BrainRow extends HaveItem {
   ownerName?: string;
   /** The plan runs on another computer only: the agent moves there first. */
   moves: BrainMachine | null;
+  /** A group row's group (ADR 0180): its members in the order a run tries them. */
+  brainGroup?: Pick<BrainGroup, "id" | "name" | "strategy" | "members">;
 }
 
 export function useBrainState(view: AgentBrain, opts: { added: readonly MachineAccount[]; signingIn: boolean }) {
@@ -145,7 +160,9 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   const usable = (a: MachineAccount) =>
     a.mine || view.canUseOthersPlans !== true ? undefined : a.ownerId === agent.ownerUserId || lendable(a, agent.name);
   const listed = allAccounts.filter((a) => ofOwner(a) || a.id === view.account);
-  const currentAccount = kind === "model" ? undefined : allAccounts.find((a) => a.id === view.account);
+  // ADR 0180 §6: a group sits over the agent's own brain, kept as saved under it: none of those rows is the one in use.
+  const own = view.group === null;
+  const currentAccount = kind === "model" || !own ? undefined : allAccounts.find((a) => a.id === view.account);
   const rowOf = (machineId: string | undefined) => ai.data?.computers.find((c) => c.machineId === machineId);
   const agentRow = rowOf(view.computer?.machineId);
 
@@ -211,7 +228,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   const accountRow = (c: AccountChoice<MachineAccount>): BrainRow | null => {
     const a = c.login;
     const plan = planOfAccount(a);
-    const current = a.id === view.account && kind !== "model";
+    const current = own && a.id === view.account && kind !== "model";
     const others = [...new Set(a.usedBy)].filter((n) => n !== agent.name);
     const taken = others.length > 0 && a.shared !== true;
     const may = usable(a) ?? a.mine;
@@ -263,7 +280,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   const ownRows: BrainRow[] = OWN_KINDS.flatMap((k): BrainRow[] => {
     const plan = planOfKind(k);
     if (!accountsOn(plan) || !ownSignInListed(view, agentRow, k)) return [];
-    const current = kind === k && view.account === null;
+    const current = own && kind === k && view.account === null;
     const ownPlan = agentRow?.own?.[k]?.plan ?? null;
     return [
       {
@@ -294,7 +311,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   const keysGroup = { key: "keys", label: t("connectAi.chat.keys") };
   const keyCurrent = saved.key ?? DEFAULT_KEY;
   const keyRow = (keyId: string | undefined, title: string, about: string | undefined, provider?: string): BrainRow => {
-    const current = kind === "model" && (keyId === undefined || keyId === keyCurrent);
+    const current = own && kind === "model" && (keyId === undefined || keyId === keyCurrent);
     return {
       id: `key:${keyId ?? "agent"}`,
       kind: "key",
@@ -341,8 +358,8 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
     kind: "plan",
     choice: c,
     brain: c === "key" ? "model" : kindOf(c),
-    act: savedCard === c ? "current" : "use",
-    current: savedCard === c,
+    act: own && savedCard === c ? "current" : "use",
+    current: own && savedCard === c,
     title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
     about:
       about ??
@@ -362,10 +379,90 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   });
   const planRows = cards.filter((c) => c !== "key" && !accountsOn(c) && homeOf(c)).map((c) => planRow(c));
 
+  // The brain groups of its computer (ADR 0180), each one way to think like an account. A group of another computer
+  // isn't offered (`brain_group.other_computer`), nor any to the right hand (§9), which keeps its own rules.
+  const groupsOn = !isRightHand(agent) && view.scope === undefined && view.computer !== null;
+  const groupsQ = useBrainGroups(org.id, groupsOn);
+  const memberName = (m: Pick<GroupMember, "kind" | "provider">) =>
+    planLabel(t, planOfAccount({ kind: m.kind as MachineAccountKind, provider: m.provider }));
+  const groupsGroup = { key: "groups", label: t("brainGroups.title") };
+  const groupRow = (gr: NonNullable<BrainRow["brainGroup"]>): BrainRow => {
+    const current = view.group?.id === gr.id;
+    // The member a run would pick now; else its first, whose mark it shows.
+    const lead = gr.members.find((m) => current && m.accountId === view.group?.current?.accountId) ?? gr.members[0];
+    const plan: AiChoice = lead
+      ? planOfAccount({ kind: lead.kind as MachineAccountKind, provider: lead.provider })
+      : savedCard;
+    return {
+      id: `group:${gr.id}`,
+      kind: "group",
+      choice: plan,
+      brain: lead ? (lead.kind as BrainKind) : kind,
+      brainGroup: gr,
+      act: current ? "current" : "use",
+      current,
+      title: gr.name,
+      about: gr.members.length > 0 ? groupLine(t, gr) : undefined,
+      whose: groupsGroup.label,
+      group: groupsGroup,
+      mark: lead ? (
+        <ProviderLogo id={lead.provider ?? lead.kind} size="xs" />
+      ) : (
+        <Icon name="layers" size={20} className="arrival-have__mark" />
+      ),
+      usage: null,
+      off: false,
+      lends: false,
+      moves: null,
+    };
+  };
+  const groupRows: BrainRow[] = groupsOn
+    ? (groupsQ.data ?? [])
+        .filter((gr) => gr.machineId === view.computer?.machineId && gr.members.length > 0)
+        .map(groupRow)
+    : [];
+  // The group it thinks with has its row even before the list is in (or once it can't see it): its summary.
+  const groupInUse =
+    view.group &&
+    (groupRows.find((r) => r.current) ??
+      groupRow({
+        id: view.group.id,
+        name: view.group.name,
+        strategy: view.group.strategy,
+        members: view.group.current
+          ? [{ ...view.group.current, provider: null, model: null, effort: null, status: "active", usage: null }]
+          : [],
+      }));
+  const groupMembers: GroupMember[] = groupInUse?.brainGroup?.members ?? [];
+  const groupNowMember = view.group?.current
+    ? groupMembers.find((m) => m.accountId === view.group?.current?.accountId)
+    : undefined;
+  /** "Pensando com Claude agora", or that none has room now. */
+  const groupNow = view.group
+    ? view.group.current
+      ? t("brainGroups.agent.now", { name: memberName(groupNowMember ?? { ...view.group.current, provider: null }) })
+      : t("brainGroups.agent.noneNow")
+    : null;
+
   // Its AI, for the switch screen's groups ("Trocar a conta" by AI, not by person): a plan by its name, keys together.
   const apiKeys = { key: "keys", label: t("connectAi.chat.apiKeys") };
-  const every = [...accountRows, ...ownRows, ...keyRows, ...planRows].map(
-    (r): BrainRow => ({ ...r, ai: r.choice === "key" ? apiKeys : { key: r.choice, label: planLabel(t, r.choice) } }),
+  const every = [
+    ...accountRows,
+    ...ownRows,
+    ...keyRows,
+    ...planRows,
+    ...groupRows.filter((r) => !r.current),
+    ...(groupInUse ? [groupInUse] : []),
+  ].map(
+    (r): BrainRow => ({
+      ...r,
+      ai:
+        r.kind === "group"
+          ? groupsGroup
+          : r.choice === "key"
+            ? apiKeys
+            : { key: r.choice, label: planLabel(t, r.choice) },
+    }),
   );
   // What it thinks with now always has its row, even when nothing of that plan is listed (no sign-in there yet).
   const currentRow =
@@ -376,11 +473,21 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   const rows = every.filter((r) => !r.current);
 
   // ── the account in use ──
-  const usage: PlanUsage | null = currentRow?.usage ?? null;
-  const limitedNow = usage ? planState(usage).state === "limited" : false;
+  // On a group, the limits of the member thinking now; it is at its limit when every member is.
+  const usage: PlanUsage | null = view.group ? (groupNowMember?.usage ?? null) : (currentRow?.usage ?? null);
+  const groupFull =
+    groupMembers.length > 0 && groupMembers.every((m) => m.usage && planState(m.usage).state === "limited");
+  // No member able to think now (`current` null) reads as used up until the group's list says each one's limits: the
+  // dialog opens on its limit before that list is in.
+  const groupListed = groupRows.some((r) => r.current);
+  const limitedNow = view.group
+    ? view.group.current === null && (!groupListed || groupFull)
+    : usage
+      ? planState(usage).state === "limited"
+      : false;
   // At its limit, its owner's free accounts of the same plan with room, never another agent's (`limitOffers`).
   const offers =
-    limitedNow && kind !== "model"
+    limitedNow && kind !== "model" && own
       ? limitOffers(listed, kind, view.account).flatMap(({ account }) => {
           const r = accountRow({ login: account, usedBy: account.usedBy, also: false });
           return r && !r.off && (r.act === "use" || r.act === "move") ? [r] : [];
@@ -448,6 +555,13 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
     t,
     kind,
     savedCard,
+    /** ADR 0180: the group it thinks with (null: its own brain), the line saying who thinks now, its members. */
+    group: view.group,
+    groupNow,
+    groupMembers,
+    memberName,
+    /** The AI's mark over the agent: the group's member thinking now, else what it is saved with. */
+    markNow: view.group ? (currentRow?.choice ?? savedCard) : savedCard,
     hold,
     edition,
     apiKey,

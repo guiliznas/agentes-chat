@@ -10683,7 +10683,16 @@
     "deleteAgents_other": "{{agents}} は自分のアカウントで考えるように戻ります。",
     "deleteNone": "このグループを使っているエージェントはいません。",
     "deleteConfirm": "削除",
-    "deleted": "{{name}} を削除しました。"
+    "deleted": "{{name}} を削除しました。",
+    "agent": {
+      "now": "いまは {{name}} で考えています",
+      "noneNow": "いま余裕のあるグループのアカウントはありません",
+      "limitTitle": "{{group}} のアカウントはすべて上限です",
+      "limitHelp": "最初に戻ったアカウントでグループが続けます。",
+      "order": "グループの順番",
+      "pickerNote": "グループの各アカウントは自分のモデルで考えます。",
+      "open": "グループを見る"
+    }
   },
   "brain": {
     "group": {

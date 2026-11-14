@@ -11553,7 +11553,16 @@
     "deleteAgents_other": "{{agents}} repensent avec leur propre compte.",
     "deleteNone": "Aucun agent n'utilise ce groupe.",
     "deleteConfirm": "Supprimer",
-    "deleted": "{{name}} supprimé."
+    "deleted": "{{name}} supprimé.",
+    "agent": {
+      "now": "Réfléchit avec {{name}} en ce moment",
+      "noneNow": "Aucun compte du groupe n’a de marge pour l’instant",
+      "limitTitle": "Tous les comptes de {{group}} sont à leur limite",
+      "limitHelp": "Le groupe continue avec le premier compte qui revient.",
+      "order": "Ordre du groupe",
+      "pickerNote": "Chaque compte du groupe réfléchit avec son propre modèle.",
+      "open": "Voir le groupe"
+    }
   },
   "brain": {
     "group": {

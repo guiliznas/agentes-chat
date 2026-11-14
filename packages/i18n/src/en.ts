@@ -11380,6 +11380,20 @@ export const en = {
     deleteNone: "No agent uses it.",
     deleteConfirm: "Delete",
     deleted: "{{name}} deleted.",
+    /** An agent's "Quem pensa" and model picker on a group. */
+    agent: {
+      /** Under the group in use: the member a run would pick now; `name`: "Claude", "ChatGPT"… */
+      now: "Thinking with {{name}} now",
+      noneNow: "No account in the group has room now",
+      /** Every member at its limit; `group`: the group's name. */
+      limitTitle: "Every account in {{group}} is at its limit",
+      limitHelp: "The group goes on with the first account back.",
+      /** Over the members in the order a run tries them. */
+      order: "The group's order",
+      /** The model picker in place, on a group. */
+      pickerNote: "Each account in the group thinks with its own model.",
+      open: "See the group",
+    },
   },
   brain: {
     /** A brain group (ADR 0180) in one line: `names` are its providers in the order a run tries them. */

@@ -27163,6 +27163,27 @@
   "brainGroups.deleted": {
     "value": "{{name}} deleted."
   },
+  "brainGroups.agent.now": {
+    "value": "Thinking with {{name}} now"
+  },
+  "brainGroups.agent.noneNow": {
+    "value": "No account in the group has room now"
+  },
+  "brainGroups.agent.limitTitle": {
+    "value": "Every account in {{group}} is at its limit"
+  },
+  "brainGroups.agent.limitHelp": {
+    "value": "The group goes on with the first account back."
+  },
+  "brainGroups.agent.order": {
+    "value": "The group's order"
+  },
+  "brainGroups.agent.pickerNote": {
+    "value": "Each account in the group thinks with its own model."
+  },
+  "brainGroups.agent.open": {
+    "value": "See the group"
+  },
   "brain.group.line.order": {
     "value": "{{names}} · in order"
   },

@@ -24,16 +24,20 @@
  * - `POST   …/account-logins` `{ kind, provider }` → a coding plan's key: no sign-in page but the plan's own
  * - `GET/POST …/brain-groups`, `PUT/DELETE …/brain-groups/{id}` (ADR 0180): groups of the accounts `setAiAccounts()`
  *   set, kept in memory; a second account of one provider is refused (`brain_group.same_provider`, 409)
+ * - `PUT …/agents/{id}/brain` `{ group }` and `GET …/agents/{id}/brain` `group` (ADR 0180): through `withGroups()`
  * Sign-ins wait until a test calls `endLogin()`.
  * Tests add machines with `pair()`, codes with `addDevice()`, a release with `setRelease()`, outages with
  * `setOutages()` and the move's answer with `setMoveResult()`. No machines, codes, release or outages by default.
  */
 import type {
   AccountLoginStatus,
+  AgentBrain,
   AiAccounts,
   ApiClient,
   BrainGroup,
   BrainGroupMemberInput,
+  BrainGroupSummary,
+  BrainKind,
   ComputerQueue,
   ComputerSetup,
   DesktopRelease,
@@ -47,6 +51,7 @@ import type {
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
+import { planState } from "@agenteschat/ui/plan-state";
 import { clone, type MockContext, MockNotFoundError } from "./context";
 
 export interface FakeMachines {
@@ -88,6 +93,12 @@ export interface FakeMachines {
   /** The groups as they are now (a test's seed, or what the client saved). */
   setBrainGroups(groups: BrainGroup[]): void;
   groups(): BrainGroup[];
+  /**
+   * `agents` with "Quem pensa" thinking with a group (ADR 0180): `setBrain` `{ group }` checks it as the server does
+   * (`brain_group.not_found`, `brain_group.other_computer`) and `brain` says it, `current` its first active member with
+   * room. The agent's own brain fields stay as they were; `group: null` puts them back.
+   */
+  withGroups(agents: ApiClient["agents"]): ApiClient["agents"];
 }
 
 let seq = 0;
@@ -451,6 +462,36 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       groups = clone(list);
     },
     groups: () => clone(groups),
+    withGroups: (agents) => {
+      const thinksWith = new Map<string, string | null>();
+      const summary = (id: string | null | undefined): BrainGroupSummary | null => {
+        const g = id ? groups.find((x) => x.id === id) : undefined;
+        if (!g) return null;
+        const m = g.members.find((x) => x.status === "active" && (!x.usage || planState(x.usage).state !== "limited"));
+        return {
+          id: g.id,
+          name: g.name,
+          strategy: g.strategy,
+          current: m ? { accountId: m.accountId, label: m.label, kind: m.kind as BrainKind } : null,
+        };
+      };
+      const withGroup = (b: AgentBrain): AgentBrain => ({ ...b, group: summary(thinksWith.get(b.agentId)) });
+      return {
+        ...agents,
+        brain: async (...args) => withGroup(await agents.brain(...args)),
+        setBrain: async (orgId, agentId, input) => {
+          if (input.group) {
+            const g = group(input.group);
+            const b = await agents.brain(orgId, agentId);
+            if (b.computer?.machineId !== g.machineId)
+              throw new ApiError(400, "brain_group.other_computer", "The group is on another computer");
+          }
+          const next = await agents.setBrain(orgId, agentId, input);
+          if (input.group !== undefined) thinksWith.set(agentId, input.group);
+          return withGroup(next);
+        },
+      };
+    },
     addDevice: (userCode, input = {}) => {
       const now = ctx.now();
       const d: DeviceRequest = {

@@ -127,3 +127,43 @@ test("a reply Automático gave with another model: 'Usar o X em todos' opens the
   await click(within(line).getByRole("button", { name: "Escolher modelo" }));
   expect(document.querySelector(".mp")).toBeTruthy();
 });
+
+test("on a brain group (ADR 0180) the picker shows the group and the account thinking now, and leads to it without switching account", async () => {
+  const state = seedState();
+  const api = createFakeApi(state);
+  const member = (accountId: string, label: string, kind: string) => ({
+    accountId,
+    label,
+    kind,
+    provider: null,
+    model: null,
+    effort: null,
+    status: "active",
+    usage: null,
+  });
+  fakeMachinesOf.get(api)?.setBrainGroups([
+    {
+      id: "bg_daily",
+      machineId: "machine_1",
+      name: "Dia a dia",
+      strategy: "order",
+      members: [member("acct_claude", "Trabalho", "claude_code"), member("acct_codex", "Pessoal", "codex")],
+      usedBy: [],
+      canEdit: true,
+    },
+  ]);
+  await api.agents.setBrain(ORG_ID, ADA_ID, { group: "bg_daily" });
+  state.calls.length = 0;
+  await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api });
+  await settle(8);
+  const header = document.querySelector(".channel__header") as HTMLElement;
+  await click(within(header).getByRole("button", { name: "Mudar o modelo de Ada" }));
+  const panel = document.querySelector(".mp") as HTMLElement;
+  expect(panel.querySelector(".mp__who b")?.textContent).toBe("Dia a dia");
+  expect(panel.textContent).toContain("Pensando com Claude agora");
+  // Each member thinks with its own model: no tiles or models to switch the agent's account with.
+  expect(panel.querySelectorAll(".mp__tile, .mp__model")).toHaveLength(0);
+  await click(within(panel).getByRole("button", { name: "Ver o grupo" }));
+  expect(screen().getByRole("dialog", { name: /^(Quem pensa pela Ada|Trocar a conta da Ada)$/ })).toBeTruthy();
+  expect(state.calls.some((c) => c.method === "agents.setBrain")).toBe(false);
+});

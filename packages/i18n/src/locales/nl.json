@@ -11197,7 +11197,16 @@
     "deleteAgents_other": "{{agents}} denken weer met hun eigen account.",
     "deleteNone": "Geen agent gebruikt deze groep.",
     "deleteConfirm": "Verwijderen",
-    "deleted": "{{name}} verwijderd."
+    "deleted": "{{name}} verwijderd.",
+    "agent": {
+      "now": "Denkt nu met {{name}}",
+      "noneNow": "Geen account van de groep heeft nu ruimte",
+      "limitTitle": "Alle accounts in {{group}} zitten aan hun limiet",
+      "limitHelp": "De groep gaat verder met het eerste account dat terug is.",
+      "order": "Volgorde van de groep",
+      "pickerNote": "Elk account van de groep denkt met zijn eigen model.",
+      "open": "Groep bekijken"
+    }
   },
   "brain": {
     "group": {

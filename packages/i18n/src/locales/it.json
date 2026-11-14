@@ -11567,7 +11567,16 @@
     "deleteAgents_other": "{{agents}} tornano a pensare con il proprio account.",
     "deleteNone": "Nessun agente usa questo gruppo.",
     "deleteConfirm": "Elimina",
-    "deleted": "{{name}} eliminato."
+    "deleted": "{{name}} eliminato.",
+    "agent": {
+      "now": "Sta pensando con {{name}} ora",
+      "noneNow": "Nessun account del gruppo ha margine ora",
+      "limitTitle": "Tutti gli account di {{group}} sono al limite",
+      "limitHelp": "Il gruppo prosegue con il primo account che torna.",
+      "order": "Ordine del gruppo",
+      "pickerNote": "Ogni account del gruppo pensa con il proprio modello.",
+      "open": "Vedi il gruppo"
+    }
   },
   "brain": {
     "group": {

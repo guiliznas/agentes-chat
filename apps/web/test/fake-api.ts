@@ -3928,6 +3928,8 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   state.drive = artifacts;
   const client: ApiClient = {
     ...http,
+    // "Quem pensa" with a brain group (ADR 0180): the groups live beside the accounts they group.
+    agents: machines.withGroups(http.agents),
     apps: apps.client,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
     // Brain groups (ADR 0180): kept beside the accounts they group.

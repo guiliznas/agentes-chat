@@ -11073,7 +11073,16 @@
     "deleteAgents_other": "{{agents}} yeniden kendi hesaplarıyla düşünür.",
     "deleteNone": "Bu grubu hiçbir ajan kullanmıyor.",
     "deleteConfirm": "Sil",
-    "deleted": "{{name}} silindi."
+    "deleted": "{{name}} silindi.",
+    "agent": {
+      "now": "Şu an {{name}} ile düşünüyor",
+      "noneNow": "Grupta şu an payı olan hesap yok",
+      "limitTitle": "{{group}} içindeki tüm hesaplar limitte",
+      "limitHelp": "Grup, ilk geri gelen hesapla devam eder.",
+      "order": "Grubun sırası",
+      "pickerNote": "Gruptaki her hesap kendi modeliyle düşünür.",
+      "open": "Grubu gör"
+    }
   },
   "brain": {
     "group": {
