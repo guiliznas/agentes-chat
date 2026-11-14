@@ -472,6 +472,10 @@ export const Agent = z
           description:
             "An API brain on Automático: the maker its models come from (its own key's, else the workspace's), whose logo shows beside it.",
         }),
+        group: z.object({ id: z.uuid(), name: z.string() }).optional().openapi({
+          description:
+            "The brain group it thinks with (ADR 0180): then `account` and `usage` are of the member a run would pick now.",
+        }),
       })
       .optional()
       .openapi({ description: "Who thinks for it (ADR 0032), to show next to its name." }),
@@ -973,6 +977,52 @@ export const BrainMachine = z
   .object({ machineId: z.uuid(), name: z.string(), online: z.boolean(), options: z.array(BrainOption) })
   .openapi("BrainMachine");
 
+export const BrainGroupStrategy = z.enum(["order", "room"]).openapi({
+  description:
+    "How a run picks the member (ADR 0180): `order` takes the first with room left, `room` the one with the most left.",
+});
+
+/** A brain group: at most one account per provider on one computer, which an agent can think with (ADR 0180). */
+export const BrainGroup = z
+  .object({
+    id: z.uuid(),
+    machineId: z.uuid().openapi({ description: "The computer all its accounts are on." }),
+    name: z.string(),
+    strategy: BrainGroupStrategy,
+    members: z
+      .array(
+        z.object({
+          accountId: z.uuid(),
+          label: z.string(),
+          kind: z.string().openapi({ description: "`claude_code`, `codex`…: the account's kind." }),
+          provider: z
+            .string()
+            .nullable()
+            .openapi({ description: "A coding plan's maker; null for a CLI's own login." }),
+          model: z.string().nullable().openapi({ description: "The model this member runs; null = the agent's." }),
+          effort: z.string().nullable().openapi({ description: "The effort this member runs; null = the agent's." }),
+          status: z.string(),
+          usage: PlanUsage.nullable().openapi({ description: "Its limits as last reported; null: not known yet." }),
+        }),
+      )
+      .openapi({ description: "In the order a run tries them." }),
+    usedBy: z.array(z.object({ id: z.uuid(), name: z.string() })).openapi({ description: "The agents that use it." }),
+    canEdit: z.boolean().openapi({ description: "The caller made it, or is an admin." }),
+  })
+  .openapi("BrainGroup");
+
+export const BrainGroupSummary = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    strategy: BrainGroupStrategy,
+    current: z
+      .object({ accountId: z.uuid(), label: z.string(), kind: BrainKind })
+      .nullable()
+      .openapi({ description: "The member a run would pick now; null when none can serve the agent." }),
+  })
+  .openapi("BrainGroupSummary");
+
 export const AgentBrain = z
   .object({
     agentId: z.uuid(),
@@ -1013,6 +1063,10 @@ export const AgentBrain = z
       .uuid()
       .nullable()
       .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
+    group: BrainGroupSummary.nullable().openapi({
+      description:
+        "The brain group it thinks with (ADR 0180): `account` above stays as saved, what comes back when it leaves the group.",
+    }),
     effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run; null = the CLI's default." }),
     speed: BrainSpeed,
     contextTokens: ContextLimit.nullable().openapi({
@@ -1073,6 +1127,10 @@ export const AgentSetup = z
       .nullable()
       .optional()
       .openapi({ description: "A computer brain: the account there; null = that computer's own sign-in." }),
+    group: z.uuid().nullable().optional().openapi({
+      description:
+        "A brain group of that computer (ADR 0180), copied only to agents on it; null = none; omitted = each agent keeps its own.",
+    }),
     effort: BrainEffortSetting.nullable().optional(),
     speed: BrainSpeed.optional().openapi({ description: "Omitted = each agent keeps its own." }),
     contextTokens: ContextLimit.nullable().optional(),

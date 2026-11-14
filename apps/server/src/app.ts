@@ -25,6 +25,7 @@ import { appRoutes } from "./routes/app/apps";
 import { artifactRoutes } from "./routes/app/artifacts";
 import { auditRoutes } from "./routes/app/audit";
 import { billingRoutes } from "./routes/app/billing";
+import { brainGroupRoutes } from "./routes/app/brain-groups";
 import { browserRoutes } from "./routes/app/browser";
 import { browserProfileRoutes } from "./routes/app/browser-profiles";
 import { calendarRoutes } from "./routes/app/calendar";
@@ -220,6 +221,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", deviceWaitRoutes(deps));
     api.route("/app", deviceAppRoutes(deps));
     api.route("/app", machineAccountRoutes(deps));
+    api.route("/app", brainGroupRoutes(deps));
     api.route("/app", planUsageRoutes(deps));
     api.route("/app", personUsageRoutes(deps));
     api.route("/app", teamWeekRoutes(deps));

@@ -1920,6 +1920,10 @@ export function agentRoutes(deps: AppDeps) {
             moveAccount: z.boolean().optional().openapi({
               description: "The account thinks for another agent (`account.in_use`): take it from that one (audited).",
             }),
+            group: z.uuid().nullable().optional().openapi({
+              description:
+                "A brain group of the agent's computer it thinks with, which picks the account each run (ADR 0180); null = none; omitted = keep (cleared when the computer changes). `brain_group.not_found`, `brain_group.other_computer`, `brain_group.right_hand`.",
+            }),
             effort: BrainEffortSetting.nullable()
               .optional()
               .openapi({ description: "`auto` = picked per run; null = the CLI's default; omitted = keep." }),
