@@ -5658,9 +5658,9 @@ export interface BrainGroup {
     kind: string;
     /** A coding plan's maker; null for a CLI's own login. */
     provider: string | null;
-    /** Null = the agent's model. */
+    /** Null = Automático. */
     model: string | null;
-    /** Null = the agent's effort. */
+    /** Null = the CLI's default. */
     effort: string | null;
     status: string;
     /** Its limits as last reported; null: not known yet. */

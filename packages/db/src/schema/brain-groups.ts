@@ -21,7 +21,7 @@ export const BRAIN_GROUP_NAME_MAX = 40;
 /**
  * A named set of one computer's accounts that think together (ADR 0180): an agent points at one instead of at a
  * single account, and the group's `strategy` says how its members take turns (`order`: the first that can answer;
- * `room`: all of them in one conversation). It lives on one computer, so it goes with it.
+ * `room`: the member with the most room left). It lives on one computer, so it goes with it.
  */
 export const brainGroups = pgTable(
   "brain_groups",
@@ -56,7 +56,8 @@ export const brainGroups = pgTable(
 /**
  * One account in a brain group (ADR 0180), at `position` in its order. A group holds one account per provider:
  * `providerKey` is `coalesce(provider, kind)` of the account, written by the engine when it adds the member.
- * `model` and `effort` are the member's own choice; null: the account's default.
+ * `model` and `effort` are the member's own choice: a null model is Automático, a null effort the CLI's default (never
+ * the agent's own, which stays saved under the group).
  */
 export const brainGroupMembers = pgTable(
   "brain_group_members",

@@ -12,10 +12,13 @@ type Account = AiAccounts["accounts"][number];
 export const GROUP_NAME_MAX = 40;
 
 /** One slot of the group being edited: its provider and the account standing for it (null model/effort: the agent's). */
+/** One member as the group's screen edits it (ADR 0180). */
 export interface Slot {
   provider: string;
   accountId: string;
+  /** Null = Automático. */
   model: string | null;
+  /** Null = the CLI's default. */
   effort: string | null;
 }
 

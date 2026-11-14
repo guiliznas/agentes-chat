@@ -26,8 +26,8 @@ const GroupParams = OrgParams.extend({ groupId: z.uuid() });
 
 const Member = z.object({
   accountId: z.uuid(),
-  model: z.string().max(80).nullable().optional().openapi({ description: "Null or omitted = the agent's model." }),
-  effort: z.string().max(20).nullable().optional().openapi({ description: "Null or omitted = the agent's effort." }),
+  model: z.string().max(80).nullable().optional().openapi({ description: "Null or omitted = Automático." }),
+  effort: z.string().max(20).nullable().optional().openapi({ description: "Null or omitted = the CLI's default." }),
 });
 
 const Members = z.array(Member).max(20).openapi({

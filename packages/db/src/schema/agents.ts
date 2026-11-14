@@ -221,7 +221,8 @@ export const agents = pgTable(
     brainAccountId: uuid(),
     /**
      * The group of accounts its computer brain thinks with instead of one (ADR 0180), on its machine; null: the
-     * account above. Cleared when the agent changes computer or brain kind, or the group goes.
+     * account above. Cleared when the agent changes computer, goes back to the API (handed to someone whose plan it
+     * isn't, or its owner leaves), or the group goes; a brain save that leaves `group` out keeps it.
      */
     brainGroupId: uuid(),
     /**

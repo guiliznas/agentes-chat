@@ -999,8 +999,11 @@ export const BrainGroup = z
             .string()
             .nullable()
             .openapi({ description: "A coding plan's maker; null for a CLI's own login." }),
-          model: z.string().nullable().openapi({ description: "The model this member runs; null = the agent's." }),
-          effort: z.string().nullable().openapi({ description: "The effort this member runs; null = the agent's." }),
+          model: z.string().nullable().openapi({ description: "The model this member runs; null = Automático." }),
+          effort: z
+            .string()
+            .nullable()
+            .openapi({ description: "The effort this member runs; null = the CLI's default." }),
           status: z.string(),
           usage: PlanUsage.nullable().openapi({ description: "Its limits as last reported; null: not known yet." }),
         }),
