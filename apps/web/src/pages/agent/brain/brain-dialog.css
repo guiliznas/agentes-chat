@@ -339,7 +339,8 @@ html:not([data-pointer]) .bd-line:focus-visible {
 }
 
 /* ---------- choices without a mark (the models, the computers) ---------- */
-.bd .arrival-have__row.bd-pick {
+/* `PickList`'s rows wherever it is used (a brain group's member too, ADR 0180), not only inside this dialog. */
+.arrival-have__row.bd-pick {
   grid-template-columns: minmax(0, 1fr);
 }
 /* Over the account line's colour (arrival.css) by specificity, never by which sheet links last. */

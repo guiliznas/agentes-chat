@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { AiAccounts, AiComputer, BrainGroup } from "@agenteschat/client";
+import type { AiAccounts, AiComputer, BrainGroup, BrainMachine, BrainOption } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -62,15 +62,29 @@ const CLAUDE = account("acct_claude", {
 const CLAUDE_2 = account("acct_claude_2", { label: "Claude Pro", plan: "pro" });
 const CHATGPT = account("acct_gpt", { kind: "codex", label: "ChatGPT Plus", plan: "plus" });
 
-async function page(groups: BrainGroup[] = [], accounts = [CLAUDE, CLAUDE_2, CHATGPT]) {
-  const api = createFakeApi(seedState());
+async function page(
+  groups: BrainGroup[] = [],
+  accounts = [CLAUDE, CLAUDE_2, CHATGPT],
+  { computers = [MAC], brainMachines }: { computers?: AiComputer[]; brainMachines?: BrainMachine[] } = {},
+) {
+  const api = createFakeApi(seedState(brainMachines ? { brainMachines } : {}));
   const fake = fakeMachinesOf.get(api);
   if (!fake) throw new Error("no machines fake");
-  fake.setAiAccounts({ accounts, computers: [MAC] });
+  fake.setAiAccounts({ accounts, computers });
   fake.setBrainGroups(groups);
   await renderApp(`/org/${ORG_ID}/settings/usage`, { api });
   await settle(6);
   return { api, fake };
+}
+
+/** Opens a kit select and picks one of its options. */
+async function pick(select: HTMLElement, option: string) {
+  await act(async () => {
+    fireEvent.pointerDown(select, { button: 0, pointerType: "mouse" });
+    fireEvent.click(select);
+  });
+  await settle(3);
+  await click(screen().getByRole("option", { name: option }));
 }
 
 const card = () => screen().getByRole("region", { name: "Grupos" });
@@ -203,5 +217,70 @@ describe("IA e uso › Grupos (ADR 0180)", () => {
     await click(within(dialog()).getByRole("button", { name: "Apagar" }));
     expect(fake.groups()).toHaveLength(0);
     expect(within(card()).getByText("Nenhum grupo ainda.")).toBeTruthy();
+  });
+
+  test("with two computers, Novo grupo picks one: its accounts become the members, and the row names it", async () => {
+    const MINI: AiComputer = { ...MAC, machineId: "machine_2", name: "Mac mini" };
+    const ON_MINI = account("acct_mini", { label: "Claude do mini", machineId: MINI.machineId, computer: MINI.name });
+    const { fake } = await page([], [CLAUDE, CHATGPT, ON_MINI], { computers: [MAC, MINI] });
+    await click(within(card()).getByRole("button", { name: "Novo grupo" }));
+    await act(async () => fireEvent.change(within(dialog()).getByLabelText("Nome"), { target: { value: "Mini" } }));
+    expect(members()).toEqual(["Claude Max", "ChatGPT Plus"]);
+    await pick(within(dialog()).getByRole("combobox", { name: "Computador" }), "Mac mini");
+    expect(members()).toEqual(["Claude do mini"]);
+    await click(within(dialog()).getByRole("button", { name: "Criar grupo" }));
+    const [saved] = fake.groups();
+    expect(saved?.machineId).toBe(MINI.machineId);
+    expect(saved?.members.map((m) => m.accountId)).toEqual([ON_MINI.id]);
+    expect(within(card()).getByRole("button", { name: /Mini/ }).textContent).toContain("Mac mini");
+  });
+
+  test("a member's model and effort: picked, saved, and back to the agent's when its account changes", async () => {
+    const option = (kind: BrainOption["kind"], models: string[]): BrainOption => ({
+      kind,
+      available: true,
+      models: models.map((m) => ({ value: m.toLowerCase(), label: m })),
+      defaultModel: null,
+    });
+    const { fake } = await page([], [CLAUDE, CLAUDE_2, CHATGPT], {
+      brainMachines: [
+        {
+          machineId: MAC.machineId,
+          name: MAC.name,
+          online: true,
+          options: [option("claude_code", ["Opus", "Sonnet"]), option("codex", ["GPT-5"])],
+        },
+      ],
+    });
+    await click(within(card()).getByRole("button", { name: "Novo grupo" }));
+    await act(async () => fireEvent.change(within(dialog()).getByLabelText("Nome"), { target: { value: "Fixo" } }));
+    const row = (name: string) =>
+      [...dialog().querySelectorAll(".bg-member")].find(
+        (m) => m.querySelector(".bg-member__name")?.textContent === name,
+      ) as HTMLElement;
+    const choose = async (member: string, model: RegExp, steps: number) => {
+      await click(within(row(member)).getByRole("button", { name: /^Modelo:/ }));
+      // Automático picks the effort too: no ramp until a model is fixed.
+      expect(within(dialog()).queryByRole("slider")).toBeNull();
+      await click(within(dialog()).getByRole("radio", { name: model }));
+      const ramp = within(dialog()).getByRole("slider", { name: "Esforço" });
+      expect(ramp.getAttribute("aria-valuetext")).toBe("Médio");
+      for (let i = 0; i < steps; i++) await act(async () => fireEvent.keyDown(ramp, { key: "ArrowRight" }));
+      await click(within(dialog()).getByRole("button", { name: "Usar" }));
+    };
+    await choose("ChatGPT Plus", /^GPT-5/, 1);
+    expect(within(row("ChatGPT Plus")).getByRole("button", { name: /^Modelo:/ }).textContent).toBe(
+      "Modelo: GPT-5 · esforço alto",
+    );
+    await choose("Claude Max", /^Opus/, 2);
+    expect(row("Claude Max").textContent).toContain("Modelo: Opus · esforço máximo");
+    // Another Claude account: its model and effort go back to the agent's.
+    await pick(within(dialog()).getByRole("combobox", { name: "Conta do Claude" }), "Claude Pro");
+    expect(within(row("Claude Pro")).getByRole("button", { name: /^Modelo:/ }).textContent).toBe("Modelo: Automático");
+    await click(within(dialog()).getByRole("button", { name: "Criar grupo" }));
+    expect(fake.groups()[0]?.members.map((m) => [m.accountId, m.model, m.effort])).toEqual([
+      [CLAUDE_2.id, null, null],
+      [CHATGPT.id, "gpt-5", "high"],
+    ]);
   });
 });

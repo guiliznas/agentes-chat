@@ -52,8 +52,19 @@
   }
 }
 
-/* The members in order, each its mark, its name and model, its meter and its moves. The name's capitals start at the
-   mark's top (`.ac-captop`); the moves sit on the mark's middle. */
+/* The members in order. On one line the mark, the name (its capitals at the mark's top, `.ac-captop`), the meter and
+   the moves; under them, from the mark's edge, its model and the other account it could be. The mark never keeps a
+   column beside more lines than the name's. */
+/* The accounts' label, its ⓘ and the list, a field's spacing without a field's one control. */
+.bg-members-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--field-gap);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
 .bg-members {
   display: grid;
   gap: var(--space-2);
@@ -70,18 +81,18 @@
   border-radius: var(--radius-md);
 }
 .bg-member__head {
-  grid-column: 2;
-  grid-row: 1;
-  display: grid;
-  min-width: 0;
+  display: contents;
 }
 .bg-member__name {
+  grid-column: 2;
+  grid-row: 1;
   font-size: 15px;
   font-weight: 600;
   line-height: 22px;
   overflow-wrap: anywhere;
 }
 .bg-member__model {
+  grid-column: 1 / -1;
   justify-self: start;
   text-align: left;
 }
@@ -100,25 +111,19 @@
 .bg-member__pick {
   grid-column: 1 / -1;
 }
+.bg-effort__auto {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
 .bg-members__add {
   flex-wrap: wrap;
 }
 
-/* A phone: the mark, the name and the moves on one line, then the model, the meter and the pick at the row's width
-   from the mark's edge. The mark never keeps a column beside them. */
+/* A phone: the meter goes under the name too, at the row's width. */
 @media (max-width: 560px) {
   .bg-member {
     grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .bg-member__head {
-    display: contents;
-  }
-  .bg-member__name {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .bg-member__model {
-    grid-column: 1 / -1;
   }
   .bg-member__acts {
     grid-column: 3;

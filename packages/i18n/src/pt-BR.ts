@@ -11416,7 +11416,11 @@ export const ptBR = {
     moveDown: "Descer {{name}}",
     /** Under a member's name: the model it thinks with there. */
     modelLine: "Modelo: {{model}}",
-    modelOf: "Modelo do {{name}}",
+    /** With a fixed model: its effort too, lowercase (`agentPage.work.brain.effortsLower`). */
+    modelEffortLine: "Modelo: {{model}} · esforço {{effort}}",
+    /** Keeps the model and effort picked for the member, back to the group. */
+    use: "Usar",
+    modelOf: "Modelo e esforço do {{name}}",
     create: "Criar grupo",
     created: "{{name}} criado.",
     saved: "{{name}} salvo.",

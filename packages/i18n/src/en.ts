@@ -11365,7 +11365,11 @@ export const en = {
     moveDown: "Move {{name}} down",
     /** Under a member's name: the model it thinks with there. */
     modelLine: "Model: {{model}}",
-    modelOf: "{{name}}'s model",
+    /** With a fixed model: its effort too, lowercase (`agentPage.work.brain.effortsLower`). */
+    modelEffortLine: "Model: {{model}} · {{effort}} effort",
+    /** Keeps the model and effort picked for the member, back to the group. */
+    use: "Use",
+    modelOf: "{{name}}'s model and effort",
     create: "Create group",
     created: "{{name}} created.",
     saved: "{{name}} saved.",

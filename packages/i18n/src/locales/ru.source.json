@@ -27124,8 +27124,14 @@
   "brainGroups.modelLine": {
     "value": "Model: {{model}}"
   },
+  "brainGroups.modelEffortLine": {
+    "value": "Model: {{model}} · {{effort}} effort"
+  },
+  "brainGroups.use": {
+    "value": "Use"
+  },
   "brainGroups.modelOf": {
-    "value": "{{name}}'s model"
+    "value": "{{name}}'s model and effort"
   },
   "brainGroups.create": {
     "value": "Create group"

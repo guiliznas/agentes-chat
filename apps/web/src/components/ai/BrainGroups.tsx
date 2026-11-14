@@ -7,6 +7,7 @@ import {
   useDeleteBrainGroup,
   useUpdateBrainGroup,
 } from "@agenteschat/client";
+import { EFFORT_LEVELS, effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { groupCandidates, groupLine, groupProviderKey } from "@agenteschat/client/lib/brain-groups";
 import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -22,8 +23,10 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EffortPixels,
   Field,
   Icon,
+  InfoHint,
   Input,
   List,
   Meter,
@@ -41,6 +44,9 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { PickList, type PickOption } from "@/pages/agent/brain/pieces";
+// `PickList`'s rows, as the right hand's dialog takes them.
+import "@/components/arrival/arrival.css";
+import "@/pages/agent/brain/brain-dialog.css";
 import "./brain-groups.css";
 
 /*
@@ -168,7 +174,11 @@ export function BrainGroupsCard() {
   );
 }
 
-type Screen = { type: "form" } | { type: "model"; provider: string } | { type: "delete" };
+/** `model`: one member's model and effort being picked, saved into the member with "Usar". */
+type Screen =
+  | { type: "form" }
+  | { type: "model"; provider: string; model: string | null; effort: string | null }
+  | { type: "delete" };
 
 /** Making a group, or changing one: its name, its computer (new only), how it picks, and its accounts in order. */
 export function BrainGroupDialog({
@@ -255,6 +265,14 @@ export function BrainGroupDialog({
   };
   const modelName = (slot: Slot) =>
     slot.model ? (modelOptions(slot).find((o) => o.value === slot.model)?.label ?? slot.model) : t("brain.auto.label");
+  // An automatic model picks the effort too (as on "Quem pensa"); a fixed one takes the ramp's level, set at once.
+  const modelLine = (slot: Slot) =>
+    slot.model && slot.effort
+      ? t("brainGroups.modelEffortLine", {
+          model: modelName(slot),
+          effort: t(`agentPage.work.brain.effortsLower.${effortLevel(slot.effort)}`),
+        })
+      : t("brainGroups.modelLine", { model: modelName(slot) });
 
   const nameError =
     touched && (name.trim().length === 0 || name.trim().length > NAME_MAX) ? t("brainGroups.nameNeeded") : undefined;
@@ -283,7 +301,8 @@ export function BrainGroupDialog({
     });
   };
 
-  const modelSlot = screen.type === "model" ? slots.find((s) => s.provider === screen.provider) : undefined;
+  const picking = screen.type === "model" ? screen : null;
+  const modelSlot = picking ? slots.find((s) => s.provider === picking.provider) : undefined;
   const title =
     screen.type === "delete" && group
       ? t("brainGroups.deleteTitle", { name: group.name })
@@ -313,33 +332,56 @@ export function BrainGroupDialog({
       width={520}
     >
       {screen.type === "delete" && (
-        <>
-          <DialogFooter>
-            <Button disabled={busy} onClick={() => setScreen({ type: "form" })}>
-              {t("common.cancel")}
-            </Button>
-            <Button variant="danger" loading={remove.isPending} onClick={drop}>
-              {t("brainGroups.deleteConfirm")}
-            </Button>
-          </DialogFooter>
-        </>
+        <DialogFooter>
+          <Button disabled={busy} onClick={() => setScreen({ type: "form" })}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="danger" loading={remove.isPending} onClick={drop}>
+            {t("brainGroups.deleteConfirm")}
+          </Button>
+        </DialogFooter>
       )}
-      {modelSlot && (
+      {modelSlot && picking && (
         <>
           <DialogBody>
             <PickList
               options={modelOptions(modelSlot)}
-              value={modelSlot.model ?? AUTO}
-              onChange={(v) => {
-                patch(modelSlot.provider, { model: v === AUTO ? null : v });
-                setScreen({ type: "form" });
-              }}
+              value={picking.model ?? AUTO}
+              onChange={(v) =>
+                setScreen(
+                  v === AUTO
+                    ? { ...picking, model: null, effort: null }
+                    : { ...picking, model: v, effort: effortLevel(picking.effort) },
+                )
+              }
               label={title}
               searchLabel={t("models.search")}
             />
+            <div className="bg-effort">
+              {picking.model ? (
+                <EffortPixels
+                  label={t("agentPage.work.brain.effort")}
+                  value={effortLevel(picking.effort)}
+                  onValueChange={(e) => setScreen({ ...picking, effort: e })}
+                  steps={EFFORT_LEVELS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
+                  hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
+                />
+              ) : (
+                <p className="bg-effort__auto">{t("agentPage.work.brain.effortText.auto")}</p>
+              )}
+            </div>
           </DialogBody>
           <DialogFooter>
             <Button onClick={() => setScreen({ type: "form" })}>{t("common.back")}</Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                patch(modelSlot.provider, { model: picking.model, effort: picking.effort });
+                setScreen({ type: "form" });
+              }}
+            >
+              {t("brainGroups.use")}
+            </Button>
           </DialogFooter>
         </>
       )}
@@ -367,7 +409,10 @@ export function BrainGroupDialog({
                     setMachineId(v);
                     setSlots(start(v));
                   }}
-                  options={machineIds.map((id) => ({ value: id, label: computerName(id) ?? id }))}
+                  options={machineIds.map((id) => ({
+                    value: id,
+                    label: computerName(id) ?? t("brainGroups.computer"),
+                  }))}
                 />
               </Field>
             )}
@@ -389,15 +434,16 @@ export function BrainGroupDialog({
                 ]}
               />
             </Field>
-            <Field
-              label={t("brainGroups.members")}
-              group
-              error={membersError}
-              hint={{
-                name: t("common.about", { label: t("brainGroups.members") }),
-                text: t("brainGroups.membersAbout"),
-              }}
-            >
+            {/* Not a Field: a list of rows, not one control of a form's height. */}
+            <fieldset className="bg-members-sec" aria-labelledby="brain-group-members">
+              <span className="ac-hintline">
+                <span className="ac-field__label" id="brain-group-members">
+                  {t("brainGroups.members")}
+                </span>
+                <InfoHint name={t("common.about", { label: t("brainGroups.members") })}>
+                  {t("brainGroups.membersAbout")}
+                </InfoHint>
+              </span>
               <div className="bg-members">
                 {slots.map((slot, i) => (
                   <MemberRow
@@ -408,11 +454,13 @@ export function BrainGroupDialog({
                     last={i === slots.length - 1}
                     alternatives={alternatives(slot)}
                     providerName={providerName(slot.provider)}
-                    modelName={modelName(slot)}
+                    modelLine={modelLine(slot)}
                     onPick={(accountId) => patch(slot.provider, { accountId, model: null, effort: null })}
                     onMove={(step) => move(i, step)}
                     onRemove={() => setSlots((list) => list.filter((s) => s.provider !== slot.provider))}
-                    onModel={() => setScreen({ type: "model", provider: slot.provider })}
+                    onModel={() =>
+                      setScreen({ type: "model", provider: slot.provider, model: slot.model, effort: slot.effort })
+                    }
                   />
                 ))}
                 {missing.length > 0 && (
@@ -441,7 +489,12 @@ export function BrainGroupDialog({
                   </div>
                 )}
               </div>
-            </Field>
+              {membersError && (
+                <p className="ac-field__error" role="alert">
+                  {membersError}
+                </p>
+              )}
+            </fieldset>
           </DialogBody>
           <DialogFooter
             note={
@@ -478,7 +531,7 @@ function MemberRow({
   last,
   alternatives,
   providerName,
-  modelName,
+  modelLine,
   onPick,
   onMove,
   onRemove,
@@ -490,7 +543,8 @@ function MemberRow({
   last: boolean;
   alternatives: Shown[];
   providerName: string;
-  modelName: string;
+  /** "Modelo: Opus · esforço alto". */
+  modelLine: string;
   onPick: (accountId: string) => void;
   onMove: (step: -1 | 1) => void;
   onRemove: () => void;
@@ -506,7 +560,7 @@ function MemberRow({
       <span className="bg-member__head">
         <span className="bg-member__name ac-captop">{label}</span>
         <button type="button" className="ac-link ac-link--muted small bg-member__model" onClick={onModel}>
-          {t("brainGroups.modelLine", { model: modelName })}
+          {modelLine}
         </button>
       </span>
       {line?.top && (
