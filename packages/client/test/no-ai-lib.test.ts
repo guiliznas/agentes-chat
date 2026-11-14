@@ -105,6 +105,7 @@ const brain = (over: Partial<AgentBrain> = {}): AgentBrain => ({
   machines: [],
   canEdit: true,
   account: null,
+  group: null,
   effort: null,
   accounts: [],
   canManageAccounts: true,

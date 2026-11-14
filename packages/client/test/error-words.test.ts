@@ -378,6 +378,15 @@ test("a provider refused this server's own OAuth app: what's wrong and who fixes
  * hit goes in `KNOWN` instead.
  */
 const PLAIN_LINE = new Set([
+  // A brain group (ADR 0180): the pickers offer only accounts a group may hold (shared, active, on its computer, serving
+  // the person), a name and a member, and the right hand's page has no group; only an API client meets these.
+  "brain_group.empty",
+  "brain_group.invalid",
+  "brain_group.invalid_name",
+  "brain_group.not_shared",
+  "brain_group.not_yours",
+  "brain_group.other_computer",
+  "brain_group.right_hand",
   // Only an agent names a project by a name that isn't one, and the pickers offer only projects that exist.
   "issue_project.unknown",
   "issue_project.not_found",

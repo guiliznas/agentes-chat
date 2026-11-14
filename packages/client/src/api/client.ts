@@ -87,6 +87,9 @@ import type {
   BatchInviteResult,
   BillingFrom,
   BlockState,
+  BrainGroup,
+  BrainGroupCreateInput,
+  BrainGroupUpdateInput,
   BrainKind,
   BrainMachine,
   BrainScope,
@@ -1089,6 +1092,15 @@ export interface ApiClient {
     startXcodeFix(orgId: string, machineId: string, kind: "select" | "update"): Promise<XcodeFixView>;
     xcodeFix(orgId: string, machineId: string): Promise<XcodeFixView>;
     cancelXcodeFix(orgId: string, machineId: string): Promise<XcodeFixView>;
+  };
+  /** Brain groups (ADR 0180): an account of each provider on one computer, which an agent can think with. */
+  brainGroups: {
+    list(orgId: string): Promise<BrainGroup[]>;
+    create(orgId: string, input: BrainGroupCreateInput): Promise<BrainGroup>;
+    /** Who made it, or an admin. */
+    update(orgId: string, groupId: string, input: BrainGroupUpdateInput): Promise<BrainGroup>;
+    /** The agents that used it think with their own account again. */
+    remove(orgId: string, groupId: string): Promise<void>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {

@@ -11387,6 +11387,13 @@ export const ptBR = {
     },
   },
   brain: {
+    /** A brain group (ADR 0180) in one line: `names` are its providers in the order a run tries them. */
+    group: {
+      line: {
+        order: "{{names}} · em ordem",
+        room: "{{names}} · a que tem mais folga",
+      },
+    },
     /** The model picker in place (a DM's header, the profile card, the side panel): the agent's AI and model. */
     picker: {
       open: "Mudar o modelo de {{agent}}",
@@ -13482,6 +13489,11 @@ export const ptBR = {
     },
   },
   errors: {
+    brainGroup: {
+      notFound: "Este grupo de IAs não existe ou foi apagado.",
+      notEditor: "Só quem criou este grupo, ou um admin, pode mudá-lo.",
+      sameProvider: "Um grupo leva uma conta de cada provedor.",
+    },
     /** A new-password link an owner can't make (ADR 0158). */
     passwordLink: {
       email: "Este servidor manda e-mail: a pessoa pede o link dela mesma em Esqueci a senha.",

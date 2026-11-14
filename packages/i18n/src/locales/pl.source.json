@@ -3629,42 +3629,6 @@
   "contextMenu.restoreOrder": {
     "value": "Restore default order"
   },
-  "appIcon.title": {
-    "value": "App icon"
-  },
-  "appIcon.hintWeb": {
-    "value": "The icon on this browser's tabs."
-  },
-  "appIcon.hintMac": {
-    "value": "The Dock's icon while the app is open. Finder and Launchpad keep the default one."
-  },
-  "appIcon.hintDesktop": {
-    "value": "The taskbar's icon while the app is open."
-  },
-  "appIcon.hintAndroid": {
-    "value": "Some home screens take a few seconds to show the new icon."
-  },
-  "appIcon.failed": {
-    "value": "Couldn't change the icon. Try again."
-  },
-  "appIcon.agentsOf": {
-    "value": "Agents in {{org}}"
-  },
-  "appIcon.names.night": {
-    "value": "Night"
-  },
-  "appIcon.names.moon": {
-    "value": "Moon"
-  },
-  "appIcon.names.sky": {
-    "value": "Sky"
-  },
-  "appIcon.names.peekNight": {
-    "value": "Peeking at night"
-  },
-  "appIcon.names.peekSky": {
-    "value": "Peeking in the sky"
-  },
   "install.frames": {
     "value": "How to install on {{system}}"
   },
@@ -3955,6 +3919,42 @@
   },
   "install.scene.settingUp": {
     "value": "Setting up agentes-chat ({{version}}) ..."
+  },
+  "appIcon.title": {
+    "value": "App icon"
+  },
+  "appIcon.hintWeb": {
+    "value": "The icon on this browser's tabs."
+  },
+  "appIcon.hintMac": {
+    "value": "The Dock's icon while the app is open. Finder and Launchpad keep the default one."
+  },
+  "appIcon.hintDesktop": {
+    "value": "The taskbar's icon while the app is open."
+  },
+  "appIcon.hintAndroid": {
+    "value": "Some home screens take a few seconds to show the new icon."
+  },
+  "appIcon.failed": {
+    "value": "Couldn't change the icon. Try again."
+  },
+  "appIcon.agentsOf": {
+    "value": "Agents in {{org}}"
+  },
+  "appIcon.names.night": {
+    "value": "Night"
+  },
+  "appIcon.names.moon": {
+    "value": "Moon"
+  },
+  "appIcon.names.sky": {
+    "value": "Sky"
+  },
+  "appIcon.names.peekNight": {
+    "value": "Peeking at night"
+  },
+  "appIcon.names.peekSky": {
+    "value": "Peeking in the sky"
   },
   "legal.updated": {
     "value": "Last updated {{date}}"
@@ -27052,6 +27052,12 @@
   "run.strip.toStop": {
     "value": "to stop"
   },
+  "brain.group.line.order": {
+    "value": "{{names}} · in order"
+  },
+  "brain.group.line.room": {
+    "value": "{{names}} · the one with the most room left"
+  },
   "brain.picker.open": {
     "value": "Change {{agent}}'s model"
   },
@@ -32493,6 +32499,15 @@
   },
   "files.nav.place": {
     "value": "{{index}} of {{count}}"
+  },
+  "errors.brainGroup.notFound": {
+    "value": "This brain group doesn't exist or was deleted."
+  },
+  "errors.brainGroup.notEditor": {
+    "value": "Only who made this group, or an admin, can change it."
+  },
+  "errors.brainGroup.sameProvider": {
+    "value": "A group takes one account of each provider."
   },
   "errors.passwordLink.email": {
     "value": "This server sends email: they ask for their own link in Forgot password."

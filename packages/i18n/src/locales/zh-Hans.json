@@ -1436,22 +1436,6 @@
     "moveDown": "下移",
     "restoreOrder": "恢复默认顺序"
   },
-  "appIcon": {
-    "title": "应用图标",
-    "hintWeb": "此浏览器标签页上的图标。",
-    "hintMac": "应用打开时 Dock 中的图标。访达和启动台仍显示默认图标。",
-    "hintDesktop": "应用打开时任务栏中的图标。",
-    "hintAndroid": "部分主屏幕需要几秒钟才会显示新图标。",
-    "failed": "无法更换图标，请重试。",
-    "agentsOf": "{{org}} 的智能体",
-    "names": {
-      "night": "夜晚",
-      "moon": "月亮",
-      "sky": "天空",
-      "peekNight": "夜里探头",
-      "peekSky": "天空探头"
-    }
-  },
   "install": {
     "frames": "如何在 {{system}} 上安装",
     "step": "第 {{n}} 步",
@@ -1559,6 +1543,22 @@
       "activities": "活动",
       "readingLists": "正在读取软件包列表... 完成",
       "settingUp": "正在设置 agentes-chat ({{version}}) ..."
+    }
+  },
+  "appIcon": {
+    "title": "应用图标",
+    "hintWeb": "此浏览器标签页上的图标。",
+    "hintMac": "应用打开时 Dock 中的图标。访达和启动台仍显示默认图标。",
+    "hintDesktop": "应用打开时任务栏中的图标。",
+    "hintAndroid": "部分主屏幕需要几秒钟才会显示新图标。",
+    "failed": "无法更换图标，请重试。",
+    "agentsOf": "{{org}} 的智能体",
+    "names": {
+      "night": "夜晚",
+      "moon": "月亮",
+      "sky": "天空",
+      "peekNight": "夜里探头",
+      "peekSky": "天空探头"
     }
   },
   "legal": {
@@ -10711,6 +10711,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · 按顺序",
+        "room": "{{names}} · 剩余额度最多的"
+      }
+    },
     "picker": {
       "open": "更改 {{agent}} 的模型",
       "ownSignIn": "此电脑的账号",
@@ -12947,6 +12953,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "这个大脑组不存在或已被删除。",
+      "notEditor": "只有创建该组的人或管理员可以修改它。",
+      "sameProvider": "每个提供商在一个组里只能有一个账号。"
+    },
     "passwordLink": {
       "email": "这台服务器会发送邮件：对方可以在「忘记密码」中自己申请链接。",
       "serverOwner": "安装这台服务器的人在运行它的电脑上直接登录，不需要链接。",

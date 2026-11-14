@@ -1520,22 +1520,6 @@
     "moveDown": "Sposta giù",
     "restoreOrder": "Ripristina ordine predefinito"
   },
-  "appIcon": {
-    "title": "Icona dell'app",
-    "hintWeb": "L'icona nelle schede di questo browser.",
-    "hintMac": "L'icona nel Dock mentre l'app è aperta. Finder e Launchpad mantengono quella predefinita.",
-    "hintDesktop": "L'icona nella barra delle applicazioni mentre l'app è aperta.",
-    "hintAndroid": "Alcune schermate Home impiegano qualche secondo a mostrare la nuova icona.",
-    "failed": "Impossibile cambiare l'icona. Riprova.",
-    "agentsOf": "Agenti di {{org}}",
-    "names": {
-      "night": "Notte",
-      "moon": "Luna",
-      "sky": "Cielo",
-      "peekNight": "Sbirciando di notte",
-      "peekSky": "Sbirciando nel cielo"
-    }
-  },
   "install": {
     "frames": "Come installare su {{system}}",
     "step": "Passo {{n}}",
@@ -1643,6 +1627,22 @@
       "activities": "Attività",
       "readingLists": "Lettura elenco dei pacchetti... Fatto",
       "settingUp": "Configurazione di agentes-chat ({{version}}) ..."
+    }
+  },
+  "appIcon": {
+    "title": "Icona dell'app",
+    "hintWeb": "L'icona nelle schede di questo browser.",
+    "hintMac": "L'icona nel Dock mentre l'app è aperta. Finder e Launchpad mantengono quella predefinita.",
+    "hintDesktop": "L'icona nella barra delle applicazioni mentre l'app è aperta.",
+    "hintAndroid": "Alcune schermate Home impiegano qualche secondo a mostrare la nuova icona.",
+    "failed": "Impossibile cambiare l'icona. Riprova.",
+    "agentsOf": "Agenti di {{org}}",
+    "names": {
+      "night": "Notte",
+      "moon": "Luna",
+      "sky": "Cielo",
+      "peekNight": "Sbirciando di notte",
+      "peekSky": "Sbirciando nel cielo"
     }
   },
   "legal": {
@@ -11530,6 +11530,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · in ordine",
+        "room": "{{names}} · quello con più margine"
+      }
+    },
     "picker": {
       "open": "Cambia il modello di {{agent}}",
       "ownSignIn": "Account di questo computer",
@@ -13898,6 +13904,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "Questo gruppo di cervelli non esiste o è stato eliminato.",
+      "notEditor": "Solo chi ha creato questo gruppo, o un admin, può modificarlo.",
+      "sameProvider": "Un gruppo accetta un account per ogni fornitore."
+    },
     "passwordLink": {
       "email": "Questo server invia email: la persona chiede il proprio link in Password dimenticata.",
       "serverOwner": "Chi ha installato questo server accede dal computer dove gira, senza link.",

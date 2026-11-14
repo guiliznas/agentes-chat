@@ -80,6 +80,8 @@ export const keys = {
     ["org", orgId, "channel", channelId, "consultations", consultationId] as const,
   agentDetail: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "detail"] as const,
   agentBrain: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "brain"] as const,
+  /** The workspace's brain groups (ADR 0180). */
+  brainGroups: (orgId: string) => ["org", orgId, "brain-groups"] as const,
   /** Every single agent's reads (its page, its brain). */
   agentPages: (orgId: string) => ["org", orgId, "agent"] as const,
   aiAccounts: (orgId: string) => ["org", orgId, "ai-accounts"] as const,

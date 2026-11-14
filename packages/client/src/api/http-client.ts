@@ -63,6 +63,7 @@ import type {
   AuthConfig,
   BatchInviteResult,
   BlockState,
+  BrainGroup,
   BrainMachine,
   BrowserHandoff,
   BrowserProfile,
@@ -1253,6 +1254,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<XcodeFixView>(`${org(orgId)}/devices/computers/${enc(machineId)}/xcode-fix`),
       cancelXcodeFix: (orgId, machineId) =>
         request<XcodeFixView>(`${org(orgId)}/devices/computers/${enc(machineId)}/xcode-fix`, { method: "DELETE" }),
+    },
+    brainGroups: {
+      list: async (orgId) => (await request<{ groups: BrainGroup[] }>(`${org(orgId)}/brain-groups`)).groups,
+      create: (orgId, input) => request<BrainGroup>(`${org(orgId)}/brain-groups`, { json: input }),
+      update: (orgId, groupId, input) =>
+        request<BrainGroup>(`${org(orgId)}/brain-groups/${enc(groupId)}`, { method: "PUT", json: input }),
+      remove: (orgId, groupId) => request<void>(`${org(orgId)}/brain-groups/${enc(groupId)}`, { method: "DELETE" }),
     },
     machines: {
       list: async (orgId) => (await request<{ machines: Machine[] }>(`${org(orgId)}/machines`)).machines,

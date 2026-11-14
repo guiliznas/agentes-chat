@@ -883,6 +883,8 @@ export interface AgentBrainLine {
   speed?: "fast";
   /** An API brain on Automático: the maker its models come from, whose logo shows beside it. */
   maker?: string;
+  /** ADR 0180: the brain group it thinks with; then `account` and `usage` are of the member a run would pick now. */
+  group?: { id: string; name: string };
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -5639,6 +5641,68 @@ export interface BrainOption {
   defaultModel: string | null;
 }
 
+/** How a run picks a group's member (ADR 0180): `order` the first with room left, `room` the one with the most left. */
+export type BrainGroupStrategy = "order" | "room";
+
+/** A brain group (ADR 0180): at most one account per provider on one computer, which an agent can think with. */
+export interface BrainGroup {
+  id: string;
+  /** The computer all its accounts are on. */
+  machineId: string;
+  name: string;
+  strategy: BrainGroupStrategy;
+  /** In the order a run tries them. */
+  members: {
+    accountId: string;
+    label: string;
+    kind: string;
+    /** A coding plan's maker; null for a CLI's own login. */
+    provider: string | null;
+    /** Null = the agent's model. */
+    model: string | null;
+    /** Null = the agent's effort. */
+    effort: string | null;
+    status: string;
+    /** Its limits as last reported; null: not known yet. */
+    usage: PlanUsage | null;
+  }[];
+  /** The agents that use it. */
+  usedBy: { id: string; name: string }[];
+  /** The caller made it, or is an admin. */
+  canEdit: boolean;
+}
+
+/** `AgentBrain.group`: the group an agent thinks with, and the member a run would pick now (null: none can serve it). */
+export interface BrainGroupSummary {
+  id: string;
+  name: string;
+  strategy: BrainGroupStrategy;
+  current: { accountId: string; label: string; kind: BrainKind } | null;
+}
+
+/** One member of a group being saved: the position is the index; null `model`/`effort` = the agent's. */
+export interface BrainGroupMemberInput {
+  accountId: string;
+  model?: string | null;
+  effort?: string | null;
+}
+
+/** `POST …/brain-groups`. */
+export interface BrainGroupCreateInput {
+  machineId: string;
+  name: string;
+  /** Omitted = `order`. */
+  strategy?: BrainGroupStrategy;
+  members: BrainGroupMemberInput[];
+}
+
+/** `PUT …/brain-groups/{id}`: omitted = keep; `members` given replaces them all. */
+export interface BrainGroupUpdateInput {
+  name?: string;
+  strategy?: BrainGroupStrategy;
+  members?: BrainGroupMemberInput[];
+}
+
 /** A computer the caller may give an agent, with what it offers. */
 export interface BrainMachine {
   machineId: string;
@@ -5678,6 +5742,8 @@ export interface AgentBrain {
   canEdit: boolean;
   /** ADR 0041: the account on the agent's computer it thinks with; null = "Conta deste computador". */
   account: string | null;
+  /** ADR 0180: the brain group it thinks with (`account` stays as saved, what it goes back to on leaving); null: none. */
+  group: BrainGroupSummary | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
   /** How fast it answers in conversations; kept whatever it thinks with, applied only where `speedFits`. */
@@ -5847,6 +5913,8 @@ export interface AgentBrainInput {
   onlyOwner?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
+  /** ADR 0180: a brain group of the agent's computer to think with; null = none; omitted = keep. */
+  group?: string | null;
   /** The account thinks for another agent: take it from that one. */
   moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
@@ -5865,6 +5933,8 @@ export interface AgentSetup {
   /** A computer brain: the computer it thinks on, and its account there (null: that computer's own sign-in). */
   machineId?: string | null;
   account?: string | null;
+  /** A brain group of that computer, copied only to agents on it; null = none; omitted = each keeps its own. */
+  group?: string | null;
   effort?: BrainEffortSetting | null;
   /** Omitted = each agent keeps its own. */
   speed?: BrainSpeed;

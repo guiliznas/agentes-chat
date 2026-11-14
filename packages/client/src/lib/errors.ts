@@ -20,6 +20,10 @@ export const REAUTH_PASSWORD = "reauth.password";
  * takes `untranslatedText`; a guard test (`error-words.test.ts`) fails on a new code that isn't here or on its list.
  */
 const KNOWN = {
+  // A brain group (ADR 0180): the pickers offer only accounts a group may hold, so these are what remains.
+  "brain_group.not_found": "errors.brainGroup.notFound",
+  "brain_group.not_editor": "errors.brainGroup.notEditor",
+  "brain_group.same_provider": "errors.brainGroup.sameProvider",
   // A new-password link an owner can't make (ADR 0158).
   "password_link.email": "errors.passwordLink.email",
   "password_link.server_owner": "errors.passwordLink.serverOwner",

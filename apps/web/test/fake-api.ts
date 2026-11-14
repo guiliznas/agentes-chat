@@ -1212,6 +1212,7 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 /** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
 type FakedParts =
   | "apps"
+  | "brainGroups"
   | "wiki"
   | "notifications"
   | "sandbox"
@@ -3929,6 +3930,17 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     ...http,
     apps: apps.client,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
+    // Brain groups (ADR 0180): none until a web test that needs them fakes them.
+    brainGroups: {
+      list: async () => [],
+      create: async () => {
+        throw new Error("fake brainGroups.create: not faked");
+      },
+      update: async () => {
+        throw new Error("fake brainGroups.update: not faked");
+      },
+      remove: async () => undefined,
+    },
     machines: machines.client,
     devices: devices.client,
     notifications: createFakeNotifications(
@@ -4225,6 +4237,7 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
     machines: [],
     canEdit: true,
     account: null,
+    group: null,
     effort: null,
     speed: "standard",
     accounts: [],

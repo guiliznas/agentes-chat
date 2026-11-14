@@ -1436,22 +1436,6 @@
     "moveDown": "아래로 이동",
     "restoreOrder": "기본 순서로 되돌리기"
   },
-  "appIcon": {
-    "title": "앱 아이콘",
-    "hintWeb": "이 브라우저 탭에 표시되는 아이콘이에요.",
-    "hintMac": "앱이 열려 있는 동안 Dock에 표시되는 아이콘이에요. Finder와 Launchpad에는 기본 아이콘이 유지돼요.",
-    "hintDesktop": "앱이 열려 있는 동안 작업 표시줄에 표시되는 아이콘이에요.",
-    "hintAndroid": "일부 홈 화면은 새 아이콘을 표시하는 데 몇 초가 걸려요.",
-    "failed": "아이콘을 바꾸지 못했어요. 다시 시도해 주세요.",
-    "agentsOf": "{{org}}의 에이전트",
-    "names": {
-      "night": "밤",
-      "moon": "달",
-      "sky": "하늘",
-      "peekNight": "밤에 빼꼼",
-      "peekSky": "하늘에서 빼꼼"
-    }
-  },
   "install": {
     "frames": "{{system}}에 설치하는 방법",
     "step": "{{n}}단계",
@@ -1559,6 +1543,22 @@
       "activities": "현재 활동",
       "readingLists": "패키지 목록을 읽는 중입니다... 완료",
       "settingUp": "agentes-chat ({{version}}) 설정하는 중입니다 ..."
+    }
+  },
+  "appIcon": {
+    "title": "앱 아이콘",
+    "hintWeb": "이 브라우저 탭에 표시되는 아이콘이에요.",
+    "hintMac": "앱이 열려 있는 동안 Dock에 표시되는 아이콘이에요. Finder와 Launchpad에는 기본 아이콘이 유지돼요.",
+    "hintDesktop": "앱이 열려 있는 동안 작업 표시줄에 표시되는 아이콘이에요.",
+    "hintAndroid": "일부 홈 화면은 새 아이콘을 표시하는 데 몇 초가 걸려요.",
+    "failed": "아이콘을 바꾸지 못했어요. 다시 시도해 주세요.",
+    "agentsOf": "{{org}}의 에이전트",
+    "names": {
+      "night": "밤",
+      "moon": "달",
+      "sky": "하늘",
+      "peekNight": "밤에 빼꼼",
+      "peekSky": "하늘에서 빼꼼"
     }
   },
   "legal": {
@@ -10642,6 +10642,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · 순서대로",
+        "room": "{{names}} · 여유가 가장 많은 것"
+      }
+    },
     "picker": {
       "open": "{{agent}}의 모델 바꾸기",
       "ownSignIn": "이 컴퓨터의 계정",
@@ -12879,6 +12885,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "이 브레인 그룹은 없거나 삭제되었습니다.",
+      "notEditor": "이 그룹을 만든 사람이나 관리자만 바꿀 수 있습니다.",
+      "sameProvider": "그룹에는 제공업체마다 계정을 하나씩만 넣을 수 있습니다."
+    },
     "passwordLink": {
       "email": "이 서버는 이메일을 보내요. 본인이 비밀번호 찾기에서 직접 링크를 요청해요.",
       "serverOwner": "이 서버를 설치한 사람은 서버가 실행되는 컴퓨터에서 링크 없이 들어가요.",

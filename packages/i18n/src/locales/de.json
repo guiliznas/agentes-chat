@@ -1477,22 +1477,6 @@
     "moveDown": "Nach unten",
     "restoreOrder": "Standardreihenfolge wiederherstellen"
   },
-  "appIcon": {
-    "title": "App-Symbol",
-    "hintWeb": "Das Symbol in den Tabs dieses Browsers.",
-    "hintMac": "Das Dock-Symbol, solange die App geöffnet ist. Finder und Launchpad behalten das Standardsymbol.",
-    "hintDesktop": "Das Taskleisten-Symbol, solange die App geöffnet ist.",
-    "hintAndroid": "Manche Startbildschirme brauchen ein paar Sekunden, bis das neue Symbol erscheint.",
-    "failed": "Das Symbol konnte nicht geändert werden. Versuch es noch einmal.",
-    "agentsOf": "Agenten in {{org}}",
-    "names": {
-      "night": "Nacht",
-      "moon": "Mond",
-      "sky": "Himmel",
-      "peekNight": "Neugierig bei Nacht",
-      "peekSky": "Neugierig am Himmel"
-    }
-  },
   "install": {
     "frames": "So installierst du es auf {{system}}",
     "step": "Schritt {{n}}",
@@ -1600,6 +1584,22 @@
       "activities": "Aktivitäten",
       "readingLists": "Paketlisten werden gelesen… Fertig",
       "settingUp": "agentes-chat ({{version}}) wird eingerichtet …"
+    }
+  },
+  "appIcon": {
+    "title": "App-Symbol",
+    "hintWeb": "Das Symbol in den Tabs dieses Browsers.",
+    "hintMac": "Das Dock-Symbol, solange die App geöffnet ist. Finder und Launchpad behalten das Standardsymbol.",
+    "hintDesktop": "Das Taskleisten-Symbol, solange die App geöffnet ist.",
+    "hintAndroid": "Manche Startbildschirme brauchen ein paar Sekunden, bis das neue Symbol erscheint.",
+    "failed": "Das Symbol konnte nicht geändert werden. Versuch es noch einmal.",
+    "agentsOf": "Agenten in {{org}}",
+    "names": {
+      "night": "Nacht",
+      "moon": "Mond",
+      "sky": "Himmel",
+      "peekNight": "Neugierig bei Nacht",
+      "peekSky": "Neugierig am Himmel"
     }
   },
   "legal": {
@@ -11098,6 +11098,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · der Reihe nach",
+        "room": "{{names}} · die mit dem meisten Spielraum"
+      }
+    },
     "picker": {
       "open": "Modell von {{agent}} ändern",
       "ownSignIn": "Konto dieses Computers",
@@ -13404,6 +13410,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "Diese Gehirngruppe gibt es nicht oder sie wurde gelöscht.",
+      "notEditor": "Nur wer diese Gruppe angelegt hat, oder ein Admin, kann sie ändern.",
+      "sameProvider": "Eine Gruppe nimmt pro Anbieter ein Konto."
+    },
     "passwordLink": {
       "email": "Dieser Server verschickt E-Mails: Die Person fordert ihren eigenen Link unter Passwort vergessen an.",
       "serverOwner": "Wer diesen Server installiert hat, meldet sich auf dem Computer an, auf dem er läuft, ohne Link.",

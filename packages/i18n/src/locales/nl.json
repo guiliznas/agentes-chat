@@ -1477,22 +1477,6 @@
     "moveDown": "Omlaag",
     "restoreOrder": "Standaardvolgorde herstellen"
   },
-  "appIcon": {
-    "title": "App-icoon",
-    "hintWeb": "Het icoon op de tabbladen van deze browser.",
-    "hintMac": "Het Dock-icoon zolang de app open is. Finder en Launchpad houden het standaardicoon.",
-    "hintDesktop": "Het taakbalkicoon zolang de app open is.",
-    "hintAndroid": "Sommige startschermen doen er een paar seconden over om het nieuwe icoon te tonen.",
-    "failed": "Kon het icoon niet wijzigen. Probeer het opnieuw.",
-    "agentsOf": "Agents van {{org}}",
-    "names": {
-      "night": "Nacht",
-      "moon": "Maan",
-      "sky": "Lucht",
-      "peekNight": "Gluren in de nacht",
-      "peekSky": "Gluren in de lucht"
-    }
-  },
   "install": {
     "frames": "Zo installeer je het op {{system}}",
     "step": "Stap {{n}}",
@@ -1600,6 +1584,22 @@
       "activities": "Activiteiten",
       "readingLists": "Pakketlijsten worden ingelezen... Klaar",
       "settingUp": "agentes-chat ({{version}}) wordt ingesteld ..."
+    }
+  },
+  "appIcon": {
+    "title": "App-icoon",
+    "hintWeb": "Het icoon op de tabbladen van deze browser.",
+    "hintMac": "Het Dock-icoon zolang de app open is. Finder en Launchpad houden het standaardicoon.",
+    "hintDesktop": "Het taakbalkicoon zolang de app open is.",
+    "hintAndroid": "Sommige startschermen doen er een paar seconden over om het nieuwe icoon te tonen.",
+    "failed": "Kon het icoon niet wijzigen. Probeer het opnieuw.",
+    "agentsOf": "Agents van {{org}}",
+    "names": {
+      "night": "Nacht",
+      "moon": "Maan",
+      "sky": "Lucht",
+      "peekNight": "Gluren in de nacht",
+      "peekSky": "Gluren in de lucht"
     }
   },
   "legal": {
@@ -11161,6 +11161,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · op volgorde",
+        "room": "{{names}} · die met de meeste ruimte"
+      }
+    },
     "picker": {
       "open": "Model van {{agent}} wijzigen",
       "ownSignIn": "Account van deze computer",
@@ -13466,6 +13472,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "Deze breingroep bestaat niet of is verwijderd.",
+      "notEditor": "Alleen wie deze groep heeft gemaakt, of een admin, kan hem wijzigen.",
+      "sameProvider": "Een groep neemt één account per aanbieder."
+    },
     "passwordLink": {
       "email": "Deze server verstuurt e-mail: de persoon vraagt zelf een link aan bij Wachtwoord vergeten.",
       "serverOwner": "Wie deze server installeerde, meldt zich aan op de computer waarop hij draait, zonder link.",

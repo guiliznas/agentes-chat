@@ -11336,6 +11336,13 @@ export const en = {
     },
   },
   brain: {
+    /** A brain group (ADR 0180) in one line: `names` are its providers in the order a run tries them. */
+    group: {
+      line: {
+        order: "{{names}} · in order",
+        room: "{{names}} · the one with the most room left",
+      },
+    },
     /** The model picker in place (a DM's header, the profile card, the side panel): the agent's AI and model. */
     picker: {
       open: "Change {{agent}}'s model",
@@ -13458,6 +13465,11 @@ export const en = {
     },
   },
   errors: {
+    brainGroup: {
+      notFound: "This brain group doesn't exist or was deleted.",
+      notEditor: "Only who made this group, or an admin, can change it.",
+      sameProvider: "A group takes one account of each provider.",
+    },
     /** A new-password link an owner can't make (ADR 0158). */
     passwordLink: {
       email: "This server sends email: they ask for their own link in Forgot password.",

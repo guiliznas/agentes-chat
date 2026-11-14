@@ -1519,22 +1519,6 @@
     "moveDown": "Bajar",
     "restoreOrder": "Restaurar el orden predeterminado"
   },
-  "appIcon": {
-    "title": "Icono de la app",
-    "hintWeb": "El icono en las pestañas de este navegador.",
-    "hintMac": "El icono del Dock mientras la app está abierta. Finder y Launchpad mantienen el predeterminado.",
-    "hintDesktop": "El icono de la barra de tareas mientras la app está abierta.",
-    "hintAndroid": "Algunas pantallas de inicio tardan unos segundos en mostrar el icono nuevo.",
-    "failed": "No se pudo cambiar el icono. Inténtalo de nuevo.",
-    "agentsOf": "Agentes de {{org}}",
-    "names": {
-      "night": "Noche",
-      "moon": "Luna",
-      "sky": "Cielo",
-      "peekNight": "Asomándose de noche",
-      "peekSky": "Asomándose en el cielo"
-    }
-  },
   "install": {
     "frames": "Cómo instalar en {{system}}",
     "step": "Paso {{n}}",
@@ -1642,6 +1626,22 @@
       "activities": "Actividades",
       "readingLists": "Leyendo lista de paquetes... Hecho",
       "settingUp": "Configurando agentes-chat ({{version}}) ..."
+    }
+  },
+  "appIcon": {
+    "title": "Icono de la app",
+    "hintWeb": "El icono en las pestañas de este navegador.",
+    "hintMac": "El icono del Dock mientras la app está abierta. Finder y Launchpad mantienen el predeterminado.",
+    "hintDesktop": "El icono de la barra de tareas mientras la app está abierta.",
+    "hintAndroid": "Algunas pantallas de inicio tardan unos segundos en mostrar el icono nuevo.",
+    "failed": "No se pudo cambiar el icono. Inténtalo de nuevo.",
+    "agentsOf": "Agentes de {{org}}",
+    "names": {
+      "night": "Noche",
+      "moon": "Luna",
+      "sky": "Cielo",
+      "peekNight": "Asomándose de noche",
+      "peekSky": "Asomándose en el cielo"
     }
   },
   "legal": {
@@ -11447,6 +11447,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · en orden",
+        "room": "{{names}} · la que más margen tenga"
+      }
+    },
     "picker": {
       "open": "Cambiar el modelo de {{agent}}",
       "ownSignIn": "Cuenta de este ordenador",
@@ -13817,6 +13823,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "Este grupo de cerebros no existe o se eliminó.",
+      "notEditor": "Solo quien creó este grupo, o un admin, puede cambiarlo.",
+      "sameProvider": "Un grupo lleva una cuenta de cada proveedor."
+    },
     "passwordLink": {
       "email": "Este servidor envía correos: la persona pide su propio enlace en Olvidé la contraseña.",
       "serverOwner": "Quien instaló este servidor entra desde el ordenador donde funciona, sin enlace.",

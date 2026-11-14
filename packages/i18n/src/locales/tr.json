@@ -1477,22 +1477,6 @@
     "moveDown": "Aşağı taşı",
     "restoreOrder": "Varsayılan sırayı geri yükle"
   },
-  "appIcon": {
-    "title": "Uygulama simgesi",
-    "hintWeb": "Bu tarayıcının sekmelerindeki simge.",
-    "hintMac": "Uygulama açıkken Dock'taki simge. Finder ve Launchpad varsayılanı korur.",
-    "hintDesktop": "Uygulama açıkken görev çubuğundaki simge.",
-    "hintAndroid": "Bazı ana ekranların yeni simgeyi göstermesi birkaç saniye sürer.",
-    "failed": "Simge değiştirilemedi. Yeniden deneyin.",
-    "agentsOf": "{{org}} ajanları",
-    "names": {
-      "night": "Gece",
-      "moon": "Ay",
-      "sky": "Gökyüzü",
-      "peekNight": "Gece gözetleyen",
-      "peekSky": "Gökyüzünde gözetleyen"
-    }
-  },
   "install": {
     "frames": "{{system}} için kurulum",
     "step": "Adım {{n}}",
@@ -1600,6 +1584,22 @@
       "activities": "Etkinlikler",
       "readingLists": "Paket listeleri okunuyor... Bitti",
       "settingUp": "agentes-chat ({{version}}) ayarlanıyor ..."
+    }
+  },
+  "appIcon": {
+    "title": "Uygulama simgesi",
+    "hintWeb": "Bu tarayıcının sekmelerindeki simge.",
+    "hintMac": "Uygulama açıkken Dock'taki simge. Finder ve Launchpad varsayılanı korur.",
+    "hintDesktop": "Uygulama açıkken görev çubuğundaki simge.",
+    "hintAndroid": "Bazı ana ekranların yeni simgeyi göstermesi birkaç saniye sürer.",
+    "failed": "Simge değiştirilemedi. Yeniden deneyin.",
+    "agentsOf": "{{org}} ajanları",
+    "names": {
+      "night": "Gece",
+      "moon": "Ay",
+      "sky": "Gökyüzü",
+      "peekNight": "Gece gözetleyen",
+      "peekSky": "Gökyüzünde gözetleyen"
     }
   },
   "legal": {
@@ -11037,6 +11037,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · sırayla",
+        "room": "{{names}} · en çok payı kalan"
+      }
+    },
     "picker": {
       "open": "{{agent}} modelini değiştir",
       "ownSignIn": "Bu bilgisayarın hesabı",
@@ -13339,6 +13345,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "Bu beyin grubu yok ya da silinmiş.",
+      "notEditor": "Bu grubu yalnızca oluşturan kişi ya da bir yönetici değiştirebilir.",
+      "sameProvider": "Bir grup, her sağlayıcıdan yalnızca bir hesap alır."
+    },
     "passwordLink": {
       "email": "Bu sunucu e-posta gönderiyor: kişi kendi bağlantısını Şifremi unuttum bölümünden ister.",
       "serverOwner": "Bu sunucuyu kuran kişi, sunucunun çalıştığı bilgisayardan bağlantısız girer.",

@@ -1436,22 +1436,6 @@
     "moveDown": "下へ移動",
     "restoreOrder": "デフォルトの順番に戻す"
   },
-  "appIcon": {
-    "title": "アプリのアイコン",
-    "hintWeb": "このブラウザのタブに表示されるアイコン。",
-    "hintMac": "アプリが開いている間のDockのアイコン。FinderとLaunchpadは標準のままです。",
-    "hintDesktop": "アプリが開いている間のタスクバーのアイコン。",
-    "hintAndroid": "ホーム画面によっては、新しいアイコンが表示されるまで数秒かかります。",
-    "failed": "アイコンを変更できませんでした。もう一度お試しください。",
-    "agentsOf": "{{org}} のエージェント",
-    "names": {
-      "night": "夜",
-      "moon": "月",
-      "sky": "空",
-      "peekNight": "夜にのぞく",
-      "peekSky": "空からのぞく"
-    }
-  },
   "install": {
     "frames": "{{system}}へのインストール方法",
     "step": "ステップ{{n}}",
@@ -1559,6 +1543,22 @@
       "activities": "アクティビティ",
       "readingLists": "パッケージリストを読み込んでいます... 完了",
       "settingUp": "agentes-chat ({{version}}) を設定しています ..."
+    }
+  },
+  "appIcon": {
+    "title": "アプリのアイコン",
+    "hintWeb": "このブラウザのタブに表示されるアイコン。",
+    "hintMac": "アプリが開いている間のDockのアイコン。FinderとLaunchpadは標準のままです。",
+    "hintDesktop": "アプリが開いている間のタスクバーのアイコン。",
+    "hintAndroid": "ホーム画面によっては、新しいアイコンが表示されるまで数秒かかります。",
+    "failed": "アイコンを変更できませんでした。もう一度お試しください。",
+    "agentsOf": "{{org}} のエージェント",
+    "names": {
+      "night": "夜",
+      "moon": "月",
+      "sky": "空",
+      "peekNight": "夜にのぞく",
+      "peekSky": "空からのぞく"
     }
   },
   "legal": {
@@ -10648,6 +10648,12 @@
     }
   },
   "brain": {
+    "group": {
+      "line": {
+        "order": "{{names}} · 順番に",
+        "room": "{{names}} · 残りが最も多いもの"
+      }
+    },
     "picker": {
       "open": "{{agent}}のモデルを変更",
       "ownSignIn": "このコンピューターのアカウント",
@@ -12885,6 +12891,11 @@
     }
   },
   "errors": {
+    "brainGroup": {
+      "notFound": "このブレイングループは存在しないか、削除されました。",
+      "notEditor": "このグループを変更できるのは、作成した人か管理者だけです。",
+      "sameProvider": "グループにはプロバイダーごとに1つのアカウントを入れられます。"
+    },
     "passwordLink": {
       "email": "このサーバーはメールを送ります。本人が「パスワードを忘れた」から自分のリンクを依頼します。",
       "serverOwner": "このサーバーをインストールした人は、サーバーが動いているコンピューターからリンクなしで入ります。",

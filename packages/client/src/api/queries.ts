@@ -101,6 +101,8 @@ import type {
   AuditQuery,
   AuditRow,
   BlockState,
+  BrainGroupCreateInput,
+  BrainGroupUpdateInput,
   BrainScope,
   CalendarEventInput,
   CalendarEventPatch,
@@ -4792,6 +4794,44 @@ export const useAgentBrain = (
     refetchInterval: pollMs,
   });
 };
+
+/** The workspace's brain groups (ADR 0180), oldest first. */
+export const useBrainGroups = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.brainGroups(orgId),
+    queryFn: () => api.brainGroups.list(orgId),
+    enabled,
+    retry: false,
+  });
+};
+
+/**
+ * A group's members and name are what its agents think with, and deleting it sends them back to their own account:
+ * every agent's brain and the agents list read again, with the groups.
+ */
+function useBrainGroupMutation<V, R>(orgId: string, run: (api: ReturnType<typeof useApi>, v: V) => Promise<R>) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: V) => run(api, v),
+    onSuccess: () => {
+      for (const key of [keys.brainGroups(orgId), keys.agentPages(orgId), keys.agents(orgId)])
+        void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+export const useCreateBrainGroup = (orgId: string) =>
+  useBrainGroupMutation(orgId, (api, input: BrainGroupCreateInput) => api.brainGroups.create(orgId, input));
+
+export const useUpdateBrainGroup = (orgId: string) =>
+  useBrainGroupMutation(orgId, (api, v: { groupId: string; input: BrainGroupUpdateInput }) =>
+    api.brainGroups.update(orgId, v.groupId, v.input),
+  );
+
+export const useDeleteBrainGroup = (orgId: string) =>
+  useBrainGroupMutation(orgId, (api, groupId: string) => api.brainGroups.remove(orgId, groupId));
 
 /** "Quem pensa" for an agent still being created ("Criar agente"): the workspace's computers and what each offers. */
 export const useBrainMachines = (orgId: string) => {
