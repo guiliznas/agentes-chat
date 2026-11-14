@@ -1254,8 +1254,8 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
     await toScreen(d, "Usar em outros agentes");
     await settle(4);
     expect(screen().getByRole("dialog", { name: "Usar em outros agentes" }).textContent).toContain("Dia a dia");
-    expect(copyCalls()[0]?.setup).toMatchObject({ group: "bg_daily" });
-    expect(copyCalls()[0]?.setup).not.toHaveProperty("account");
+    expect(copyCalls()[0]).toMatchObject({ setup: { group: "bg_daily" } });
+    expect(copyCalls()[0]).not.toHaveProperty("setup.account");
   });
 
   test("every member at its limit: the limit screen shows the group's order, each with its limit, never other accounts", async () => {
