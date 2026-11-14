@@ -2,6 +2,7 @@ import {
   createBrainGroup,
   deleteBrainGroup,
   listBrainGroups,
+  publishAgentsChanged,
   publishMachineAgentsChanged,
   updateBrainGroup,
 } from "@agenteschat/engine";
@@ -42,8 +43,12 @@ export function brainGroupRoutes(deps: AppDeps) {
   const { db } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
-  // The computers hear a group's members with the agents that use it.
-  const changed = (orgId: string) => publishMachineAgentsChanged(deps.adapters.pubsub, orgId);
+  // The computers hear a group's members with the agents that use it; the open apps read the agents again (what a
+  // group's agents show and think with changes with it).
+  const changed = async (orgId: string) => {
+    await publishMachineAgentsChanged(deps.adapters.pubsub, orgId);
+    await publishAgentsChanged(deps.adapters.pubsub, orgId);
+  };
 
   app.openapi(
     createRoute({

@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, orgTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -115,6 +115,23 @@ test("a member creates a group of their plans and gives it to their agent", asyn
   expect(gone.status).toBe(204);
   expect(((await (await api(`/agents/${agentId}/brain`)).json()) as { group: unknown }).group).toBeNull();
   expect(((await (await api("/brain-groups")).json()) as { groups: Group[] }).groups).toEqual([]);
+});
+
+test("making, changing and deleting a group tells the open apps the agents changed", async () => {
+  const { api, orgId, machineId, account } = await workspace();
+  const claude = await account("claude_code", "Claude A");
+  let heard = 0;
+  t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
+    if ((e as { event?: { type?: string } }).event?.type === "agents.changed") heard++;
+  });
+  const created = await api("/brain-groups", { json: { machineId, name: "Planos", members: [{ accountId: claude }] } });
+  expect(created.status).toBe(201);
+  expect(heard).toBe(1);
+  const { id } = (await created.json()) as Group;
+  expect((await api(`/brain-groups/${id}`, { method: "PUT", json: { name: "Planos 2" } })).status).toBe(200);
+  expect(heard).toBe(2);
+  expect((await api(`/brain-groups/${id}`, { method: "DELETE" })).status).toBe(204);
+  expect(heard).toBe(3);
 });
 
 test("an agent that moves to another computer leaves its group", async () => {
