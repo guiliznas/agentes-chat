@@ -10641,6 +10641,42 @@
       "toStop": "중지"
     }
   },
+  "brainGroups": {
+    "title": "그룹",
+    "about": "한 컴퓨터에서 제공업체마다 계정 하나씩. 그룹을 쓰는 에이전트는 한 계정이 한도에 닿으면 다음 계정으로 이어 갑니다.",
+    "empty": "아직 그룹이 없습니다.",
+    "new": "새 그룹",
+    "edit": "그룹 편집",
+    "usedBy": "{{names}}이(가) 사용 중",
+    "unused": "아직 사용하는 에이전트가 없습니다",
+    "name": "이름",
+    "namePlaceholder": "Claude와 ChatGPT",
+    "nameNeeded": "40자 이내로 이름을 정해 주세요.",
+    "computer": "컴퓨터",
+    "strategy": "선택 방식",
+    "strategyAbout": "순서대로: 여유가 있는 첫 계정. 여유 우선: 한도에서 가장 먼 계정.",
+    "order": "순서대로",
+    "room": "여유 우선",
+    "members": "계정",
+    "membersAbout": "위에서부터 차례로 시도합니다. 대화는 여유가 있는 동안 같은 계정을 씁니다.",
+    "membersNeeded": "계정을 하나 이상 추가하세요.",
+    "accountOf": "{{provider}} 계정",
+    "add": "{{name}} 추가",
+    "remove": "{{name}} 빼기",
+    "moveUp": "{{name}} 위로",
+    "moveDown": "{{name}} 아래로",
+    "modelLine": "모델: {{model}}",
+    "modelOf": "{{name}} 모델",
+    "create": "그룹 만들기",
+    "created": "{{name}}을(를) 만들었습니다.",
+    "saved": "{{name}}을(를) 저장했습니다.",
+    "delete": "그룹 삭제",
+    "deleteTitle": "{{name}}을(를) 삭제할까요?",
+    "deleteAgents_other": "{{agents}}은(는) 자기 계정으로 다시 생각합니다.",
+    "deleteNone": "이 그룹을 쓰는 에이전트가 없습니다.",
+    "deleteConfirm": "삭제",
+    "deleted": "{{name}}을(를) 삭제했습니다."
+  },
   "brain": {
     "group": {
       "line": {

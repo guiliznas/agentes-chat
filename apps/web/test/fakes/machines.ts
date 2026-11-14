@@ -22,6 +22,8 @@
  * - `GET    …/ai-accounts` → what `setAiAccounts()` set (none by default); `PATCH`/`DELETE …/accounts/{id}`
  *   rename or drop one of them
  * - `POST   …/account-logins` `{ kind, provider }` → a coding plan's key: no sign-in page but the plan's own
+ * - `GET/POST …/brain-groups`, `PUT/DELETE …/brain-groups/{id}` (ADR 0180): groups of the accounts `setAiAccounts()`
+ *   set, kept in memory; a second account of one provider is refused (`brain_group.same_provider`, 409)
  * Sign-ins wait until a test calls `endLogin()`.
  * Tests add machines with `pair()`, codes with `addDevice()`, a release with `setRelease()`, outages with
  * `setOutages()` and the move's answer with `setMoveResult()`. No machines, codes, release or outages by default.
@@ -30,6 +32,8 @@ import type {
   AccountLoginStatus,
   AiAccounts,
   ApiClient,
+  BrainGroup,
+  BrainGroupMemberInput,
   ComputerQueue,
   ComputerSetup,
   DesktopRelease,
@@ -79,6 +83,11 @@ export interface FakeMachines {
   endLogin(loginId: string, status: AccountLoginStatus): void;
   /** What "Contas de IA" lists. */
   setAiAccounts(view: AiAccounts): void;
+  /** Brain groups (ADR 0180), of the accounts `setAiAccounts()` set. */
+  brainGroups: ApiClient["brainGroups"];
+  /** The groups as they are now (a test's seed, or what the client saved). */
+  setBrainGroups(groups: BrainGroup[]): void;
+  groups(): BrainGroup[];
 }
 
 let seq = 0;
@@ -111,6 +120,77 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   let setup: ComputerSetup = PAIR;
   type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
   let ai: AiAccounts = { accounts: [], computers: [] };
+  let groups: BrainGroup[] = [];
+  let groupN = 0;
+  /** The members as the server answers them: each account's name and limits, after the engine's checks. */
+  const membersOf = (machineId: string, input: BrainGroupMemberInput[]): BrainGroup["members"] => {
+    if (input.length === 0) throw new ApiError(400, "brain_group.empty", "A group needs at least one account");
+    const seen = new Set<string>();
+    return input.map((m) => {
+      const a = ai.accounts.find((x) => x.id === m.accountId);
+      if (!a) throw new MockNotFoundError("Conta não encontrada.");
+      if (a.machineId !== machineId) throw new ApiError(400, "brain_group.other_computer", "Another computer");
+      const key = a.provider ?? a.kind;
+      if (seen.has(key)) throw new ApiError(409, "brain_group.same_provider", "One account per provider");
+      seen.add(key);
+      return {
+        accountId: a.id,
+        label: a.label,
+        kind: a.kind,
+        provider: a.provider,
+        model: m.model ?? null,
+        effort: m.effort ?? null,
+        status: a.status,
+        usage: a.usage,
+      };
+    });
+  };
+  const named = (name: string) => {
+    const trimmed = name.trim();
+    if (trimmed.length < 1 || trimmed.length > 40) throw new ApiError(400, "brain_group.invalid_name", "1 to 40");
+    return trimmed;
+  };
+  const group = (id: string) => {
+    const g = groups.find((x) => x.id === id);
+    if (!g) throw new ApiError(404, "brain_group.not_found", "No such group");
+    return g;
+  };
+  const brainGroups: ApiClient["brainGroups"] = {
+    // Read whenever IA e uso renders: not logged.
+    list: async () => clone(groups),
+    create: async (orgId, input) => {
+      log("brainGroups.create", orgId, input);
+      const g: BrainGroup = {
+        id: `bg_${++groupN}`,
+        machineId: input.machineId,
+        name: named(input.name),
+        strategy: input.strategy ?? "order",
+        members: membersOf(input.machineId, input.members),
+        usedBy: [],
+        canEdit: true,
+      };
+      groups = [...groups, g];
+      return clone(g);
+    },
+    update: async (orgId, groupId, input) => {
+      log("brainGroups.update", orgId, groupId, input);
+      const g = group(groupId);
+      if (!g.canEdit) throw new ApiError(403, "brain_group.not_editor", "Not yours");
+      const next: BrainGroup = {
+        ...g,
+        ...(input.name !== undefined ? { name: named(input.name) } : {}),
+        ...(input.strategy ? { strategy: input.strategy } : {}),
+        ...(input.members ? { members: membersOf(g.machineId, input.members) } : {}),
+      };
+      groups = groups.map((x) => (x.id === groupId ? next : x));
+      return clone(next);
+    },
+    remove: async (orgId, groupId) => {
+      log("brainGroups.remove", orgId, groupId);
+      group(groupId);
+      groups = groups.filter((x) => x.id !== groupId);
+    },
+  };
   const logins: Login[] = [];
   const loginStatus = new Map<string, AccountLoginStatus>();
   const login = (loginId: string) => {
@@ -366,6 +446,11 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     setAiAccounts: (view) => {
       ai = clone(view);
     },
+    brainGroups,
+    setBrainGroups: (list) => {
+      groups = clone(list);
+    },
+    groups: () => clone(groups),
     addDevice: (userCode, input = {}) => {
       const now = ctx.now();
       const d: DeviceRequest = {

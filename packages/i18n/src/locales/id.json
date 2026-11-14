@@ -10700,6 +10700,42 @@
       "toStop": "untuk menghentikan"
     }
   },
+  "brainGroups": {
+    "title": "Grup",
+    "about": "Satu akun dari tiap penyedia di satu komputer. Agen dengan grup lanjut dengan akun berikutnya saat satu akun mencapai batasnya.",
+    "empty": "Belum ada grup.",
+    "new": "Grup baru",
+    "edit": "Edit grup",
+    "usedBy": "Dipakai oleh {{names}}",
+    "unused": "Belum dipakai agen mana pun",
+    "name": "Nama",
+    "namePlaceholder": "Claude dan ChatGPT",
+    "nameNeeded": "Beri nama paling banyak 40 karakter.",
+    "computer": "Komputer",
+    "strategy": "Cara memilih",
+    "strategyAbout": "Berurutan: yang pertama masih punya ruang. Ruang terbanyak: yang paling jauh dari batasnya.",
+    "order": "Berurutan",
+    "room": "Ruang terbanyak",
+    "members": "Akun",
+    "membersAbout": "Dicoba dari atas ke bawah. Percakapan tetap memakai akunnya selama masih ada ruang.",
+    "membersNeeded": "Tambahkan setidaknya satu akun.",
+    "accountOf": "Akun {{provider}}",
+    "add": "Tambah {{name}}",
+    "remove": "Keluarkan {{name}}",
+    "moveUp": "Naikkan {{name}}",
+    "moveDown": "Turunkan {{name}}",
+    "modelLine": "Model: {{model}}",
+    "modelOf": "Model {{name}}",
+    "create": "Buat grup",
+    "created": "{{name}} dibuat.",
+    "saved": "{{name}} disimpan.",
+    "delete": "Hapus grup",
+    "deleteTitle": "Hapus {{name}}?",
+    "deleteAgents_other": "{{agents}} kembali berpikir dengan akunnya sendiri.",
+    "deleteNone": "Tidak ada agen yang memakai grup ini.",
+    "deleteConfirm": "Hapus",
+    "deleted": "{{name}} dihapus."
+  },
   "brain": {
     "group": {
       "line": {

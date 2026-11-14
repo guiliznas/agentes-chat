@@ -11036,6 +11036,43 @@
       "toStop": "durdurmak için"
     }
   },
+  "brainGroups": {
+    "title": "Gruplar",
+    "about": "Aynı bilgisayarda her sağlayıcıdan bir hesap. Grubu olan bir ajan, bir hesap sınırına ulaşınca sıradakiyle devam eder.",
+    "empty": "Henüz grup yok.",
+    "new": "Yeni grup",
+    "edit": "Grubu düzenle",
+    "usedBy": "{{names}} kullanıyor",
+    "unused": "Henüz hiçbir ajan kullanmıyor",
+    "name": "Ad",
+    "namePlaceholder": "Claude ve ChatGPT",
+    "nameNeeded": "En fazla 40 karakterlik bir ad ver.",
+    "computer": "Bilgisayar",
+    "strategy": "Nasıl seçer",
+    "strategyAbout": "Sırayla: payı kalan ilk hesap. En çok pay: sınırına en uzak olan.",
+    "order": "Sırayla",
+    "room": "En çok pay",
+    "members": "Hesaplar",
+    "membersAbout": "Yukarıdan aşağıya denenir. Bir sohbet, payı kaldıkça kendi hesabında kalır.",
+    "membersNeeded": "En az bir hesap ekle.",
+    "accountOf": "{{provider}} hesabı",
+    "add": "{{name}} ekle",
+    "remove": "{{name}} çıkar",
+    "moveUp": "{{name}} yukarı",
+    "moveDown": "{{name}} aşağı",
+    "modelLine": "Model: {{model}}",
+    "modelOf": "{{name}} modeli",
+    "create": "Grup oluştur",
+    "created": "{{name}} oluşturuldu.",
+    "saved": "{{name}} kaydedildi.",
+    "delete": "Grubu sil",
+    "deleteTitle": "{{name}} silinsin mi?",
+    "deleteAgents_one": "{{agents}} yeniden kendi hesabıyla düşünür.",
+    "deleteAgents_other": "{{agents}} yeniden kendi hesaplarıyla düşünür.",
+    "deleteNone": "Bu grubu hiçbir ajan kullanmıyor.",
+    "deleteConfirm": "Sil",
+    "deleted": "{{name}} silindi."
+  },
   "brain": {
     "group": {
       "line": {

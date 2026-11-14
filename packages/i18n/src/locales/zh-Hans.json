@@ -10710,6 +10710,42 @@
       "toStop": "以停止"
     }
   },
+  "brainGroups": {
+    "title": "分组",
+    "about": "同一台电脑上，每个提供商一个账号。使用分组的智能体在一个账号达到上限时，会换到下一个继续。",
+    "empty": "还没有分组。",
+    "new": "新建分组",
+    "edit": "编辑分组",
+    "usedBy": "{{names}} 正在使用",
+    "unused": "还没有智能体使用",
+    "name": "名称",
+    "namePlaceholder": "Claude 和 ChatGPT",
+    "nameNeeded": "请起一个不超过 40 个字符的名称。",
+    "computer": "电脑",
+    "strategy": "选择方式",
+    "strategyAbout": "按顺序：第一个还有余量的账号。余量优先：离上限最远的账号。",
+    "order": "按顺序",
+    "room": "余量优先",
+    "members": "账号",
+    "membersAbout": "从上往下依次尝试。只要还有余量，对话就一直用同一个账号。",
+    "membersNeeded": "请至少添加一个账号。",
+    "accountOf": "{{provider}} 账号",
+    "add": "添加 {{name}}",
+    "remove": "移除 {{name}}",
+    "moveUp": "上移 {{name}}",
+    "moveDown": "下移 {{name}}",
+    "modelLine": "模型：{{model}}",
+    "modelOf": "{{name}} 的模型",
+    "create": "创建分组",
+    "created": "已创建 {{name}}。",
+    "saved": "已保存 {{name}}。",
+    "delete": "删除分组",
+    "deleteTitle": "删除 {{name}}？",
+    "deleteAgents_other": "{{agents}} 将改回用自己的账号思考。",
+    "deleteNone": "没有智能体使用这个分组。",
+    "deleteConfirm": "删除",
+    "deleted": "已删除 {{name}}。"
+  },
   "brain": {
     "group": {
       "line": {

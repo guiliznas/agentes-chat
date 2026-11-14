@@ -71,6 +71,7 @@ import { AiAppsSection } from "@/components/AiApps";
 import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
+import { BrainGroupsCard } from "@/components/ai/BrainGroups";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { WhoPicksSection } from "@/components/ai/Jev";
@@ -1132,6 +1133,7 @@ function UsageSection() {
   return (
     <>
       <PlanUsageCards />
+      <BrainGroupsCard />
       {composio.data && showsComposioUsage(composio.data) && (
         <Card>
           <span className="small">{composioUsageText(t, i18n.language, composio.data)}</span>

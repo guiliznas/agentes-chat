@@ -1379,7 +1379,9 @@
       "machines.oneClick.tools.cursor",
       "machines.oneClick.tools.opencode",
       "machines.oneClick.tools.grok",
-      "machines.oneClick.tools.antigravity"
+      "machines.oneClick.tools.antigravity",
+      "brainGroups.name",
+      "brainGroups.computer"
     ],
     "it": [
       "shell.email.label",
@@ -1734,7 +1736,8 @@
       "machines.oneClick.tools.cursor",
       "machines.oneClick.tools.opencode",
       "machines.oneClick.tools.grok",
-      "machines.oneClick.tools.antigravity"
+      "machines.oneClick.tools.antigravity",
+      "brainGroups.computer"
     ],
     "nl": [
       "calendar.moreRuns",
@@ -2314,7 +2317,10 @@
       "machines.oneClick.tools.cursor",
       "machines.oneClick.tools.opencode",
       "machines.oneClick.tools.grok",
-      "machines.oneClick.tools.antigravity"
+      "machines.oneClick.tools.antigravity",
+      "brainGroups.computer",
+      "brainGroups.members",
+      "brainGroups.modelLine"
     ],
     "ja": [
       "channel.tooLong.fileName",
@@ -3085,7 +3091,8 @@
       "machines.oneClick.tools.grok",
       "machines.oneClick.tools.antigravity",
       "machines.oneClick.tools.browser",
-      "machines.oneClick.tools.terminal"
+      "machines.oneClick.tools.terminal",
+      "brainGroups.modelLine"
     ],
     "tr": [
       "devices.cpus",
@@ -3269,7 +3276,8 @@
       "machines.oneClick.tools.cursor",
       "machines.oneClick.tools.opencode",
       "machines.oneClick.tools.grok",
-      "machines.oneClick.tools.antigravity"
+      "machines.oneClick.tools.antigravity",
+      "brainGroups.modelLine"
     ],
     "pl": [
       "devices.cpus",
@@ -3554,7 +3562,8 @@
       "machines.oneClick.tools.cursor",
       "machines.oneClick.tools.opencode",
       "machines.oneClick.tools.grok",
-      "machines.oneClick.tools.antigravity"
+      "machines.oneClick.tools.antigravity",
+      "brainGroups.modelLine"
     ],
     "ru": [
       "channel.tooLong.fileName",

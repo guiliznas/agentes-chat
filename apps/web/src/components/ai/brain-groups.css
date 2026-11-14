@@ -1,0 +1,130 @@
+/* IA e uso › Grupos (BrainGroups.tsx, ADR 0180): the rows are the accounts' (`.plan-row`), the dialog the kit's. */
+
+.bg-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* A group's row: its members' marks, its name with its line under it, and the chevron. */
+.plan-row__head.bg-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.plan-row__head.bg-row:disabled {
+  cursor: default;
+}
+.plan-row__head.bg-row:disabled:hover {
+  background: none;
+}
+.bg-row__marks {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  gap: var(--space-1);
+  min-height: var(--line);
+  align-items: center;
+  align-self: start;
+}
+/* Not `.plan-acct__name`: on a phone the accounts' rows unwrap theirs, and a group's name has no parts. */
+.bg-row__name {
+  grid-column: 2;
+  grid-row: 1;
+  margin-top: calc((var(--line) - 22px) / 2);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+.bg-row__sub {
+  grid-column: 2;
+  grid-row: 2;
+}
+.plan-row__head.bg-row .bg-row__chevron {
+  grid-column: 3;
+}
+/* A phone: the marks, the name and the chevron on one line, the group's line under all of them from the marks' edge. */
+@media (max-width: 560px) {
+  .bg-row__marks {
+    grid-row: 1;
+  }
+  .bg-row__sub {
+    grid-column: 1 / -1;
+  }
+}
+
+/* The members in order, each its mark, its name and model, its meter and its moves. The name's capitals start at the
+   mark's top (`.ac-captop`); the moves sit on the mark's middle. */
+.bg-members {
+  display: grid;
+  gap: var(--space-2);
+}
+.bg-member {
+  /* The mark's height (`.ac-brand--sm`). */
+  --bg-mark: 30px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 120px) auto;
+  align-items: start;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.bg-member__head {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  min-width: 0;
+}
+.bg-member__name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+.bg-member__model {
+  justify-self: start;
+  text-align: left;
+}
+.bg-member__meter {
+  grid-column: 3;
+  grid-row: 1;
+}
+.bg-member__acts {
+  grid-column: 4;
+  grid-row: 1;
+  display: inline-flex;
+  gap: var(--space-2);
+  margin-block: calc((var(--bg-mark) - var(--control-h-sm)) / 2);
+}
+/* Another account of the same provider, under the row from the mark's edge. */
+.bg-member__pick {
+  grid-column: 1 / -1;
+}
+.bg-members__add {
+  flex-wrap: wrap;
+}
+
+/* A phone: the mark, the name and the moves on one line, then the model, the meter and the pick at the row's width
+   from the mark's edge. The mark never keeps a column beside them. */
+@media (max-width: 560px) {
+  .bg-member {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .bg-member__head {
+    display: contents;
+  }
+  .bg-member__name {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .bg-member__model {
+    grid-column: 1 / -1;
+  }
+  .bg-member__acts {
+    grid-column: 3;
+  }
+  .bg-member__meter {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}

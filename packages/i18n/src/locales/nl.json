@@ -11160,6 +11160,43 @@
       "toStop": "om te stoppen"
     }
   },
+  "brainGroups": {
+    "title": "Groepen",
+    "about": "Eén account per aanbieder op één computer. Een agent met een groep gaat verder met de volgende als er een zijn limiet bereikt.",
+    "empty": "Nog geen groepen.",
+    "new": "Nieuwe groep",
+    "edit": "Groep bewerken",
+    "usedBy": "Gebruikt door {{names}}",
+    "unused": "Nog door geen agent gebruikt",
+    "name": "Naam",
+    "namePlaceholder": "Claude en ChatGPT",
+    "nameNeeded": "Geef het een naam van maximaal 40 tekens.",
+    "computer": "Computer",
+    "strategy": "Hoe hij kiest",
+    "strategyAbout": "Op volgorde: de eerste met ruimte. Meeste ruimte: die het verst van zijn limiet is.",
+    "order": "Op volgorde",
+    "room": "Meeste ruimte",
+    "members": "Accounts",
+    "membersAbout": "Van boven naar beneden geprobeerd. Een gesprek blijft bij zijn account zolang er ruimte is.",
+    "membersNeeded": "Voeg minstens één account toe.",
+    "accountOf": "{{provider}}-account",
+    "add": "{{name}} toevoegen",
+    "remove": "{{name}} weghalen",
+    "moveUp": "{{name}} omhoog",
+    "moveDown": "{{name}} omlaag",
+    "modelLine": "Model: {{model}}",
+    "modelOf": "Model van {{name}}",
+    "create": "Groep maken",
+    "created": "{{name}} gemaakt.",
+    "saved": "{{name}} opgeslagen.",
+    "delete": "Groep verwijderen",
+    "deleteTitle": "{{name}} verwijderen?",
+    "deleteAgents_one": "{{agents}} denkt weer met het eigen account.",
+    "deleteAgents_other": "{{agents}} denken weer met hun eigen account.",
+    "deleteNone": "Geen agent gebruikt deze groep.",
+    "deleteConfirm": "Verwijderen",
+    "deleted": "{{name}} verwijderd."
+  },
   "brain": {
     "group": {
       "line": {

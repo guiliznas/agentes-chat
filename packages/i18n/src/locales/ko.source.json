@@ -27052,6 +27052,111 @@
   "run.strip.toStop": {
     "value": "to stop"
   },
+  "brainGroups.title": {
+    "value": "Groups"
+  },
+  "brainGroups.about": {
+    "value": "One account of each provider on one computer. An agent with a group goes on with the next one when one reaches its limit."
+  },
+  "brainGroups.empty": {
+    "value": "No groups yet."
+  },
+  "brainGroups.new": {
+    "value": "New group"
+  },
+  "brainGroups.edit": {
+    "value": "Edit group"
+  },
+  "brainGroups.usedBy": {
+    "value": "Used by {{names}}"
+  },
+  "brainGroups.unused": {
+    "value": "No agent uses it yet"
+  },
+  "brainGroups.name": {
+    "value": "Name"
+  },
+  "brainGroups.namePlaceholder": {
+    "value": "Claude and ChatGPT"
+  },
+  "brainGroups.nameNeeded": {
+    "value": "Give it a name of up to 40 characters."
+  },
+  "brainGroups.computer": {
+    "value": "Computer"
+  },
+  "brainGroups.strategy": {
+    "value": "How it picks"
+  },
+  "brainGroups.strategyAbout": {
+    "value": "In order: the first one with room left. Most room: the one furthest from its limit."
+  },
+  "brainGroups.order": {
+    "value": "In order"
+  },
+  "brainGroups.room": {
+    "value": "Most room"
+  },
+  "brainGroups.members": {
+    "value": "Accounts"
+  },
+  "brainGroups.membersAbout": {
+    "value": "Tried from the top. A conversation stays with its account while it has room."
+  },
+  "brainGroups.membersNeeded": {
+    "value": "Add at least one account."
+  },
+  "brainGroups.accountOf": {
+    "value": "{{provider}} account"
+  },
+  "brainGroups.add": {
+    "value": "Add {{name}}"
+  },
+  "brainGroups.remove": {
+    "value": "Take {{name}} out"
+  },
+  "brainGroups.moveUp": {
+    "value": "Move {{name}} up"
+  },
+  "brainGroups.moveDown": {
+    "value": "Move {{name}} down"
+  },
+  "brainGroups.modelLine": {
+    "value": "Model: {{model}}"
+  },
+  "brainGroups.modelOf": {
+    "value": "{{name}}'s model"
+  },
+  "brainGroups.create": {
+    "value": "Create group"
+  },
+  "brainGroups.created": {
+    "value": "{{name}} created."
+  },
+  "brainGroups.saved": {
+    "value": "{{name}} saved."
+  },
+  "brainGroups.delete": {
+    "value": "Delete group"
+  },
+  "brainGroups.deleteTitle": {
+    "value": "Delete {{name}}?"
+  },
+  "brainGroups.deleteAgents": {
+    "value": {
+      "one": "{{agents}} goes back to thinking with its own account.",
+      "other": "{{agents}} go back to thinking with their own accounts."
+    }
+  },
+  "brainGroups.deleteNone": {
+    "value": "No agent uses it."
+  },
+  "brainGroups.deleteConfirm": {
+    "value": "Delete"
+  },
+  "brainGroups.deleted": {
+    "value": "{{name}} deleted."
+  },
   "brain.group.line.order": {
     "value": "{{names}} · in order"
   },

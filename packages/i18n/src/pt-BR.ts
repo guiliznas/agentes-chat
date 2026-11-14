@@ -11386,6 +11386,48 @@ export const ptBR = {
       toStop: "para parar",
     },
   },
+  /** Configurações › IA e uso, "Groups" (ADR 0180): accounts of one computer, one per provider, an agent thinks with. */
+  brainGroups: {
+    title: "Grupos",
+    about:
+      "Uma conta de cada provedor, no mesmo computador. O agente com um grupo segue com a próxima quando uma chega ao limite.",
+    empty: "Nenhum grupo ainda.",
+    new: "Novo grupo",
+    edit: "Editar grupo",
+    /** `names`: the agents that think with the group. */
+    usedBy: "Usado por {{names}}",
+    unused: "Nenhum agente usa ainda",
+    name: "Nome",
+    namePlaceholder: "Claude e ChatGPT",
+    nameNeeded: "Dê um nome de até 40 caracteres.",
+    computer: "Computador",
+    strategy: "Como escolhe",
+    strategyAbout: "Em ordem: a primeira com folga. Mais folga: a mais longe do limite.",
+    order: "Em ordem",
+    room: "Mais folga",
+    members: "Contas",
+    membersAbout: "Tentadas de cima para baixo. Uma conversa fica com a conta dela enquanto houver folga.",
+    membersNeeded: "Adicione pelo menos uma conta.",
+    /** The select of another account of the same provider; `provider`: "Claude", "ChatGPT"… */
+    accountOf: "Conta do {{provider}}",
+    add: "Adicionar {{name}}",
+    remove: "Tirar {{name}}",
+    moveUp: "Subir {{name}}",
+    moveDown: "Descer {{name}}",
+    /** Under a member's name: the model it thinks with there. */
+    modelLine: "Modelo: {{model}}",
+    modelOf: "Modelo do {{name}}",
+    create: "Criar grupo",
+    created: "{{name}} criado.",
+    saved: "{{name}} salvo.",
+    delete: "Apagar grupo",
+    deleteTitle: "Apagar {{name}}?",
+    deleteAgents_one: "{{agents}} volta a pensar com a própria conta.",
+    deleteAgents_other: "{{agents}} voltam a pensar com a própria conta.",
+    deleteNone: "Nenhum agente usa este grupo.",
+    deleteConfirm: "Apagar",
+    deleted: "{{name}} apagado.",
+  },
   brain: {
     /** A brain group (ADR 0180) in one line: `names` are its providers in the order a run tries them. */
     group: {

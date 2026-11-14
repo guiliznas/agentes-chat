@@ -11097,6 +11097,43 @@
       "toStop": "zum Stoppen"
     }
   },
+  "brainGroups": {
+    "title": "Gruppen",
+    "about": "Ein Konto pro Anbieter auf einem Computer. Ein Agent mit einer Gruppe macht mit dem nächsten weiter, wenn eines sein Limit erreicht.",
+    "empty": "Noch keine Gruppen.",
+    "new": "Neue Gruppe",
+    "edit": "Gruppe bearbeiten",
+    "usedBy": "Genutzt von {{names}}",
+    "unused": "Noch von keinem Agenten genutzt",
+    "name": "Name",
+    "namePlaceholder": "Claude und ChatGPT",
+    "nameNeeded": "Gib ihr einen Namen mit bis zu 40 Zeichen.",
+    "computer": "Computer",
+    "strategy": "Wie sie wählt",
+    "strategyAbout": "Der Reihe nach: das erste mit Spielraum. Meister Spielraum: das am weitesten von seinem Limit.",
+    "order": "Der Reihe nach",
+    "room": "Meister Spielraum",
+    "members": "Konten",
+    "membersAbout": "Von oben nach unten versucht. Eine Unterhaltung bleibt bei ihrem Konto, solange es Spielraum hat.",
+    "membersNeeded": "Füge mindestens ein Konto hinzu.",
+    "accountOf": "{{provider}}-Konto",
+    "add": "{{name}} hinzufügen",
+    "remove": "{{name}} entfernen",
+    "moveUp": "{{name}} nach oben",
+    "moveDown": "{{name}} nach unten",
+    "modelLine": "Modell: {{model}}",
+    "modelOf": "Modell von {{name}}",
+    "create": "Gruppe erstellen",
+    "created": "{{name}} erstellt.",
+    "saved": "{{name}} gespeichert.",
+    "delete": "Gruppe löschen",
+    "deleteTitle": "{{name}} löschen?",
+    "deleteAgents_one": "{{agents}} denkt wieder mit dem eigenen Konto.",
+    "deleteAgents_other": "{{agents}} denken wieder mit dem eigenen Konto.",
+    "deleteNone": "Kein Agent nutzt diese Gruppe.",
+    "deleteConfirm": "Löschen",
+    "deleted": "{{name}} gelöscht."
+  },
   "brain": {
     "group": {
       "line": {

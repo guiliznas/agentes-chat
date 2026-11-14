@@ -9,7 +9,7 @@ import { planLabel, planOfAccount } from "./no-ai";
  */
 
 /** The provider a group holds one account of: a coding plan's key, else the CLI's kind (the engine's `provider ?? kind`). */
-export const groupProviderKey = (a: Pick<MachineAccount, "provider" | "kind">): string => a.provider ?? a.kind;
+export const groupProviderKey = (a: { provider: string | null; kind: string }): string => a.provider ?? a.kind;
 
 /** A provider with the accounts that could stand for it in a group: the person picks one of them. */
 export interface GroupCandidates<A> {

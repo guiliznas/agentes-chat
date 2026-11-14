@@ -10647,6 +10647,42 @@
       "toStop": "で停止"
     }
   },
+  "brainGroups": {
+    "title": "グループ",
+    "about": "1台のコンピューターで、プロバイダーごとに1つのアカウント。グループを使うエージェントは、1つが上限に達すると次のアカウントで続けます。",
+    "empty": "グループはまだありません。",
+    "new": "新しいグループ",
+    "edit": "グループを編集",
+    "usedBy": "{{names}} が使用中",
+    "unused": "まだどのエージェントも使っていません",
+    "name": "名前",
+    "namePlaceholder": "Claude と ChatGPT",
+    "nameNeeded": "40文字以内で名前を付けてください。",
+    "computer": "コンピューター",
+    "strategy": "選び方",
+    "strategyAbout": "順番: 余裕のある最初のアカウント。余裕優先: 上限から最も遠いアカウント。",
+    "order": "順番",
+    "room": "余裕優先",
+    "members": "アカウント",
+    "membersAbout": "上から順に試します。会話は余裕があるかぎり同じアカウントを使います。",
+    "membersNeeded": "アカウントを1つ以上追加してください。",
+    "accountOf": "{{provider}} のアカウント",
+    "add": "{{name}} を追加",
+    "remove": "{{name}} を外す",
+    "moveUp": "{{name}} を上へ",
+    "moveDown": "{{name}} を下へ",
+    "modelLine": "モデル: {{model}}",
+    "modelOf": "{{name}} のモデル",
+    "create": "グループを作成",
+    "created": "{{name}} を作成しました。",
+    "saved": "{{name}} を保存しました。",
+    "delete": "グループを削除",
+    "deleteTitle": "{{name}} を削除しますか？",
+    "deleteAgents_other": "{{agents}} は自分のアカウントで考えるように戻ります。",
+    "deleteNone": "このグループを使っているエージェントはいません。",
+    "deleteConfirm": "削除",
+    "deleted": "{{name}} を削除しました。"
+  },
   "brain": {
     "group": {
       "line": {
