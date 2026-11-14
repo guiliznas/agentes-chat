@@ -1153,7 +1153,7 @@ async function offPlansNotOwners(tx: Executor, orgId: string, ids: string[]) {
   if (ids.length === 0) return;
   await tx
     .update(agents)
-    .set({ brain: "model", brainAccountId: null, updatedAt: new Date() })
+    .set({ brain: "model", brainAccountId: null, brainGroupId: null, updatedAt: new Date() })
     .where(
       and(
         eq(agents.orgId, orgId),
@@ -1444,7 +1444,7 @@ export async function deleteAccount(
     const ownerless = plan.leaves.length
       ? await tx
           .update(agents)
-          .set({ brain: "model", brainAccountId: null, updatedAt: new Date() })
+          .set({ brain: "model", brainAccountId: null, brainGroupId: null, updatedAt: new Date() })
           .where(
             and(
               inArray(

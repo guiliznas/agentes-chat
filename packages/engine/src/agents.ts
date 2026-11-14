@@ -492,7 +492,7 @@ export async function updateAgent(
         ? answersOthers(audienceOf(before), owner)
           ? { audienceMode: "owner" as const }
           : {}
-        : { brain: "model", brainAccountId: null }
+        : { brain: "model", brainAccountId: null, brainGroupId: null }
       : {};
   // The handle it leaves joins the ones it had, so what names it there still reaches it; taking one back takes it out.
   const previous =

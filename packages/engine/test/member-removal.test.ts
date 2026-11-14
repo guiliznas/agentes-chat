@@ -17,6 +17,7 @@ import {
   removeMember,
   requireChannelAccess,
   setMemberRoles,
+  updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -236,6 +237,66 @@ test("deleting the account: their agents on a plan someone else's computer gives
   await deleteAccount(f.db, caio.id, { pubsub: f.pubsub });
   // No owner now, so no plan thinks for it; the computer stays (it isn't theirs).
   expect(await agentRow()).toMatchObject({ ownerUserId: null, machineId, brain: "model", brainAccountId: null });
+});
+
+/** A brain group on `machineId` (ADR 0180), with `agentId` thinking with it. */
+async function inGroup(machineId: string, createdBy: string) {
+  const [group] = await f.db
+    .insert(schema.brainGroups)
+    .values({ orgId: f.org.id, machineId, name: "Time", strategy: "order", createdBy })
+    .returning();
+  if (!group) throw new Error("no group");
+  await f.db.update(schema.agents).set({ brainGroupId: group.id }).where(eq(schema.agents.id, f.agent.id));
+  return group.id;
+}
+
+test("sent back to the API, an agent leaves its brain group too: its owner's plan left, or it has no owner", async () => {
+  // Bia's agent on Caio's account: removing Bia hands it to the remover, whose plan it isn't, back to the API.
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const mac = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, MAC);
+  await f.db.insert(schema.machineAccounts).values({
+    id: ACCOUNT_ID,
+    orgId: f.org.id,
+    machineId: mac.machineId,
+    kind: "claude_code",
+    label: "Trabalho",
+    status: "active",
+    createdBy: caio.id,
+  });
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: bia.id, machineId: mac.machineId, brain: "claude_code", brainAccountId: ACCOUNT_ID })
+    .where(eq(schema.agents.id, f.agent.id));
+  await inGroup(mac.machineId, bia.id);
+  await removeMember(f.db, f.owner.id, f.org.id, bia.id, { pubsub: f.pubsub });
+  expect(await agentRow()).toMatchObject({
+    ownerUserId: f.owner.id,
+    brain: "model",
+    brainAccountId: null,
+    brainGroupId: null,
+  });
+
+  // Caio's agent on someone else's computer: deleting his account leaves it with no owner, back to the API.
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: caio.id, brain: "opencode", brainAccountId: null })
+    .where(eq(schema.agents.id, f.agent.id));
+  await inGroup(mac.machineId, f.owner.id);
+  await deleteAccount(f.db, caio.id, { pubsub: f.pubsub });
+  expect(await agentRow()).toMatchObject({ ownerUserId: null, brain: "model", brainGroupId: null });
+});
+
+test("handed to someone whose plan it isn't, an agent goes back to the API and leaves its brain group", async () => {
+  const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, MAC);
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", brainAccountId: null })
+    .where(eq(schema.agents.id, f.agent.id));
+  await inGroup(machineId, f.owner.id);
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { ownerUserId: caio.id });
+  expect(await agentRow()).toMatchObject({ ownerUserId: caio.id, brain: "model", brainGroupId: null });
 });
 
 test("leaving on one's own is quiet, and the agents skip a blocked owner", async () => {
