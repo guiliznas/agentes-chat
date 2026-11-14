@@ -575,8 +575,11 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
   const where = s.homeOf(s.savedCard);
   const carried = withAutonomy ? view.autonomy : undefined;
   const autonomy = carried ? { autonomy: carried } : {};
-  const setup: AgentSetup | null =
-    s.kind === "model"
+  const setup: AgentSetup | null = s.group
+    ? // A group goes alone (ADR 0180), whatever is saved under it: each agent keeps its own brain, model and account,
+      // and the server takes it only to the agents on the group's computer (`other_computer`, said on its row).
+      { brain: s.kind, model: null, group: s.group.id, ...autonomy }
+    : s.kind === "model"
       ? {
           brain: "model",
           model: saved.model,
@@ -597,8 +600,6 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
             contextTokens: s.shownContext,
             fallback: view.fallback,
             onlyOwner: view.onlyOwner,
-            // Its group goes too; the server skips an agent on another computer (`other_computer`), said on its row.
-            ...(s.group ? { group: s.group.id } : {}),
             ...autonomy,
           }
         : null;

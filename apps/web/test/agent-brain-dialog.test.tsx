@@ -1077,6 +1077,8 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
     groups: BrainGroup[],
     thinking?: string,
     tweak?: (state: ReturnType<typeof seedState>, api: ReturnType<typeof createFakeApi>) => void,
+    /** What the agent has saved under the group (its own brain): Claude Code on its account by default. */
+    saved: Parameters<typeof fakeAgentBrain>[1] = { brain: "claude_code", effectiveModel: "sonnet", accounts: [work] },
   ) {
     const state = seedState();
     const api = createFakeApi(state);
@@ -1088,7 +1090,7 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
     state.calls.length = 0;
     const stored = api.agents.brain;
     api.agents.brain = async (orgId, agentId, scope) => ({
-      ...fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", accounts: [work] }),
+      ...fakeAgentBrain(ADA_ID, saved),
       group: (await stored(orgId, agentId, scope)).group,
     });
     return open(state, api);
@@ -1224,12 +1226,9 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
     await settle(4);
     const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
     expect(c.textContent).toContain("Dia a dia");
+    // The group goes alone (ADR 0180): never the account, model or effort saved under it, which each agent keeps.
     expect(copyCalls()).toEqual([
-      {
-        setup: expect.objectContaining({ group: "bg_daily", machineId: "machine_1" }),
-        agentIds: expect.any(Array),
-        preview: true,
-      },
+      { setup: { brain: "claude_code", model: null, group: "bg_daily" }, agentIds: expect.any(Array), preview: true },
     ]);
     const lia = within(c).getByRole("checkbox", { name: /^Lia/ });
     expect(lia.closest("label")?.textContent).toContain("Trabalha no PC");
@@ -1241,6 +1240,18 @@ describe("Quem pensa with a brain group (ADR 0180)", () => {
       setup: expect.objectContaining({ group: "bg_daily" }),
       agentIds: [ATLAS_ID],
     });
+  });
+
+  test("Usar em outros agentes on a group saved over the API model still copies the group, never the model alone", async () => {
+    const { state } = await withGroups([daily], "bg_daily", undefined, { brain: "model", model: "claude-sonnet-5-5" });
+    const copyCalls = () => state.calls.filter((c) => c.method === "agents.applySetup").map((c) => c.args[1]);
+    const d = await brainDialog();
+    await toScreen(d, "Mais opções");
+    await toScreen(d, "Usar em outros agentes");
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Usar em outros agentes" }).textContent).toContain("Dia a dia");
+    expect(copyCalls()[0]?.setup).toMatchObject({ group: "bg_daily" });
+    expect(copyCalls()[0]?.setup).not.toHaveProperty("account");
   });
 
   test("every member at its limit: the limit screen shows the group's order, each with its limit, never other accounts", async () => {
