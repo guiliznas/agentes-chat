@@ -32,7 +32,7 @@ import { runnerUpdateWay } from "../runner-update";
 import type { AgentRun } from "../runs";
 import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
-import { groupPickFor, withGroupBrain } from "./groups";
+import { groupHasNoMember, groupPickFor, withGroupBrain } from "./groups";
 import { BRAIN_NAMES, BRAIN_PLAN_NAMES, type BrainAccount, type BrainKind, type BrainSession } from "./types";
 
 const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"];
@@ -788,6 +788,12 @@ async function sessionFor(
   return { id: sessionId, resume: id ? await sessionUsed(db, run, kind, sessionId) : false };
 }
 
+/** A brain group with no member that can think now (ADR 0180 §7): the plan-limit rule, its reset unknown. */
+export const GROUP_MEMBERLESS: BrainUnavailability = {
+  code: "plan_limit",
+  message: "No account in the agent's brain group can think for it now.",
+};
+
 /**
  * The brain, model and session of a run: the mission's when the run is its
  * main session, else the agent's; for a
@@ -822,12 +828,14 @@ export async function resolveBrain(
   if (kind === "model") return { kind, ...base };
   const model = brainModelFor(kind, agent, mission);
   const machineId = mission?.session?.machineId ?? agent.machineId ?? null;
+  // A group with no member that can think (ADR 0180 §7): as one whose members are all at their limit, with no account.
+  const memberless = !mission && groupHasNoMember(agent);
   const [status, account] = await Promise.all([
     machineId && deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
-    brainAccountFor(deps.db, agent, kind, machineId),
+    memberless ? undefined : brainAccountFor(deps.db, agent, kind, machineId),
   ]);
   const usage =
-    machineId && deps.machines
+    machineId && deps.machines && !memberless
       ? await storedPlanUsage(deps.db, agent.orgId, machineId, kind, account?.id).catch(() => null)
       : null;
   // A plan's model kept while another account thinks (or none): what that one runs instead, so no turn asks a
@@ -836,6 +844,7 @@ export async function resolveBrain(
     kind === "claude_code" && model && !isAutoModel(model) ? claudeCodeModel(planOf(account?.provider), model) : model;
   const effort = brainEffortFor(agent, kind);
   const unavailable =
+    (memberless ? GROUP_MEMBERLESS : null) ??
     (isRightHand(agent) ? await rightHandPlanRefusal(deps.db, agent, run, status) : null) ??
     (machineId && !deps.machines
       ? null

@@ -934,6 +934,31 @@ describe("a brain group (ADR 0180)", () => {
     expect((await getAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id)).group).toBeNull();
   });
 
+  test("on a group the summary never says Fast: a member thinks at standard speed (ADR 0180)", async () => {
+    const { fx, group, claude } = await grouped();
+    // Saved on Codex with Fast, the group's Claude at its limit: its Codex member thinks.
+    await fx.db
+      .update(schema.agents)
+      .set({ brain: "codex", brainSpeed: "fast" })
+      .where(eq(schema.agents.id, fx.agent.id));
+    await fx.db
+      .update(schema.machineAccounts)
+      .set({
+        usage: {
+          windows: [{ kind: "five_hour", usedPercent: 100, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }],
+          source: "probe",
+          at: new Date().toISOString(),
+        },
+      })
+      .where(eq(schema.machineAccounts.id, claude));
+    const before = [...(await agentBrainSummaries(fx.db, fx.owner.id, fx.org.id, [await agentRow(fx)])).values()];
+    expect(before[0]?.speed).toBe("fast");
+    await fx.db.update(schema.agents).set({ brainGroupId: group.id }).where(eq(schema.agents.id, fx.agent.id));
+    const [summary] = [...(await agentBrainSummaries(fx.db, fx.owner.id, fx.org.id, [await agentRow(fx)])).values()];
+    expect(summary).toMatchObject({ kind: "codex", account: "Codex 1" });
+    expect(summary?.speed).toBeUndefined();
+  });
+
   test("taking the group off brings back the account it had", async () => {
     const { fx, deps, row, account, group, save } = await grouped();
     await account(ANAS, fx.owner.id);

@@ -13,6 +13,10 @@ import { enqueue } from "./outbox";
 import { isTerminal } from "./runs";
 import { effectiveAgentBudget, monthStartUtc } from "./usage";
 
+/** The agent's extra usage, never on a brain group's member (ADR 0180): Fast and extra usage are its saved brain's. */
+const memberExtraUsage =
+  sql<boolean>`(${schema.agents.brainExtraUsage} and ${schema.agents.brainGroupId} is null)`.mapWith(Boolean);
+
 /**
  * A run waiting on usage (the usage-aware design, Phase 1): its plan's limit (`plan_limit`) or its agent's
  * monthly API budget (`budget`). It parks in its own session (`waiting_input`, `waitingForBrain` with this
@@ -242,7 +246,7 @@ export async function wakePlanWaits(
           .select({
             ...fields,
             waitModel: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'model'`,
-            extraUsage: agents.brainExtraUsage,
+            extraUsage: memberExtraUsage,
           })
           .from(agentRuns)
           .innerJoin(agents, eq(agents.id, agentRuns.agentId))
@@ -447,7 +451,7 @@ export async function pauseContinuesPastPlan(
   const [row] = await db
     .select({
       wait: sql<Record<string, unknown> | null>`${agentRuns.transcript}->'waitingForBrain'`,
-      extraUsage: agents.brainExtraUsage,
+      extraUsage: memberExtraUsage,
     })
     .from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId))

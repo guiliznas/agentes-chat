@@ -3,8 +3,8 @@ import { ensureOpenRouterModels, isAutoModel, routerModelOf } from "@agenteschat
 import type { Agent } from "./agents";
 import { autoModelFor, autoProvider } from "./auto-model";
 import { brainOf } from "./brain-settings";
-import { withGroupBrain } from "./brains/groups";
-import { brainAccountFor, computerBrainUnavailable, mayFallBack, NO_AI_CODES } from "./brains/select";
+import { groupHasNoMember, withGroupBrain } from "./brains/groups";
+import { brainAccountFor, computerBrainUnavailable, GROUP_MEMBERLESS, mayFallBack, NO_AI_CODES } from "./brains/select";
 import { BRAIN_PLAN_NAMES, type BrainKind, type ComputerBrainKind, isComputerBrain } from "./brains/types";
 import type { ModelGateway } from "./gateway";
 import type { MachineStatus } from "./machine-hub";
@@ -150,12 +150,17 @@ export async function agentAiState(
     return provider ? { state: "ready", provider } : READY;
   }
   const machineId = mission?.session?.machineId ?? agent.machineId ?? null;
+  // A group with no member that can think (ADR 0180 §7): as one at its limit, never "no AI" (it waits or falls back).
+  const memberless = !mission && groupHasNoMember(agent);
   const [status, account] = await Promise.all([
     machineId && deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
-    brainAccountFor(deps.db, agent, kind, machineId),
+    memberless ? undefined : brainAccountFor(deps.db, agent, kind, machineId),
   ]);
-  const unavailable =
-    machineId && !deps.machines ? null : computerBrainUnavailable(kind, machineId, status, Date.now(), account);
+  const unavailable = memberless
+    ? GROUP_MEMBERLESS
+    : machineId && !deps.machines
+      ? null
+      : computerBrainUnavailable(kind, machineId, status, Date.now(), account);
   if (!unavailable) return READY;
   if (mayFallBack(agent, { background: background || (run?.background ?? false) }) && (await modelReady(deps, agent)))
     return READY;

@@ -453,11 +453,43 @@ async function lastThreadAccount(db: Database, orgId: string, agentId: string, t
 
 /** Agents `withGroupBrain` already gave their member: the run's second look (`resolveBrain`) keeps that one. */
 const picked = new WeakSet<object>();
+/** Agents `withGroupBrain` found no usable member for: they think as at a plan's limit (`groupHasNoMember`). */
+const memberless = new WeakSet<object>();
+
+/**
+ * The agent's group has no member that can think for it now (ADR 0180 §7): every one signed out, unshared or no longer
+ * serving its owner. It follows the rule of a group whose members are all at their limit, never its saved brain: its
+ * fallback answers a conversation, other work waits (`plan_limit`, its reset unknown).
+ */
+export const groupHasNoMember = (agent: object) => memberless.has(agent);
+
+/** A group member's own settings (ADR 0180): Fast and extra usage are the agent's saved brain's, never a member's. */
+const MEMBER_SETTINGS = { brainSpeed: "standard", brainExtraUsage: false } as const;
+
+/** The CLI a memberless group thinks as for its wait: its first member's, else the agent's saved computer brain. */
+async function memberlessKind(db: Database, orgId: string, groupId: string, saved: unknown): Promise<BrainKind> {
+  const [first] = await db
+    .select({ kind: schema.machineAccounts.kind })
+    .from(schema.brainGroupMembers)
+    .innerJoin(
+      schema.machineAccounts,
+      and(
+        eq(schema.machineAccounts.orgId, schema.brainGroupMembers.orgId),
+        eq(schema.machineAccounts.id, schema.brainGroupMembers.accountId),
+      ),
+    )
+    .where(and(eq(schema.brainGroupMembers.orgId, orgId), eq(schema.brainGroupMembers.groupId, groupId)))
+    .orderBy(asc(schema.brainGroupMembers.position))
+    .limit(1);
+  if (first) return first.kind as BrainKind;
+  return typeof saved === "string" && saved !== "model" ? (saved as BrainKind) : "claude_code";
+}
 
 /**
  * The agent with its group's member in place of its own `brain*` fields (ADR 0180), the way `withPersonalBrain` does
- * for the right hand. The stored fields stay untouched, so leaving the group gives them back. No group, the right
- * hand, no computer or no usable member: the agent as it is.
+ * for the right hand, at standard speed and with no extra usage. The stored fields stay untouched, so leaving the group
+ * gives them back. No group, the right hand or no computer: the agent as it is. No usable member: no account, marked
+ * `groupHasNoMember`, so it thinks as a group at its limit does.
  */
 export async function withGroupBrain<
   T extends ThinkingAgent & Pick<typeof schema.agents.$inferSelect, "id"> & { brainGroupId?: string | null },
@@ -474,9 +506,23 @@ export async function withGroupBrain<
     },
     opts,
   );
-  if (!pick) return agent;
+  if (!pick) {
+    const none: T = {
+      ...agent,
+      ...MEMBER_SETTINGS,
+      brain: await memberlessKind(db, agent.orgId, agent.brainGroupId, agent.brain),
+      brainModel: AUTO_MODEL,
+      brainEffort: null,
+      brainAccountId: null,
+      brainAccountLentBy: null,
+    };
+    picked.add(none);
+    memberless.add(none);
+    return none;
+  }
   const substituted: T = {
     ...agent,
+    ...MEMBER_SETTINGS,
     brain: pick.kind,
     brainModel: pick.model ?? AUTO_MODEL,
     brainEffort: pick.effort,

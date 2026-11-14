@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   createBrainGroup,
   deleteBrainGroup,
+  groupHasNoMember,
   listBrainGroups,
   pickGroupMember,
   updateBrainGroup,
@@ -264,7 +265,9 @@ test("a member signed out, removed or kept to its owner is skipped", async () =>
     { ...w.agent, brain: "model", brainModel: "m", brainEffort: null, brainAccountId: null, brainAccountLentBy: null },
     {},
   );
-  expect(agent.brain).toBe("model");
+  // None left: never its saved brain (the API model here), but the group's limit rule with no account (ADR 0180 §7).
+  expect(groupHasNoMember(agent)).toBe(true);
+  expect(agent).toMatchObject({ brain: "claude_code", brainAccountId: null });
 });
 
 test("every member at its limit: the one back first, marked exhausted", async () => {
@@ -334,5 +337,8 @@ test("a group on another computer than the agent's is ignored", async () => {
     brainAccountId: null,
     brainAccountLentBy: null,
   };
-  expect((await withGroupBrain(w.db, agent, {})).brain).toBe("model");
+  // A pointer left behind by a move in flight: no member there can think for it, the group's limit rule.
+  const none = await withGroupBrain(w.db, agent, {});
+  expect(groupHasNoMember(none)).toBe(true);
+  expect(none.brainAccountId).toBeNull();
 });

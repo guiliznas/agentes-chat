@@ -1960,7 +1960,11 @@ export async function agentBrainSummaries(
       ...(plan ? { account: plan.account } : {}),
       ...(plan?.usage ? { usage: plan.usage } : {}),
       ...(a.brainGroupId && groupInfo.has(a.brainGroupId) ? { group: groupInfo.get(a.brainGroupId) } : {}),
-      ...(a.brainSpeed === "fast" && !isRightHand(a) && speedFits({ kind, provider: row?.provider, model: brainModel })
+      // A group's member thinks at standard speed (ADR 0180): Fast is the agent's saved brain's.
+      ...(a.brainSpeed === "fast" &&
+      !isRightHand(a) &&
+      !a.brainGroupId &&
+      speedFits({ kind, provider: row?.provider, model: brainModel })
         ? { speed: "fast" as const }
         : {}),
     });

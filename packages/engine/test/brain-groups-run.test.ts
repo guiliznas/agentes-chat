@@ -1,11 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, inArray, schema } from "@agenteschat/db";
 import {
   agentAiState,
   type Brain,
   type BrainEvent,
   type BrainTurn,
+  brainSpeedFor,
   clearPlanLimits,
   createBrainGroup,
   createJobHandlers,
@@ -18,6 +19,7 @@ import {
   RESUME_GAP_MS,
   resolveBrain,
   runRoutineNow,
+  withGroupBrain,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -252,12 +254,74 @@ test("an agent whose own sign-in is gone has an AI while a member of its group c
   };
   expect((await agentAiState(deps, { ...(await row()), brainGroupId: null })).state).toBe("no_ai");
   expect((await agentAiState(deps, await row())).state).toBe("ready");
-  // Every member signed out: no AI again.
+  // Every member signed out: as a group at its limit (ADR 0180 §7), it waits, never "no AI" nor its saved brain.
   await f.db
     .update(schema.machineAccounts)
     .set({ status: "signed_out" })
     .where(eq(schema.machineAccounts.orgId, f.org.id));
-  expect((await agentAiState(deps, await row())).state).toBe("no_ai");
+  expect((await agentAiState(deps, await row())).state).toBe("waiting");
+  // With its fallback and a key, the API answers meanwhile.
+  const withKey = { ...deps, gateway: { hasModelCredential: async () => true } };
+  await f.db.update(schema.agents).set({ brainFallback: true }).where(eq(schema.agents.id, f.agent.id));
+  expect((await agentAiState(withKey, await row())).state).toBe("ready");
+});
+
+test("a group with no usable member never thinks with the agent's saved brain: a routine's run waits", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  // Saved under the group: the API model, which would think on the workspace's key.
+  const g = await grouped(f, { brain: "model", brainFallback: false });
+  await f.db
+    .update(schema.machineAccounts)
+    .set({ status: "signed_out" })
+    .where(inArray(schema.machineAccounts.id, [g.claude, g.codex]));
+  const deps = { db: f.db, pubsub: f.pubsub, context: f.context };
+  const routine = await createRoutine(deps, f.owner.id, f.org.id, {
+    name: "Deploys",
+    agentId: f.agent.id,
+    prompt: "Check the deploys.",
+    target: { type: "channel", channelId: f.general.id },
+    trigger: { type: "schedule", phrase: "todo dia às 8h" },
+  });
+  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, handlersWith(f, {}));
+  const [run] = await runs(f);
+  expect(f.provider.calls).toHaveLength(0);
+  expect(run?.status).toBe("waiting_input");
+  expect((run?.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain?.code).toBe("plan_limit");
+});
+
+test("a group with no usable member: a person's run falls back as at the group's limit, said so", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
+  const g = await grouped(f, { brainFallback: true });
+  await f.db
+    .update(schema.machineAccounts)
+    .set({ shared: false })
+    .where(inArray(schema.machineAccounts.id, [g.claude, g.codex]));
+  const claude = scripted("claude_code", () => [{ type: "done", text: "não" }]);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+  await drainOutbox(f.db, handlersWith(f, { claude_code: claude.brain }));
+  const [run] = await runs(f);
+  expect([run?.status, run?.brain]).toEqual(["done", "model"]);
+  expect(claude.turns()).toBe(0);
+  const steps = await f.db
+    .select()
+    .from(schema.agentRunSteps)
+    .where(and(eq(schema.agentRunSteps.runId, run?.id ?? ""), eq(schema.agentRunSteps.kind, "context")));
+  expect(steps.map((s) => s.data.brainFallback).find(Boolean)).toMatchObject({ code: "plan_limit" });
+});
+
+test("a group's member thinks at standard speed with no extra usage, whatever the agent saved", async () => {
+  f = await setup();
+  // Fast fits Codex: saved on Codex with Fast and extra usage on, and the group's Claude at its limit.
+  const g = await grouped(f, { brain: "codex", brainSpeed: "fast", brainExtraUsage: true });
+  await g.use(g.claude, usageAt(100));
+  const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+  if (!agent) throw new Error("no agent");
+  const member = await withGroupBrain(f.db, agent);
+  expect(member).toMatchObject({ brainAccountId: g.codex, brainSpeed: "standard", brainExtraUsage: false });
+  const plan = { kind: "codex" as const, model: "auto" };
+  expect(brainSpeedFor(member, plan, { background: false, workId: null }, false)).toBeUndefined();
+  expect(brainSpeedFor(agent, plan, { background: false, workId: null }, false)).toBe("fast");
 });
 
 test("back on a member of another CLI, a conversation starts that CLI's session afresh with the whole conversation", async () => {
