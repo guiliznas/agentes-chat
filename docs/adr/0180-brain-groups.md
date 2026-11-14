@@ -25,7 +25,9 @@ signed-in plans that serve a person.
 `brain_groups` has `org_id`, `machine_id`, a name and its members. A member is an account of that computer. The
 account of a turn must be on the agent's computer (`brainAccountFor` checks it) and the runner's frame is per
 computer, so a group of the workspace filtered later would only hide the same constraint. An agent with a group must
-be on the group's computer; moving it to another computer turns the group off, as `brainAccountId` is already cleared.
+be on the group's computer; moving it to another computer turns the group off, as `brainAccountId` is already cleared,
+and so does sending it back to the API (handed to someone whose plan it isn't, or its owner leaving). A removed
+computer's groups are no longer listed, and no group is made on one.
 
 ### 2. One account per provider
 
@@ -40,8 +42,12 @@ limits. It never makes one provider's limit larger.
 An account that is `shared` (its sign-in thinks for all the owner's agents), `active`, and usable by this agent
 (`planIsOwners`: it serves everyone, or it is the agent's owner's). `SHARED_SIGN_INS` is true for Claude Code, Codex,
 Antigravity and keys, so in system mode this covers the real case, and the rules of one login per agent
-(`account.in_use`, `moveAccount`) never come into it. Who creates and edits a group is who manages the computer's
-accounts, as for an agent's account (ADR 0041 §4).
+(`account.in_use`, `moveAccount`) never come into it. Anyone in the workspace may create a group on a computer from
+the accounts there that serve them; its creator, or an admin (`manage_agents`), changes or deletes it. Pointing an agent
+at a group is a change to its brain (its owner or an admin, as for its account, ADR 0041 §4), and it grants nothing:
+every turn checks each member against the agent's owner again, so someone else's group thinks for an agent only with
+the accounts that already serve its owner. "Usar em outros agentes" copies the group alone: each agent keeps its own
+saved brain, model and account under it.
 
 ### 4. Strategy
 
@@ -51,20 +57,28 @@ tightest window (`planRoom` in `machine-accounts.ts`, the measure `servingPlanFo
 ### 5. A conversation sticks to its member
 
 The member of the conversation's last run is preferred while it isn't at its limit. Without this, `room` would change
-provider every turn when two members use about the same, and each change loses the CLI's session.
+provider every turn when two members use about the same, and each change loses the CLI's session. When the member does
+change, to another CLI or to another account of the same CLI (Claude's subscription and GLM Coding are both Claude
+Code), the turn starts a fresh session with the conversation so far: an account's session lives in its own home and
+never saw the other's turns.
 
 ### 6. The group sits over the agent's brain
 
 `agents.brain_group_id` overrides the agent's `brain*` fields without erasing them. `resolveBrain` reads the group
-first and takes the member's account, brain and model; with no group, or a group with nothing usable, the fields are
-read as before. Removing the group puts the old settings back.
+first and takes the member's account, brain and model; with no group the fields are read as before. A group with no
+usable member never falls back to them: it follows §7. Removing the group puts the old settings back. The saved Fast
+mode and extra usage stay with the saved brain: a member runs at standard speed with no extra usage.
 
 ### 7. A group that is used up behaves as today
 
 When every member is at its limit, a run someone is waiting for falls back as it does now (`brainFallback`, guarded by
 `mayFallBack`), and a background run waits for the nearest `resetsAt` among the members, not the first one's. An
-account removed or signed out is skipped, and the next member answers; the agent only gets "no AI" when no member is
-left. Fallback for unattended work stays refused (ADR 0053): a background run doesn't fall back to another brain.
+account removed or signed out is skipped, and the next member answers. A group with no usable member at all (every one
+signed out, removed, unshared or no longer serving the agent's owner) follows the same single rule, as a limit whose
+reset isn't known: the run someone waits for falls back when it may, other work waits and checks again, and nothing
+thinks with the agent's saved brain or says "no AI". Presence and routing judge the agent the same way, by the group's
+pick: out of office only when the group can't think and nothing falls back. Fallback for unattended work stays
+refused (ADR 0053): a background run doesn't fall back to another brain.
 
 ### 8. A turn cut by the limit is not moved
 
@@ -77,8 +91,8 @@ The right hand keeps `servingPlanFor` and its own rules (ADR 0137). Groups are f
 
 ### 10. Model and effort belong to the member
 
-Each member has its own `model` (null means `auto`) and effort. Models don't carry between providers, so a group
-can't have one.
+Each member has its own `model` (null means `auto`) and effort (null means the CLI's default). Models don't carry
+between providers, so a group can't have one. Speed is not a member's: members run at standard speed (§6).
 
 ## Consequences
 
