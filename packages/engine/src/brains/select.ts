@@ -702,10 +702,15 @@ async function sessionFor(
   machineId: string,
   options: { fresh?: boolean; promptKey?: string },
   now: Date,
+  /** The account this turn thinks with (null: the computer's own sign-in). */
+  accountId: string | null,
 ): Promise<{ id: string; resume: boolean }> {
-  // A run that thought on another CLI (a group's member of another kind, ADR 0180) starts this one's session afresh:
-  // that CLI's session never saw the other's turns.
-  const otherCli = run.brain != null && run.brain !== "model" && run.brain !== kind;
+  // A run that thought on another CLI or another account of the same one (a group's other member, ADR 0180: Claude's
+  // subscription and GLM Coding are both Claude Code) starts this one's session afresh: that session never saw the
+  // other's turns, and the account it was left on keeps it on its disk.
+  const otherCli =
+    (run.brain != null && run.brain !== "model" && run.brain !== kind) ||
+    (run.brainAccountId != null && run.brainAccountId !== accountId);
   if (run.brainSessionId && !otherCli) {
     return { id: run.brainSessionId, resume: await sessionUsed(db, run, kind, run.brainSessionId) };
   }
@@ -717,6 +722,7 @@ async function sessionFor(
         id: agentRuns.id,
         sessionId: agentRuns.brainSessionId,
         brain: agentRuns.brain,
+        account: agentRuns.brainAccountId,
         at: sql<Date>`coalesce(${agentRuns.finishedAt}, ${agentRuns.updatedAt})`.mapWith(
           (v: string | Date) => new Date(v),
         ),
@@ -763,6 +769,9 @@ async function sessionFor(
       // The conversation's last session is another CLI's (a group switched members, ADR 0180): a fresh one here,
       // with the whole conversation in its first prompt. Rows from before the brain was stored count as this one's.
       (last.brain === null || last.brain === kind) &&
+      // …and another account's of the same CLI: its session lives in that account's home, without the turns since.
+      // Rows from before the account was stored count as this one's.
+      (last.account === null || last.account === accountId) &&
       now.getTime() - last.at.getTime() < SESSION_IDLE_MS &&
       last.input < SESSION_MAX_INPUT_TOKENS &&
       // A live session keeps the system prompt it started with: after an edit to the instructions (or anything
@@ -864,7 +873,17 @@ export async function resolveBrain(
     mission?.session ??
     (machineId
       ? {
-          ...(await sessionFor(deps.db, agent, run, kind, conversation, machineId, options, options.now ?? new Date())),
+          ...(await sessionFor(
+            deps.db,
+            agent,
+            run,
+            kind,
+            conversation,
+            machineId,
+            options,
+            options.now ?? new Date(),
+            account?.id ?? null,
+          )),
           machineId,
           cwd: "",
         }

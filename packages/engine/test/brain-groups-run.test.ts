@@ -297,6 +297,59 @@ test("back on a member of another CLI, a conversation starts that CLI's session 
   expect(JSON.stringify(third)).toContain("Resposta do Codex.");
 });
 
+test("back on a member of the same CLI with another account, a conversation starts that account's session afresh", async () => {
+  f = await setup();
+  const fx = f;
+  // Claude's subscription and GLM Coding: both Claude Code, one provider each.
+  const g = await grouped(fx, { brainFallback: false });
+  const [glm] = await fx.db
+    .insert(schema.machineAccounts)
+    .values({
+      id: Bun.randomUUIDv7(),
+      orgId: fx.org.id,
+      machineId: g.machineId,
+      kind: "claude_code",
+      provider: "zai",
+      label: "GLM Coding",
+      status: "active",
+      createdBy: fx.owner.id,
+      shared: true,
+    })
+    .returning();
+  if (!glm) throw new Error("no GLM account");
+  await fx.db
+    .update(schema.brainGroupMembers)
+    .set({ accountId: glm.id, providerKey: "zai" })
+    .where(eq(schema.brainGroupMembers.accountId, g.codex));
+  const claude = scripted("claude_code", (n) => [{ type: "done", text: `Resposta ${n + 1}.` }]);
+  const handlers = handlersWith(fx, { claude_code: claude.brain });
+  const question = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+    body: "@dev oi",
+  });
+  const reply = (body: string) =>
+    postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+      body,
+      threadId: question.id,
+    });
+  await drainOutbox(fx.db, handlers);
+  // The subscription at its limit: GLM takes the conversation, in a session of its own.
+  await g.use(g.claude, usageAt(100));
+  await reply("@dev e agora?");
+  await drainOutbox(fx.db, handlers);
+  // GLM at its limit, the subscription back: never its old session, which missed GLM's turn.
+  await g.use(g.claude, usageAt(0));
+  await g.use(glm.id, usageAt(100));
+  await reply("@dev e então?");
+  await drainOutbox(fx.db, handlers);
+  const accounts = (await runs(fx)).map((r) => r.brainAccountId);
+  expect(accounts).toEqual([g.claude, glm.id, g.claude]);
+  const ids = claude.seen.map((s) => s.session?.id);
+  expect(ids).toHaveLength(3);
+  expect(new Set(ids).size).toBe(3);
+  expect(claude.seen[2]?.session?.resume).toBe(false);
+  expect(JSON.stringify(claude.seen[2])).toContain("Resposta 2.");
+});
+
 test("a turn cut by its member's limit waits for that member, never redone on another with room", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   const g = await grouped(f);
