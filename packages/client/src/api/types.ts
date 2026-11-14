@@ -5933,7 +5933,7 @@ export interface AgentSetup {
   /** A computer brain: the computer it thinks on, and its account there (null: that computer's own sign-in). */
   machineId?: string | null;
   account?: string | null;
-  /** A brain group of that computer, copied only to agents on it; null = none; omitted = each keeps its own. */
+  /** A brain group (ADR 0180): it goes alone, only to agents on its computer, each keeping its own saved brain under it; null = none; omitted = each keeps its own. */
   group?: string | null;
   effort?: BrainEffortSetting | null;
   /** Omitted = each agent keeps its own. */

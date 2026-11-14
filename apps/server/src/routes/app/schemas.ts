@@ -1129,7 +1129,7 @@ export const AgentSetup = z
       .openapi({ description: "A computer brain: the account there; null = that computer's own sign-in." }),
     group: z.uuid().nullable().optional().openapi({
       description:
-        "A brain group of that computer (ADR 0180), copied only to agents on it; null = none; omitted = each agent keeps its own.",
+        "A brain group (ADR 0180): it goes alone, only to the agents on its computer, each keeping its own saved brain, model and account under it (the rest of the setup is ignored); null = none; omitted = each agent keeps its own.",
     }),
     effort: BrainEffortSetting.nullable().optional(),
     speed: BrainSpeed.optional().openapi({ description: "Omitted = each agent keeps its own." }),

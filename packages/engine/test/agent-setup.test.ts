@@ -209,6 +209,55 @@ describe("Usar em outros agentes", () => {
     expect(again).toEqual([{ agentId: w.dev, status: "same" }]);
   });
 
+  test("a group copied from an agent on the API goes as the group alone: each agent keeps its own saved brain under it", async () => {
+    const w = await world();
+    const { fx, deps } = w;
+    const group = await createBrainGroup(fx.db, fx.owner.id, fx.org.id, {
+      machineId: w.mac,
+      name: "Time",
+      members: [{ accountId: ANAS }],
+    });
+    // The source's saved brain is the API model: the setup says so, and the group goes with it (ADR 0180).
+    const setup = { brain: "model", model: "claude-sonnet-5-5", group: group.id };
+    const result = await applyAgentSetup(deps, fx.owner.id, fx.org.id, {
+      setup,
+      agentIds: [w.theo, w.zoe, w.lia],
+    });
+    expect(result).toEqual([
+      { agentId: w.theo, status: "applied" },
+      // Bia's agent on her own plan takes the group too, and keeps her plan saved under it.
+      { agentId: w.zoe, status: "applied" },
+      { agentId: w.lia, status: "skipped", reason: "other_computer", params: { computer: "PC" } },
+    ]);
+    expect(await w.row(w.theo)).toMatchObject({ brain: "model", brainAccountId: null, brainGroupId: group.id });
+    expect(await w.row(w.zoe)).toMatchObject({ brain: "claude_code", brainAccountId: BIAS, brainGroupId: group.id });
+    expect(await w.row(w.lia)).toMatchObject({ brainGroupId: null });
+    // A group is not a brain: what new agents start with stays as it was.
+    expect(await w.stored()).toBeNull();
+    const again = await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup, agentIds: [w.theo] });
+    expect(again).toEqual([{ agentId: w.theo, status: "same" }]);
+  });
+
+  test("a group copied from an agent on a plan never moves the others' saved account", async () => {
+    const w = await world();
+    const { fx, deps } = w;
+    const group = await createBrainGroup(fx.db, fx.owner.id, fx.org.id, {
+      machineId: w.mac,
+      name: "Time",
+      members: [{ accountId: ANAS }],
+    });
+    const result = await applyAgentSetup(deps, fx.owner.id, fx.org.id, {
+      setup: { ...ANA_CLAUDE(w.mac), group: group.id },
+      agentIds: [w.theo, w.zoe],
+    });
+    expect(result).toEqual([
+      { agentId: w.theo, status: "applied" },
+      { agentId: w.zoe, status: "applied" },
+    ]);
+    expect(await w.row(w.theo)).toMatchObject({ brain: "model", brainAccountId: null, brainGroupId: group.id });
+    expect(await w.row(w.zoe)).toMatchObject({ brainAccountId: BIAS, brainModel: null, brainGroupId: group.id });
+  });
+
   test("Velocidade goes to the agents picked, never into what new agents start with; left out, each keeps its own", async () => {
     const w = await world();
     const setup = { ...ANA_CLAUDE(w.mac), speed: "fast" };

@@ -26,7 +26,7 @@ import {
 import { planIsOwners } from "./brains/select";
 import type { BrainKind } from "./brains/types";
 import { caches } from "./cache";
-import { ValidationError } from "./errors";
+import { NotFoundError, ValidationError } from "./errors";
 import { defaultAccountLabel, listMachineAccounts, type MachineAccountView } from "./machine-accounts";
 import { getMachine } from "./machines";
 import { setAgentMissionApproval } from "./mission-settings";
@@ -125,6 +125,12 @@ function readSetup(input: AgentSetupInput): Setup {
     throw new ValidationError("Choose always, low_risk_auto or never", "mission.invalid_command_approval");
   }
   const autonomy = isCommandApproval(input.autonomy) ? { autonomy: input.autonomy } : {};
+  // A brain group (ADR 0180) goes as itself alone: each agent keeps its own saved brain, model and account under it,
+  // which come back when it leaves the group. The rest of the setup is ignored.
+  const group = input.group !== undefined ? nullableId(input.group, "group") : undefined;
+  if (typeof group === "string") {
+    return { brain: input.brain, model: typeof input.model === "string" ? input.model : null, group, ...autonomy };
+  }
   if (input.brain === "model") {
     if (typeof input.model !== "string" || !input.model) {
       throw new ValidationError("The API brain needs a model", "brain.invalid_model");
@@ -160,7 +166,7 @@ function readSetup(input: AgentSetupInput): Setup {
     contextTokens,
     fallback: (input.fallback as boolean | undefined) ?? true,
     ...(input.onlyOwner !== undefined ? { onlyOwner: input.onlyOwner as boolean } : {}),
-    ...(input.group !== undefined ? { group: nullableId(input.group, "group") } : {}),
+    ...(group !== undefined ? { group } : {}),
     ...autonomy,
   };
 }
@@ -226,7 +232,8 @@ export async function applyAgentSetup(
   const setup = readSetup(input.setup);
   const ids = [...new Set(input.agentIds)];
   if (ids.length > SETUP_AGENTS_MAX) throw new ValidationError(`At most ${SETUP_AGENTS_MAX} agents`, "setup.invalid");
-  if (setup.brain === "model") {
+  const groupOnly = typeof setup.group === "string" ? setup.group : null;
+  if (setup.brain === "model" && !groupOnly) {
     await validateAgentFields(deps.db, orgId, { model: setup.model ?? undefined, credentialId: setup.key ?? null });
   }
   const rows = ids.length
@@ -238,7 +245,15 @@ export async function applyAgentSetup(
   const rowById = new Map(rows.map((r) => [r.id, r]));
   // In the order asked: the first one asked takes a sign-in made for one agent.
   const targets = ids.flatMap((id) => rowById.get(id) ?? []);
-  const machine = setup.machineId ? await getMachine(deps.db, orgId, setup.machineId) : null;
+  // The group's own computer: it goes only to the agents there (`nextBrainGroup` checks again).
+  const [groupRow] = groupOnly
+    ? await deps.db
+        .select({ machineId: schema.brainGroups.machineId })
+        .from(schema.brainGroups)
+        .where(and(eq(schema.brainGroups.orgId, orgId), eq(schema.brainGroups.id, groupOnly)))
+    : [];
+  if (groupOnly && !groupRow) throw new NotFoundError("Group not found", "brain_group.not_found");
+  const machine = setup.machineId && !groupOnly ? await getMachine(deps.db, orgId, setup.machineId) : null;
   const theirs = machine ? await listMachineAccounts(deps, orgId, machine.id, userId) : [];
   const account = setup.account ? theirs.find((a) => a.id === setup.account) : undefined;
   // The computer's own sign-in is its pairer's plan: who else may pick it says whose it is.
@@ -277,6 +292,7 @@ export async function applyAgentSetup(
       computerName,
       sourcePlan: account?.provider ?? null,
       pairerName: paired?.name ?? null,
+      groupMachineId: groupRow?.machineId ?? null,
     });
 
   const results = new Map<string, SetupResult>();
@@ -338,8 +354,9 @@ export async function applyAgentSetup(
             ...(autonomy ? { autonomy: { from, to: autonomy } } : {}),
             ...(opensPlan ? { opensPlan: true as const } : {}),
           });
-          // Not one that kept its own account (even one that already thought so), nor one that took only the Autonomia.
-          if (p.status === "applied" ? !p.keeps : p.status === "same" && !p.ownAccount) whole ??= t.id;
+          // Not one that kept its own account (even one that already thought so), nor one that took only the Autonomia,
+          // nor a group's (it isn't a brain: each agent kept its own under it).
+          if (!groupOnly && (p.status === "applied" ? !p.keeps : p.status === "same" && !p.ownAccount)) whole ??= t.id;
         } catch (error) {
           results.set(t.id, { agentId: t.id, status: "skipped", ...refusal(error) });
         }
@@ -376,10 +393,21 @@ function planFor(
     sourcePlan: string | null;
     /** Whoever connected the setup's computer, when not the caller. */
     pairerName: string | null;
+    /** A group's setup (ADR 0180): the group's computer. */
+    groupMachineId: string | null;
   },
 ): Plan {
   const { setup, admin, userId } = c;
   if (!admin && t.ownerUserId !== userId) return skip("not_allowed");
+  // A group goes alone, as the agent's own dialog saves it: its saved brain, model and account stay under it.
+  if (typeof setup.group === "string") {
+    if (t.machineId !== c.groupMachineId) {
+      const where = t.machineId ? c.computerName.get(t.machineId) : undefined;
+      return skip("other_computer", where ? { computer: where } : undefined);
+    }
+    if ((t.brainGroupId ?? null) === setup.group) return { status: "same" };
+    return { status: "applied", brain: { group: setup.group } };
+  }
   if (setup.brain === "model") {
     const patch: Partial<AgentInput> = {
       ...(t.model !== setup.model && setup.model ? { model: setup.model } : {}),
