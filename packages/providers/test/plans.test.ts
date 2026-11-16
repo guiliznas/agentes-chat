@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MODEL_CATALOG } from "../src/catalog";
 import {
+  antigravityRefusedBases,
   antigravityStandIn,
   autoPlanModel,
   CODING_PLANS,
@@ -455,5 +456,45 @@ describe("antigravityStandIn", () => {
     ).toBeUndefined();
     const passed = { models: { "gemini-3.8-flash": { at, until: "2026-11-16T02:00:00.000Z" } } };
     expect(antigravityStandIn("gemini-3.8-flash-medium", passed, new Set(), now)).toBeUndefined();
+  });
+});
+
+describe("antigravityRefusedBases", () => {
+  // The `/usage` reading: Gemini's windows are the account's; Argon and Claude and GPT have a week of their own.
+  const windows = [
+    { kind: "seven_day", resetsAt: "2026-11-21T21:48:50.000Z" },
+    { kind: "five_hour", resetsAt: "2026-11-16T08:02:54.000Z" },
+    { kind: "other", label: "Claude and GPT models · 7d", resetsAt: "2026-11-17T04:21:04.000Z" },
+    { kind: "other", label: "Gemini 4 Argon · 7d", resetsAt: "2026-11-21T21:45:50.000Z" },
+  ];
+  const usage = { windows };
+
+  test("a refusal that resets when Argon's week does holds Argon, not the Flash it was asked on", () => {
+    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:46:10.000Z")).toEqual([
+      "gemini-4-argon",
+    ]);
+  });
+
+  test("Argon's and Gemini's weeks are three minutes apart: the nearer one is the group", () => {
+    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:48:40.000Z")).toEqual([
+      "gemini-3.8-flash",
+    ]);
+  });
+
+  test("the account's own window, no reset, no reading, or no window near it hold the model asked", () => {
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-11-16T08:02:40.000Z")).toEqual([
+      "gemini-3.8-flash",
+    ]);
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, undefined)).toEqual(["gemini-3.8-flash"]);
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", null, "2026-11-21T21:46:10.000Z")).toEqual([
+      "gemini-3.8-flash",
+    ]);
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-12-30T00:00:00.000Z")).toEqual([
+      "gemini-3.8-flash",
+    ]);
+  });
+
+  test("another group with no catalog model (Claude and GPT) holds none of them", () => {
+    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-17T04:21:30.000Z")).toEqual([]);
   });
 });

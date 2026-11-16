@@ -469,6 +469,41 @@ export function autoPlanModel(
   return models.find((m) => (m.tag === "cheap" || m.tag === "smart") && !m.needs && !m.free && free(m.id))?.id ?? value;
 }
 
+/** How near (ms) a refusal's reset must be to a usage window's to name that window's model group. */
+const REFUSAL_RESET_SLACK_MS = 90_000;
+
+/**
+ * The base models an Antigravity refusal holds. Its 429 names no model group, but its "Resets in …" is the reset of
+ * a window of the `/usage` reading, so the group whose window resets then is the one out: another group's (Argon's,
+ * Claude and GPT's) holds that group's catalog models, not `model`, which that group's quota never stopped. The
+ * account's own windows (Gemini's), no reset, or none near it, hold `model`'s base.
+ */
+export function antigravityRefusedBases(
+  model: string,
+  usage: { windows: readonly { kind: string; label?: string; resetsAt?: string }[] } | null | undefined,
+  resetsAt: string | undefined,
+): string[] {
+  const own = [antigravityBaseModel(model)];
+  const at = resetsAt ? Date.parse(resetsAt) : Number.NaN;
+  if (!usage || !Number.isFinite(at)) return own;
+  const near = usage.windows
+    .flatMap((w) => {
+      const r = w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN;
+      return Number.isFinite(r) && Math.abs(r - at) <= REFUSAL_RESET_SLACK_MS ? [{ w, gap: Math.abs(r - at) }] : [];
+    })
+    .sort((a, b) => a.gap - b.gap)[0]?.w;
+  if (near?.kind !== "other" || !near.label) return own;
+  const names = near.label
+    .toLowerCase()
+    .replace(/\s*·\s*(?:5h|7d)$/, "")
+    .replace(/\bmodels?\b/g, "")
+    .split(/\s+and\s+|,|\//)
+    .map((n) => n.trim().replace(/\s+/g, "-"))
+    .filter(Boolean);
+  const bases = new Set(ANTIGRAVITY_MODELS.map((m) => antigravityBaseModel(m.id)));
+  return [...bases].filter((b) => names.some((n) => b.includes(n)));
+}
+
 /** A coding plan's model by its id, whichever plan has it. */
 export const planModelById = (id: string): PlanModel | undefined =>
   PLAN_IDS.flatMap((p) => planOf(p)?.claudeCode.models ?? []).find((m) => m.id === id);

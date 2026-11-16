@@ -35,7 +35,7 @@ import {
   textOf,
 } from "@agenteschat/providers";
 import {
-  antigravityBaseModel,
+  antigravityRefusedBases,
   antigravityStandIn,
   autoPlanModel,
   droppedPlanModel,
@@ -3801,16 +3801,15 @@ async function executeRunInner(
     // Antigravity's refusal is one model's (its CLI's 429 doesn't say whose, so the one asked): kept by its base
     // model with the reset the CLI gave, never the whole account's (`onLimit`).
     if (plan.kind === "antigravity" && account && plan.model && plan.model !== "auto") {
-      antigravityTried.add(antigravityBaseModel(plan.model));
-      await noteModelLimit(
-        db,
-        run.orgId,
-        account.id,
-        antigravityBaseModel(plan.model),
-        error.resetsAt ? { until: error.resetsAt } : {},
-      )
-        .then(() => publishAccountsChanged(deps.pubsub, run.orgId, machineId))
-        .catch(() => {});
+      // Whose quota it is comes from when it resets (`antigravityRefusedBases`): Argon's out says nothing of Flash.
+      const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, account.id).catch(() => null);
+      for (const base of antigravityRefusedBases(plan.model, stored ?? plan.usage, error.resetsAt)) {
+        antigravityTried.add(base);
+        await noteModelLimit(db, run.orgId, account.id, base, error.resetsAt ? { until: error.resetsAt } : {}).catch(
+          () => {},
+        );
+      }
+      publishAccountsChanged(deps.pubsub, run.orgId, machineId).catch(() => {});
       return { scope: "model", ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}) };
     }
     const ownModel = ownLimitsModel(account?.provider, plan.model);

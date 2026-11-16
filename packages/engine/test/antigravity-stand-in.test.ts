@@ -29,6 +29,7 @@ afterEach(() => {
 
 const FLASH = "gemini-3.8-flash-medium";
 const ARGON = "gemini-4-argon-medium";
+const ARGON_WEEK = new Date(Date.now() + 6 * 86_400_000).toISOString();
 const REFUSAL = "Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 138h.";
 
 const statusOf = (machineId: string): MachineStatus => ({
@@ -61,6 +62,7 @@ async function geminiAgent(fx: Fixture) {
     windows: [
       { kind: "seven_day", usedPercent: 3, resetsAt: new Date(Date.now() + 5 * 86_400_000).toISOString() },
       { kind: "five_hour", usedPercent: 2, resetsAt: new Date(Date.now() + 4 * 3600_000).toISOString() },
+      { kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: 100, resetsAt: ARGON_WEEK },
     ],
   };
   await fx.db.insert(schema.machineAccounts).values({
@@ -155,4 +157,18 @@ test("every model refused: the run waits for that model's reset instead of askin
       scope: "model",
     },
   );
+});
+
+test("a refusal that resets when Argon's week does is Argon's: Flash is not held and the run waits", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const { accountId } = await geminiAgent(f);
+  const { brain, seen } = scripted(() => refused(ARGON_WEEK));
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers(f, brain));
+  // The turn was asked on Flash and came back with Argon's quota: another go would only be refused again.
+  expect(seen.map((t) => t.model)).toEqual([FLASH]);
+  const usage = await accountUsage(f, accountId);
+  expect(usage?.models?.["gemini-4-argon"]).toMatchObject({ until: ARGON_WEEK });
+  expect(usage?.models?.["gemini-3.8-flash"]).toBeUndefined();
+  expect((await runs(f))[0]?.status).toBe("waiting_input");
 });
