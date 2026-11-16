@@ -4603,9 +4603,13 @@ async function executeRunInner(
               turnLimited = true;
               const machineId = turnPlan.session?.machineId;
               // A plan whose models have their own limits: whose this one is waits for the refusal's words.
+              // Antigravity's model groups (Gemini, Claude and GPT, Argon) each have a quota of their own and its
+              // 429 doesn't say which one ran out, so a refusal never closes the whole account from here: the
+              // account's own windows (Gemini's) come from its `/usage` reading, which `storedPlanLimit` reads.
               if (
                 machineId &&
                 turnPlan.kind !== "model" &&
+                turnPlan.kind !== "antigravity" &&
                 !ownLimitsModel(turnPlan.account?.provider, turnPlan.model)
               ) {
                 notePlanLimit(machineId, turnPlan.kind, resetsAt, Date.now(), turnPlan.account?.id);
