@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/providers/plans";
 import { antigravityModels, brainOptions, defaultBrainModel, isBrainKind } from "../src/brain-settings";
 import { AntigravityBrain, type BrainTurnRequest, type ComputerBrainLink } from "../src/brains/codex";
-import { bindingReset, computerBrainUnavailable, NO_AI_CODES, UNAVAILABLE_CODES } from "../src/brains/select";
+import { computerBrainUnavailable, NO_AI_CODES, UNAVAILABLE_CODES } from "../src/brains/select";
 import { BRAIN_NAMES, BRAIN_PLAN_NAMES, type BrainEvent, type BrainTurn, isComputerBrain } from "../src/brains/types";
 import { defaultAccountLabel, sharesSignIns } from "../src/machine-accounts";
 import type { MachineStatus } from "../src/machine-hub";
@@ -245,14 +245,4 @@ test("Gemini's account is at its limit, until its own full window resets, when t
       "gemini-3.8-flash-medium",
     ),
   ).toMatchObject({ code: "plan_limit", resetsAt: hoursFrom(now, 5) });
-});
-
-test("a refusal with no window full has no known reset for Antigravity, not the first window's (hours away)", () => {
-  const now = Date.now();
-  const at = new Date(now - 60_000).toISOString();
-  const idle: PlanUsage = { source: "probe", at, windows: geminiWindows(now, 2) };
-  expect(bindingReset(idle, now)).toBe(Date.parse(hoursFrom(now, 5)));
-  expect(bindingReset(idle, now, { guess: false })).toBeNull();
-  const full: PlanUsage = { source: "probe", at, windows: geminiWindows(now, 100) };
-  expect(bindingReset(full, now, { guess: false })).toBe(Date.parse(hoursFrom(now, 5)));
 });

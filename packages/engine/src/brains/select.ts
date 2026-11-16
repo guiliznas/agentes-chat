@@ -124,18 +124,11 @@ export function clearPlanLimits() {
  * When the binding window of a stored reading resets (ms): the latest reset of its full windows, else (a refusal
  * known only from its words, no window full) the first window reset after the reading, while it is still ahead.
  * Later windows didn't refuse anything: once that first reset passed, a turn asks the plan again. Null: none known.
- * `guess: false`: no full window means no known reset (null), not the first window's: a plan whose refusal can come
- * from one model group (Antigravity's) says nothing about the others' windows.
  */
-export function bindingReset(
-  usage: PlanUsage | null | undefined,
-  now = Date.now(),
-  options: { guess?: boolean } = {},
-): number | null {
+export function bindingReset(usage: PlanUsage | null | undefined, now = Date.now()): number | null {
   if (!usage) return null;
   const { until } = planState(usage, now);
   if (until) return Date.parse(until);
-  if (options.guess === false) return null;
   const at = Date.parse(usage.at);
   const first = Math.min(
     ...usage.windows.map((w) => (w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN)).filter((r) => r > at),

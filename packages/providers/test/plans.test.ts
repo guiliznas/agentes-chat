@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MODEL_CATALOG } from "../src/catalog";
 import {
-  antigravityAutoModel,
-  antigravityRefusedBases,
-  antigravityStandIn,
+  antigravityModelFor,
   autoPlanModel,
   CODING_PLANS,
   claudeCodeModel,
@@ -417,173 +415,71 @@ console.log(JSON.stringify([droppedPlanModel("opencode", "glm-9"), droppedPlanMo
   expect(run.stdout.toString().trim()).toBe("[null,null]");
 });
 
-describe("antigravityStandIn", () => {
-  const now = Date.parse("2026-11-16T03:00:00.000Z");
-  const at = new Date(now - 60_000).toISOString();
-  const week = "2026-11-21T22:00:00.000Z";
-  const heldBy = (...bases: string[]) => ({
-    models: Object.fromEntries(bases.map((b) => [b, { at, until: week }])),
+describe("antigravityModelFor", () => {
+  const now = Date.parse("2026-11-16T12:00:00.000Z");
+  const gemini = (used: number) => [
+    { kind: "seven_day", usedPercent: used, resetsAt: "2026-11-21T21:48:50.000Z" },
+    { kind: "five_hour", usedPercent: used, resetsAt: "2026-11-16T17:00:00.000Z" },
+  ];
+  const group = (label: string, used: number, resetsAt = "2026-11-21T21:45:50.000Z") => ({
+    kind: "other",
+    label,
+    usedPercent: used,
+    resetsAt,
   });
+  const argon = (used: number) => group("Gemini 4 Argon · 7d", used);
 
-  test("a model whose quota is not held stays, and so does one the CLI picks (auto, none)", () => {
-    expect(antigravityStandIn("gemini-3.8-flash-medium", heldBy("gemini-4-argon"), new Set(), now)).toBeUndefined();
-    expect(antigravityStandIn("auto", heldBy("gemini-3.8-flash"), new Set(), now)).toBeUndefined();
-    expect(antigravityStandIn(undefined, heldBy("gemini-3.8-flash"), new Set(), now)).toBeUndefined();
-  });
-
-  test("a held model gives way to another one's, at the same thinking level", () => {
-    const held = heldBy("gemini-3.8-flash");
-    expect(antigravityStandIn("gemini-3.8-flash-medium", held, new Set(), now)).toBe("gemini-4-argon-medium");
-    expect(antigravityStandIn("gemini-3.8-flash-high", held, new Set(), now)).toBe("gemini-4-argon-high");
-    // Argon has no low: the first free model stands in.
-    expect(antigravityStandIn("gemini-3.8-flash-low", held, new Set(), now)).toBe("gemini-4-argon-high");
-  });
-
-  test("its thinking levels share one quota: a refusal of any holds them all", () => {
-    expect(antigravityStandIn("gemini-4-argon-high", heldBy("gemini-4-argon"), new Set(), now)).toBe(
-      "gemini-3.8-flash-high",
+  test("the model as chosen while its group has room, whatever the other groups say", () => {
+    const usage = { windows: [...gemini(5), argon(100)] };
+    expect(antigravityModelFor("gemini-3.8-flash-high", "medium", usage, now)).toBe("gemini-3.8-flash-high");
+    expect(antigravityModelFor("gemini-4-argon-high", "medium", { windows: [...gemini(100), argon(0)] }, now)).toBe(
+      "gemini-4-argon-high",
     );
   });
 
-  test("a model refused in this run counts as held before the account's reading says so", () => {
-    expect(antigravityStandIn("gemini-3.8-flash-medium", null, new Set(["gemini-3.8-flash"]), now)).toBe(
+  test("a model whose group is full gives way to a group with room, at the same thinking level", () => {
+    expect(antigravityModelFor("gemini-4-argon-medium", "low", { windows: [...gemini(5), argon(100)] }, now)).toBe(
+      "gemini-3.8-flash-medium",
+    );
+    expect(antigravityModelFor("gemini-3.8-flash-high", "low", { windows: [...gemini(100), argon(0)] }, now)).toBe(
+      "gemini-4-argon-high",
+    );
+  });
+
+  test("none chosen (auto, unset): the account's own group at the level asked, else the first with room", () => {
+    const usage = { windows: [...gemini(5), argon(0)] };
+    expect(antigravityModelFor(undefined, "high", usage, now)).toBe("gemini-3.8-flash-high");
+    expect(antigravityModelFor("auto", "low", usage, now)).toBe("gemini-3.8-flash-low");
+    expect(antigravityModelFor(null, "medium", { windows: [...gemini(100), argon(0)] }, now)).toBe(
+      "gemini-4-argon-medium",
+    );
+    expect(antigravityModelFor(undefined, "low", { windows: [...gemini(100), argon(0)] }, now)).toBe(
       "gemini-4-argon-medium",
     );
   });
 
-  test("every model held: none stands in; a limit whose reset passed no longer holds", () => {
-    expect(
-      antigravityStandIn("gemini-3.8-flash-medium", heldBy("gemini-3.8-flash", "gemini-4-argon"), new Set(), now),
-    ).toBeUndefined();
-    const passed = { models: { "gemini-3.8-flash": { at, until: "2026-11-16T02:00:00.000Z" } } };
-    expect(antigravityStandIn("gemini-3.8-flash-medium", passed, new Set(), now)).toBeUndefined();
-  });
-});
-
-describe("antigravityRefusedBases", () => {
-  // The `/usage` reading: Gemini's windows are the account's; Argon and Claude and GPT have a week of their own.
-  const windows = [
-    { kind: "seven_day", resetsAt: "2026-11-21T21:48:50.000Z" },
-    { kind: "five_hour", resetsAt: "2026-11-16T08:02:54.000Z" },
-    { kind: "other", label: "Claude and GPT models · 7d", resetsAt: "2026-11-17T04:21:04.000Z" },
-    { kind: "other", label: "Gemini 4 Argon · 7d", resetsAt: "2026-11-21T21:45:50.000Z" },
-  ];
-  const usage = { windows };
-
-  test("a refusal that resets when Argon's week does holds Argon, not the Flash it was asked on", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:46:10.000Z")).toEqual({
-      bases: ["gemini-4-argon"],
-      matched: true,
-    });
-  });
-
-  test("Argon's and Gemini's weeks are three minutes apart: the nearer one is the group", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:48:40.000Z")).toEqual({
-      bases: ["gemini-3.8-flash"],
-      matched: true,
-    });
-  });
-
-  test("the account's own window holds the model asked, and its reset can be trusted", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-11-16T08:02:40.000Z")).toEqual({
-      bases: ["gemini-3.8-flash"],
-      matched: true,
-    });
-  });
-
-  test("a reset no window shares, no reset, or no reading holds the model asked, and its reset can't be trusted", () => {
-    const own = { bases: ["gemini-3.8-flash"], matched: false };
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-11-22T01:16:52.000Z")).toEqual(own);
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, undefined)).toEqual(own);
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", null, "2026-11-21T21:46:10.000Z")).toEqual(own);
-  });
-
-  test("another group with no catalog model (Claude and GPT) holds none of them", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-17T04:21:30.000Z")).toEqual({
-      bases: [],
-      matched: true,
-    });
-  });
-});
-
-describe("antigravityStandIn with the /usage reading", () => {
-  const now = Date.parse("2026-11-16T12:00:00.000Z");
-  const week = "2026-11-21T21:45:50.000Z";
-  const gemini = (used: number) => [
-    { kind: "seven_day", usedPercent: used, resetsAt: "2026-11-21T21:48:50.000Z" },
-    { kind: "five_hour", usedPercent: used, resetsAt: "2026-11-16T17:00:00.000Z" },
-  ];
-  const argon = (used: number) => ({ kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: used, resetsAt: week });
-
-  test("never a model of a group the reading says is full: Argon at 100% is no stand-in for a refused Flash", () => {
-    const usage = { windows: [...gemini(5), argon(100)] };
-    expect(antigravityStandIn("gemini-3.8-flash-medium", usage, new Set(["gemini-3.8-flash"]), now)).toBeUndefined();
-  });
-
-  test("a model whose group the reading says is full gives way to a group with room", () => {
-    const usage = { windows: [...gemini(100), argon(0)] };
-    expect(antigravityStandIn("gemini-3.8-flash-medium", usage, new Set(), now)).toBe("gemini-4-argon-medium");
-  });
-
-  test("a model with room stays, whatever the other groups say", () => {
-    expect(antigravityStandIn("gemini-3.8-flash-medium", { windows: [...gemini(5), argon(100)] }, new Set(), now)).toBe(
-      undefined,
+  test("a model of a group with no window of its own follows the account's, and Claude and GPT their own", () => {
+    const claude = group("Claude and GPT models · 7d", 100, "2026-11-17T04:21:04.000Z");
+    expect(antigravityModelFor("claude-sonnet-5-5-high", "medium", { windows: [...gemini(5), claude] }, now)).toBe(
+      "gemini-3.8-flash-high",
     );
-  });
-
-  test("a full group's window that has reset no longer counts", () => {
-    const passed = {
-      kind: "other",
-      label: "Gemini 4 Argon · 7d",
-      usedPercent: 100,
-      resetsAt: "2026-11-16T11:00:00.000Z",
-    };
-    expect(
-      antigravityStandIn("gemini-4-argon-high", { windows: [...gemini(5), passed] }, new Set(), now),
-    ).toBeUndefined();
-  });
-});
-
-describe("antigravityAutoModel", () => {
-  const now = Date.parse("2026-11-16T12:00:00.000Z");
-  const gemini = (used: number) => [
-    { kind: "seven_day", usedPercent: used, resetsAt: "2026-11-21T21:48:50.000Z" },
-    { kind: "five_hour", usedPercent: used, resetsAt: "2026-11-16T17:00:00.000Z" },
-  ];
-  const argon = (used: number) => ({
-    kind: "other",
-    label: "Gemini 4 Argon · 7d",
-    usedPercent: used,
-    resetsAt: "2026-11-21T21:45:50.000Z",
-  });
-  const at = new Date(now - 60_000).toISOString();
-
-  test("a model of the account's own group at the level asked, even when Argon has room", () => {
-    const usage = { windows: [...gemini(5), argon(0)] };
-    expect(antigravityAutoModel("medium", usage, now)).toBe("gemini-3.8-flash-medium");
-    expect(antigravityAutoModel("high", usage, now)).toBe("gemini-3.8-flash-high");
-    expect(antigravityAutoModel("low", usage, now)).toBe("gemini-3.8-flash-low");
-  });
-
-  test("never a group the reading says is full: Gemini's own group is the one left", () => {
-    expect(antigravityAutoModel("medium", { windows: [...gemini(5), argon(100)] }, now)).toBe(
+    expect(antigravityModelFor("gpt-oss-120b-medium", "medium", { windows: [...gemini(5), claude] }, now)).toBe(
       "gemini-3.8-flash-medium",
     );
+    expect(antigravityModelFor("claude-sonnet-5-5-high", "medium", { windows: [...gemini(5)] }, now)).toBe(
+      "claude-sonnet-5-5-high",
+    );
   });
 
-  test("the account's own group full gives way to a group with room, at the same level", () => {
-    expect(antigravityAutoModel("medium", { windows: [...gemini(100), argon(0)] }, now)).toBe("gemini-4-argon-medium");
-    // Argon has no low: the first free model of it.
-    expect(antigravityAutoModel("low", { windows: [...gemini(100), argon(0)] }, now)).toBe("gemini-4-argon-medium");
-  });
-
-  test("a model the account refused is left out, and none free is undefined", () => {
-    const refused = { models: { "gemini-3.8-flash": { at, until: "2026-11-21T00:00:00.000Z" } }, windows: [argon(0)] };
-    expect(antigravityAutoModel("medium", refused, now)).toBe("gemini-4-argon-medium");
-    expect(antigravityAutoModel("medium", { windows: [...gemini(100), argon(100)] }, now)).toBeUndefined();
-  });
-
-  test("no reading: the account's own group's model, by the catalog's order", () => {
-    expect(antigravityAutoModel("medium", null, now)).toBe("gemini-3.8-flash-medium");
+  test("a full window that has reset no longer counts; no reading, or every group full, asks what was chosen", () => {
+    const passed = group("Gemini 4 Argon · 7d", 100, "2026-11-16T11:00:00.000Z");
+    expect(antigravityModelFor("gemini-4-argon-high", "low", { windows: [...gemini(5), passed] }, now)).toBe(
+      "gemini-4-argon-high",
+    );
+    expect(antigravityModelFor("gemini-4-argon-high", "low", null, now)).toBe("gemini-4-argon-high");
+    expect(antigravityModelFor("gemini-4-argon-high", "low", { windows: [...gemini(100), argon(100)] }, now)).toBe(
+      "gemini-4-argon-high",
+    );
+    expect(antigravityModelFor(undefined, "medium", { windows: [...gemini(100), argon(100)] }, now)).toBeUndefined();
   });
 });

@@ -35,9 +35,7 @@ import {
   textOf,
 } from "@agenteschat/providers";
 import {
-  antigravityAutoModel,
-  antigravityRefusedBases,
-  antigravityStandIn,
+  antigravityModelFor,
   autoPlanModel,
   droppedPlanModel,
   ownLimitsModel,
@@ -3009,18 +3007,6 @@ async function executeRunInner(
       throw outage;
     }
     ({ agent: thinker, plan: brainPlan } = withAuto(agent, brainPlan, applied));
-    // Antigravity has no model per tier: "Automático" left none and the CLI picked its own, which can be one out of
-    // quota. A model of the account's own group at the effort asked (else the tier's), one the reading says is full
-    // never.
-    if (brainPlan.kind === "antigravity" && !brainPlan.model) {
-      const asked = brainPlan.effort;
-      const level =
-        asked === "low" || asked === "medium" || asked === "high"
-          ? asked
-          : ({ small: "low", medium: "medium", large: "high" } as const)[choice.tier];
-      const model = antigravityAutoModel(level, brainPlan.usage);
-      if (model) brainPlan = { ...brainPlan, model };
-    }
     if (autoBrain) {
       const model = autoPlanModel(brainPlan.account?.provider, brainPlan.model, brainPlan.usage);
       if (model) brainPlan = { ...brainPlan, model };
@@ -3042,15 +3028,19 @@ async function executeRunInner(
   // The context budget reads the model's window: an OpenRouter model's comes with its list.
   await modelInfoFor(db, thinker.model, run.orgId);
   let plan: BrainPlan = brainPlan;
-  /** Antigravity models (by base) its account refused in this run: the turn goes on another one that still has quota. */
-  const antigravityTried = new Set<string>();
-  /** An Antigravity turn refused on a resumed session already went again on a new one in this run. */
+  /** An Antigravity turn refused in this run already went again on a new session. */
   let antigravityFresh = false;
-  // Antigravity's model groups each have a quota, and the account's refusal of one is kept by its model
-  // (`refusalOf`): a model known to be out gives way before the turn is asked, not after its refusal.
+  // Antigravity has no model per tier and its groups each have a quota: the model asked comes from the `/usage`
+  // reading (`antigravityModelFor`), so "Automático" never leaves the choice to the CLI's own default, which can be
+  // one out of quota, and an agent on a model whose group is full asks one that has room.
   if (plan.kind === "antigravity") {
-    const to = antigravityStandIn(plan.model, plan.usage, antigravityTried);
-    if (to) plan = { ...plan, model: to };
+    const asked = plan.effort;
+    const model = antigravityModelFor(
+      plan.model,
+      asked === "low" || asked === "medium" || asked === "high" ? asked : "medium",
+      plan.usage,
+    );
+    if (model && model !== plan.model) plan = { ...plan, model };
   }
   /**
    * What the turn-end judge reads (ADR 0109), filled only when it runs: the run's general means (`turnMeans`, its
@@ -3813,22 +3803,6 @@ async function executeRunInner(
     error: BrainFailure,
   ): Promise<Pick<BrainUnavailability, "scope" | "resetsAt">> => {
     const account = plan.account;
-    // Antigravity's refusal is one model's (its CLI's 429 doesn't say whose, so the one asked): kept by its base
-    // model with the reset the CLI gave, never the whole account's (`onLimit`).
-    if (plan.kind === "antigravity" && account && plan.model && plan.model !== "auto") {
-      // Whose quota it is comes from when it resets (`antigravityRefusedBases`): Argon's out says nothing of Flash.
-      const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, account.id).catch(() => null);
-      const { bases, matched } = antigravityRefusedBases(plan.model, stored ?? plan.usage, error.resetsAt);
-      // A reset no window of the reading shares is no one's: the model is held for the short hold, and the run
-      // waits on the re-checks, not on days the CLI said for something else.
-      const until = matched ? error.resetsAt : undefined;
-      for (const base of bases) {
-        antigravityTried.add(base);
-        await noteModelLimit(db, run.orgId, account.id, base, until ? { until } : {}).catch(() => {});
-      }
-      publishAccountsChanged(deps.pubsub, run.orgId, machineId).catch(() => {});
-      return { scope: "model", ...(until ? { resetsAt: until } : {}) };
-    }
     const ownModel = ownLimitsModel(account?.provider, plan.model);
     if (!account || !ownModel) return error.resetsAt ? { resetsAt: error.resetsAt } : {};
     const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, account.id).catch(() => null);
@@ -3893,11 +3867,11 @@ async function executeRunInner(
     const line = await usageWaitPlace(db, run, key, wait.since, budget ? null : (plan.model ?? ""));
     let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
     // The account's windows say nothing about when a model's own limit resets.
-    if (!budget && !scope && !(at > now) && machineId) {
+    // Antigravity's refusal can be one model group's: the account's windows (the first one resetting, hours away and
+    // maybe unused) say nothing of it, so with no reset in the refusal it waits on the re-checks.
+    if (!budget && !scope && plan.kind !== "antigravity" && !(at > now) && machineId) {
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
-      // Antigravity's refusal may be one model group's: with no window of the account full, its reset is unknown
-      // (the re-checks of `LIMIT_LADDER_MS`), not the first window's, which can be hours away and not used at all.
-      at = bindingReset(stored, now, { guess: plan.kind !== "antigravity" }) ?? Number.NaN;
+      at = bindingReset(stored, now) ?? Number.NaN;
     }
     const known = at > now;
     // An unknown reset: only the head of the line asks the plan again (one re-check an hour per plan, not one per
@@ -4836,11 +4810,10 @@ async function executeRunInner(
             later(() => addRunStep(db, run, "context", { sessionLost: gone }));
             continue;
           }
-          // Antigravity keeps a quota refusal in its conversation: resumed, the CLI answers with the same one whatever
-          // model is asked (seen: a conversation that failed on Argon, resumed asking Flash, ended in Argon's
-          // refusal with the same "Resets in" it stored), and a session that failed once in this run is resumed by
-          // the runner whatever the hint says. So the first refusal of a run, with nothing run in it, goes again once
-          // on a new session, which the thread's next runs resume (`sessionFor`).
+          // Antigravity keeps a quota refusal in its conversation: a session that failed on a model out of quota,
+          // resumed, answers with the same refusal whatever model is asked (and the runner resumes it whatever the
+          // `resume` hint says). So the first refusal of a run, with nothing run in it, goes again once on a new
+          // session, which the thread's next runs resume (`sessionFor`).
           if (
             turnPlan.kind === "antigravity" &&
             error instanceof BrainFailure &&
@@ -4902,20 +4875,6 @@ async function executeRunInner(
               : error.resetsAt
                 ? { resetsAt: error.resetsAt }
                 : {};
-          // Antigravity refused this model (`refusalOf` kept it): the turn goes again at once on another model of its
-          // catalog that still has quota, as many times as there are models; none left waits as it did.
-          if (turnPlan.kind === "antigravity" && refusal.scope === "model" && machineId) {
-            const stored = await storedPlanUsage(db, run.orgId, machineId, turnPlan.kind, turnPlan.account?.id).catch(
-              () => null,
-            );
-            const from = turnPlan.model;
-            const to = antigravityStandIn(from, stored, antigravityTried);
-            if (to) {
-              plan = { ...plan, model: to };
-              later(() => addRunStep(db, run, "context", { antigravityStandIn: { from: from ?? null, to } }));
-              continue;
-            }
-          }
           // "Automático" refused on one model: the turn goes again at once, once a run, on a model the key serves
           // (`autoPlanModel`), and the reply says so (`meta.modelStandIn`).
           if (autoBrain && refusal.scope && refusal.scope !== "inactive" && machineId && !transcript.modelStandIn) {
