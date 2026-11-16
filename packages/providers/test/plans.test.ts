@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MODEL_CATALOG } from "../src/catalog";
 import {
+  antigravityAutoModel,
   antigravityRefusedBases,
   antigravityStandIn,
   autoPlanModel,
@@ -540,5 +541,49 @@ describe("antigravityStandIn with the /usage reading", () => {
     expect(
       antigravityStandIn("gemini-4-argon-high", { windows: [...gemini(5), passed] }, new Set(), now),
     ).toBeUndefined();
+  });
+});
+
+describe("antigravityAutoModel", () => {
+  const now = Date.parse("2026-11-16T12:00:00.000Z");
+  const gemini = (used: number) => [
+    { kind: "seven_day", usedPercent: used, resetsAt: "2026-11-21T21:48:50.000Z" },
+    { kind: "five_hour", usedPercent: used, resetsAt: "2026-11-16T17:00:00.000Z" },
+  ];
+  const argon = (used: number) => ({
+    kind: "other",
+    label: "Gemini 4 Argon · 7d",
+    usedPercent: used,
+    resetsAt: "2026-11-21T21:45:50.000Z",
+  });
+  const at = new Date(now - 60_000).toISOString();
+
+  test("a model of the account's own group at the level asked, even when Argon has room", () => {
+    const usage = { windows: [...gemini(5), argon(0)] };
+    expect(antigravityAutoModel("medium", usage, now)).toBe("gemini-3.8-flash-medium");
+    expect(antigravityAutoModel("high", usage, now)).toBe("gemini-3.8-flash-high");
+    expect(antigravityAutoModel("low", usage, now)).toBe("gemini-3.8-flash-low");
+  });
+
+  test("never a group the reading says is full: Gemini's own group is the one left", () => {
+    expect(antigravityAutoModel("medium", { windows: [...gemini(5), argon(100)] }, now)).toBe(
+      "gemini-3.8-flash-medium",
+    );
+  });
+
+  test("the account's own group full gives way to a group with room, at the same level", () => {
+    expect(antigravityAutoModel("medium", { windows: [...gemini(100), argon(0)] }, now)).toBe("gemini-4-argon-medium");
+    // Argon has no low: the first free model of it.
+    expect(antigravityAutoModel("low", { windows: [...gemini(100), argon(0)] }, now)).toBe("gemini-4-argon-medium");
+  });
+
+  test("a model the account refused is left out, and none free is undefined", () => {
+    const refused = { models: { "gemini-3.8-flash": { at, until: "2026-11-21T00:00:00.000Z" } }, windows: [argon(0)] };
+    expect(antigravityAutoModel("medium", refused, now)).toBe("gemini-4-argon-medium");
+    expect(antigravityAutoModel("medium", { windows: [...gemini(100), argon(100)] }, now)).toBeUndefined();
+  });
+
+  test("no reading: the account's own group's model, by the catalog's order", () => {
+    expect(antigravityAutoModel("medium", null, now)).toBe("gemini-3.8-flash-medium");
   });
 });

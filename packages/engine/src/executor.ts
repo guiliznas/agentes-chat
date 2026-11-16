@@ -35,6 +35,7 @@ import {
   textOf,
 } from "@agenteschat/providers";
 import {
+  antigravityAutoModel,
   antigravityRefusedBases,
   antigravityStandIn,
   autoPlanModel,
@@ -3008,6 +3009,18 @@ async function executeRunInner(
       throw outage;
     }
     ({ agent: thinker, plan: brainPlan } = withAuto(agent, brainPlan, applied));
+    // Antigravity has no model per tier: "Automático" left none and the CLI picked its own, which can be one out of
+    // quota. A model of the account's own group at the effort asked (else the tier's), one the reading says is full
+    // never.
+    if (brainPlan.kind === "antigravity" && !brainPlan.model) {
+      const asked = brainPlan.effort;
+      const level =
+        asked === "low" || asked === "medium" || asked === "high"
+          ? asked
+          : ({ small: "low", medium: "medium", large: "high" } as const)[choice.tier];
+      const model = antigravityAutoModel(level, brainPlan.usage);
+      if (model) brainPlan = { ...brainPlan, model };
+    }
     if (autoBrain) {
       const model = autoPlanModel(brainPlan.account?.provider, brainPlan.model, brainPlan.usage);
       if (model) brainPlan = { ...brainPlan, model };
@@ -4825,13 +4838,14 @@ async function executeRunInner(
           }
           // Antigravity keeps a quota refusal in its conversation: resumed, the CLI answers with the same one whatever
           // model is asked (seen: a conversation that failed on Argon, resumed asking Flash, ended in Argon's
-          // refusal with the same "Resets in" it stored). So a turn refused on a resumed session, with nothing run
-          // in it, goes again once on a new session, which the thread's next runs resume (`sessionFor`).
+          // refusal with the same "Resets in" it stored), and a session that failed once in this run is resumed by
+          // the runner whatever the hint says. So the first refusal of a run, with nothing run in it, goes again once
+          // on a new session, which the thread's next runs resume (`sessionFor`).
           if (
             turnPlan.kind === "antigravity" &&
             error instanceof BrainFailure &&
             error.code === "plan_limit" &&
-            plan.session?.resume &&
+            plan.session &&
             !plan.missionId &&
             !antigravityFresh &&
             executed.length === 0

@@ -681,6 +681,36 @@ export function antigravityStandIn(
   return (free.find((m) => level && m.id.endsWith(`-${level}`)) ?? free[0])?.id;
 }
 
+/**
+ * The Antigravity model "Automático" runs for a thinking `level`, when the CLI's own default would be left to chance
+ * (it can be a model out of quota: an agent on `auto` asked none and was refused). A model of the account's own group
+ * (Gemini's: no window of its own in the reading) at that level, else any free one at it, else the first free one.
+ * Never a model whose group the reading says is full, nor one the account refused (`PlanUsage.models`). Undefined:
+ * none is free.
+ */
+export function antigravityAutoModel(
+  level: "low" | "medium" | "high",
+  usage: { models?: Parameters<typeof modelLimitOf>[0]; windows?: readonly AgyWindow[] } | null | undefined,
+  now = Date.now(),
+): string | undefined {
+  const own = (base: string) =>
+    !(usage?.windows ?? []).some(
+      (w) => w.kind === "other" && w.label && agyGroupNames(w.label).some((n) => base.includes(n)),
+    );
+  const free = [...ANTIGRAVITY_MODELS]
+    .reverse()
+    .filter(
+      (m) =>
+        modelLimitOf(usage?.models, antigravityBaseModel(m.id), now) === null &&
+        !antigravityGroupFull(antigravityBaseModel(m.id), usage?.windows, now),
+    );
+  const ordered = [
+    ...free.filter((m) => own(antigravityBaseModel(m.id))),
+    ...free.filter((m) => !own(antigravityBaseModel(m.id))),
+  ];
+  return (ordered.find((m) => m.id.endsWith(`-${level}`)) ?? ordered[0])?.id;
+}
+
 /** How near (ms) a refusal's reset must be to a usage window's to name that window's model group. */
 const REFUSAL_RESET_SLACK_MS = 90_000;
 

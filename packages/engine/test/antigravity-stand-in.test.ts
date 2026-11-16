@@ -45,7 +45,7 @@ const statusOf = (machineId: string): MachineStatus => ({
 
 /** An Antigravity account on a runner, the agent on `FLASH`, the account read with room in Gemini's own windows. */
 // `argonUsed`: how much of Argon's own week the reading says is used.
-async function geminiAgent(fx: Fixture, argonUsed: number) {
+async function geminiAgent(fx: Fixture, argonUsed: number, brainModel = FLASH) {
   const paired = await pairMachine({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, {
     name: "box",
     hostname: "box",
@@ -81,7 +81,7 @@ async function geminiAgent(fx: Fixture, argonUsed: number) {
     .set({
       machineId: paired.machineId,
       brain: "antigravity",
-      brainModel: FLASH,
+      brainModel,
       brainFallback: false,
       brainAccountId: accountId,
     })
@@ -127,10 +127,10 @@ test("a refused model: the turn goes again at once on another model with quota, 
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
   const { accountId } = await geminiAgent(f, 0);
   const week = new Date(Date.now() + 5 * 86_400_000).toISOString();
-  const { brain, seen } = scripted((n) => (n === 0 ? refused(week) : [{ type: "done", text: "feito" }]));
+  const { brain, seen } = scripted((n) => (n <= 1 ? refused(week) : [{ type: "done", text: "feito" }]));
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers(f, brain));
-  expect(seen.map((t) => t.model)).toEqual([FLASH, ARGON]);
+  expect(seen.map((t) => t.model)).toEqual([FLASH, FLASH, ARGON]);
   expect((await runs(f))[0]?.status).toBe("done");
   // The refusal is the model's, kept by its base model; the account is not at its limit.
   const usage = await accountUsage(f, accountId);
@@ -149,7 +149,7 @@ test("every model refused: the run waits for that model's reset instead of askin
   const { brain, seen } = scripted(() => refused(week));
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers(f, brain));
-  expect(seen.map((t) => t.model)).toEqual([FLASH, ARGON]);
+  expect(seen.map((t) => t.model)).toEqual([FLASH, FLASH, ARGON]);
   const [run] = await runs(f);
   expect(run?.status).toBe("waiting_input");
   expect((run?.transcript as { waitingForBrain?: Record<string, unknown> } | undefined)?.waitingForBrain).toMatchObject(
@@ -167,7 +167,7 @@ test("a refusal that resets when Argon's week does is Argon's: Flash is not held
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers(f, brain));
   // The turn was asked on Flash and came back with Argon's quota: another go would only be refused again.
-  expect(seen.map((t) => t.model)).toEqual([FLASH]);
+  expect(seen.map((t) => t.model)).toEqual([FLASH, FLASH]);
   const usage = await accountUsage(f, accountId);
   expect(usage?.models?.["gemini-4-argon"]).toMatchObject({ until: ARGON_WEEK });
   expect(usage?.models?.["gemini-3.8-flash"]).toBeUndefined();
@@ -182,7 +182,7 @@ test("a reset no window of the reading shares is nobody's: Flash is held for the
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers(f, brain));
   // Argon's week is full in the reading: nothing to go again on, and the CLI's days are not taken for Flash's.
-  expect(seen.map((t) => t.model)).toEqual([FLASH]);
+  expect(seen.map((t) => t.model)).toEqual([FLASH, FLASH]);
   const usage = await accountUsage(f, accountId);
   expect(usage?.models?.["gemini-3.8-flash"]).toBeDefined();
   expect(usage?.models?.["gemini-3.8-flash"]?.until).toBeUndefined();
@@ -246,4 +246,27 @@ test("a new session refused too is asked once, not again: the run waits as for a
   // One turn, then the resumed one refused, then the new one refused: no third.
   expect(seen.map((t) => t.session?.resume)).toEqual([false, true, false]);
   expect((await runs(f))[1]?.status).toBe("waiting_input");
+});
+
+test("the first refusal of a run goes again on a new session: a session that failed in this run is resumed by the CLI", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const { accountId } = await geminiAgent(f, 100);
+  const week = new Date(Date.now() + 5 * 86_400_000).toISOString();
+  const { brain, seen } = scripted((n) => (n === 0 ? refused(week) : answered("feito")));
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers(f, brain));
+  expect(seen.map((t) => t.model)).toEqual([FLASH, FLASH]);
+  expect(seen[1]?.session?.id).not.toBe(seen[0]?.session?.id);
+  expect((await runs(f))[0]?.status).toBe("done");
+  expect((await accountUsage(f, accountId))?.models?.["gemini-3.8-flash"]).toBeUndefined();
+});
+
+test("an agent on Automático is asked a model of the account's group, not the CLI's own default", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await geminiAgent(f, 0, "auto");
+  const { brain, seen } = scripted(() => answered("feito"));
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers(f, brain));
+  // Argon has room in the reading too, and the account's own group (Gemini) is still the one asked.
+  expect(seen[0]?.model).toMatch(/^gemini-3\.8-flash-(low|medium|high)$/);
 });
