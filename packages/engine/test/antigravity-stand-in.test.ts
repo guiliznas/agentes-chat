@@ -197,3 +197,53 @@ test("a reset no window of the reading shares is nobody's: Flash is held for the
   expect(seen.at(-1)?.model).toBe(FLASH);
   expect(seen.map((t) => t.model)).not.toContain(ARGON);
 });
+
+const answered = (text: string): BrainEvent[] => [
+  { type: "usage", input: 1000, output: 40, source: "plan", model: FLASH },
+  { type: "done", text },
+];
+
+test("a turn refused on a resumed session goes again on a new one, and the thread's next run resumes that one", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await geminiAgent(f, 100);
+  const week = new Date(Date.now() + 5 * 86_400_000).toISOString();
+  // The CLI keeps a refusal in the conversation: the session that took it (the first run's) answers with it again
+  // whenever it is resumed, a new one answers.
+  let poisoned: string | undefined;
+  const { brain, seen } = scripted((n, turn) => {
+    if (n === 0) poisoned = turn.session?.id;
+    return n > 0 && turn.session?.id === poisoned ? refused(week) : answered("feito");
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers(f, brain));
+  await post(f, "@dev e agora?");
+  await drainOutbox(f.db, handlers(f, brain));
+  expect(seen.map((t) => [t.model, t.session?.resume])).toEqual([
+    [FLASH, false],
+    [FLASH, true],
+    [FLASH, false],
+  ]);
+  const fresh = seen[2]?.session?.id;
+  expect(fresh).not.toBe(seen[1]?.session?.id);
+  const all = await runs(f);
+  expect(all.map((r) => r.status)).toEqual(["done", "done"]);
+  expect(all[1]?.brainSessionId).toBe(fresh);
+  // The new session is the thread's: the next run resumes it.
+  await post(f, "@dev e depois?");
+  await drainOutbox(f.db, handlers(f, brain));
+  expect(seen.at(-1)?.session).toMatchObject({ id: fresh, resume: true });
+});
+
+test("a new session refused too is asked once, not again: the run waits as for any refusal", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await geminiAgent(f, 100);
+  const week = new Date(Date.now() + 5 * 86_400_000).toISOString();
+  const { brain, seen } = scripted((n) => (n === 0 ? answered("feito") : refused(week)));
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers(f, brain));
+  await post(f, "@dev e agora?");
+  await drainOutbox(f.db, handlers(f, brain));
+  // One turn, then the resumed one refused, then the new one refused: no third.
+  expect(seen.map((t) => t.session?.resume)).toEqual([false, true, false]);
+  expect((await runs(f))[1]?.status).toBe("waiting_input");
+});

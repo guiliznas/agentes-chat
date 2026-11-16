@@ -3031,6 +3031,8 @@ async function executeRunInner(
   let plan: BrainPlan = brainPlan;
   /** Antigravity models (by base) its account refused in this run: the turn goes on another one that still has quota. */
   const antigravityTried = new Set<string>();
+  /** An Antigravity turn refused on a resumed session already went again on a new one in this run. */
+  let antigravityFresh = false;
   // Antigravity's model groups each have a quota, and the account's refusal of one is kept by its model
   // (`refusalOf`): a model known to be out gives way before the turn is asked, not after its refusal.
   if (plan.kind === "antigravity") {
@@ -4819,6 +4821,26 @@ async function executeRunInner(
             transcript.sessionLost = gone;
             await saveTranscript(db, transcript);
             later(() => addRunStep(db, run, "context", { sessionLost: gone }));
+            continue;
+          }
+          // Antigravity keeps a quota refusal in its conversation: resumed, the CLI answers with the same one whatever
+          // model is asked (seen: a conversation that failed on Argon, resumed asking Flash, ended in Argon's
+          // refusal with the same "Resets in" it stored). So a turn refused on a resumed session, with nothing run
+          // in it, goes again once on a new session, which the thread's next runs resume (`sessionFor`).
+          if (
+            turnPlan.kind === "antigravity" &&
+            error instanceof BrainFailure &&
+            error.code === "plan_limit" &&
+            plan.session?.resume &&
+            !plan.missionId &&
+            !antigravityFresh &&
+            executed.length === 0
+          ) {
+            antigravityFresh = true;
+            const fresh = Bun.randomUUIDv7();
+            await db.update(agentRuns).set({ brainSessionId: fresh }).where(eq(agentRuns.id, run.id));
+            plan = { ...plan, session: { ...plan.session, id: fresh, resume: false } };
+            later(() => addRunStep(db, run, "context", { antigravityFreshSession: true }));
             continue;
           }
           // The plan refused the rest of a turn that worked (the runner says so; an older one is taken as having
