@@ -470,31 +470,75 @@ describe("antigravityRefusedBases", () => {
   const usage = { windows };
 
   test("a refusal that resets when Argon's week does holds Argon, not the Flash it was asked on", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:46:10.000Z")).toEqual([
-      "gemini-4-argon",
-    ]);
+    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:46:10.000Z")).toEqual({
+      bases: ["gemini-4-argon"],
+      matched: true,
+    });
   });
 
   test("Argon's and Gemini's weeks are three minutes apart: the nearer one is the group", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:48:40.000Z")).toEqual([
-      "gemini-3.8-flash",
-    ]);
+    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-21T21:48:40.000Z")).toEqual({
+      bases: ["gemini-3.8-flash"],
+      matched: true,
+    });
   });
 
-  test("the account's own window, no reset, no reading, or no window near it hold the model asked", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-11-16T08:02:40.000Z")).toEqual([
-      "gemini-3.8-flash",
-    ]);
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, undefined)).toEqual(["gemini-3.8-flash"]);
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", null, "2026-11-21T21:46:10.000Z")).toEqual([
-      "gemini-3.8-flash",
-    ]);
-    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-12-30T00:00:00.000Z")).toEqual([
-      "gemini-3.8-flash",
-    ]);
+  test("the account's own window holds the model asked, and its reset can be trusted", () => {
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-11-16T08:02:40.000Z")).toEqual({
+      bases: ["gemini-3.8-flash"],
+      matched: true,
+    });
+  });
+
+  test("a reset no window shares, no reset, or no reading holds the model asked, and its reset can't be trusted", () => {
+    const own = { bases: ["gemini-3.8-flash"], matched: false };
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, "2026-11-22T01:16:52.000Z")).toEqual(own);
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", usage, undefined)).toEqual(own);
+    expect(antigravityRefusedBases("gemini-3.8-flash-low", null, "2026-11-21T21:46:10.000Z")).toEqual(own);
   });
 
   test("another group with no catalog model (Claude and GPT) holds none of them", () => {
-    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-17T04:21:30.000Z")).toEqual([]);
+    expect(antigravityRefusedBases("gemini-3.8-flash-medium", usage, "2026-11-17T04:21:30.000Z")).toEqual({
+      bases: [],
+      matched: true,
+    });
+  });
+});
+
+describe("antigravityStandIn with the /usage reading", () => {
+  const now = Date.parse("2026-11-16T12:00:00.000Z");
+  const week = "2026-11-21T21:45:50.000Z";
+  const gemini = (used: number) => [
+    { kind: "seven_day", usedPercent: used, resetsAt: "2026-11-21T21:48:50.000Z" },
+    { kind: "five_hour", usedPercent: used, resetsAt: "2026-11-16T17:00:00.000Z" },
+  ];
+  const argon = (used: number) => ({ kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: used, resetsAt: week });
+
+  test("never a model of a group the reading says is full: Argon at 100% is no stand-in for a refused Flash", () => {
+    const usage = { windows: [...gemini(5), argon(100)] };
+    expect(antigravityStandIn("gemini-3.8-flash-medium", usage, new Set(["gemini-3.8-flash"]), now)).toBeUndefined();
+  });
+
+  test("a model whose group the reading says is full gives way to a group with room", () => {
+    const usage = { windows: [...gemini(100), argon(0)] };
+    expect(antigravityStandIn("gemini-3.8-flash-medium", usage, new Set(), now)).toBe("gemini-4-argon-medium");
+  });
+
+  test("a model with room stays, whatever the other groups say", () => {
+    expect(antigravityStandIn("gemini-3.8-flash-medium", { windows: [...gemini(5), argon(100)] }, new Set(), now)).toBe(
+      undefined,
+    );
+  });
+
+  test("a full group's window that has reset no longer counts", () => {
+    const passed = {
+      kind: "other",
+      label: "Gemini 4 Argon · 7d",
+      usedPercent: 100,
+      resetsAt: "2026-11-16T11:00:00.000Z",
+    };
+    expect(
+      antigravityStandIn("gemini-4-argon-high", { windows: [...gemini(5), passed] }, new Set(), now),
+    ).toBeUndefined();
   });
 });

@@ -469,41 +469,6 @@ export function autoPlanModel(
   return models.find((m) => (m.tag === "cheap" || m.tag === "smart") && !m.needs && !m.free && free(m.id))?.id ?? value;
 }
 
-/** How near (ms) a refusal's reset must be to a usage window's to name that window's model group. */
-const REFUSAL_RESET_SLACK_MS = 90_000;
-
-/**
- * The base models an Antigravity refusal holds. Its 429 names no model group, but its "Resets in …" is the reset of
- * a window of the `/usage` reading, so the group whose window resets then is the one out: another group's (Argon's,
- * Claude and GPT's) holds that group's catalog models, not `model`, which that group's quota never stopped. The
- * account's own windows (Gemini's), no reset, or none near it, hold `model`'s base.
- */
-export function antigravityRefusedBases(
-  model: string,
-  usage: { windows: readonly { kind: string; label?: string; resetsAt?: string }[] } | null | undefined,
-  resetsAt: string | undefined,
-): string[] {
-  const own = [antigravityBaseModel(model)];
-  const at = resetsAt ? Date.parse(resetsAt) : Number.NaN;
-  if (!usage || !Number.isFinite(at)) return own;
-  const near = usage.windows
-    .flatMap((w) => {
-      const r = w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN;
-      return Number.isFinite(r) && Math.abs(r - at) <= REFUSAL_RESET_SLACK_MS ? [{ w, gap: Math.abs(r - at) }] : [];
-    })
-    .sort((a, b) => a.gap - b.gap)[0]?.w;
-  if (near?.kind !== "other" || !near.label) return own;
-  const names = near.label
-    .toLowerCase()
-    .replace(/\s*·\s*(?:5h|7d)$/, "")
-    .replace(/\bmodels?\b/g, "")
-    .split(/\s+and\s+|,|\//)
-    .map((n) => n.trim().replace(/\s+/g, "-"))
-    .filter(Boolean);
-  const bases = new Set(ANTIGRAVITY_MODELS.map((m) => antigravityBaseModel(m.id)));
-  return [...bases].filter((b) => names.some((n) => b.includes(n)));
-}
-
 /** A coding plan's model by its id, whichever plan has it. */
 export const planModelById = (id: string): PlanModel | undefined =>
   PLAN_IDS.flatMap((p) => planOf(p)?.claudeCode.models ?? []).find((m) => m.id === id);
@@ -670,22 +635,79 @@ export const providerFitsChoice = (provider: string | null | undefined, choice: 
 /** An Antigravity model slug's model in the catalog: `gemini-4-argon-high` → `gemini-4-argon`. */
 export const antigravityBaseModel = (slug: string) => slug.replace(/-(?:low|medium|high)$/, "");
 
+/** Antigravity's `/usage` window, as `PlanUsage` keeps it. */
+type AgyWindow = { kind: string; label?: string; usedPercent?: number; resetsAt?: string };
+
+/** The model names a group's label stands for: "Claude and GPT models · 7d" is `claude`, `gpt`. */
+const agyGroupNames = (label: string) =>
+  label
+    .toLowerCase()
+    .replace(/\s*·\s*(?:5h|7d)$/, "")
+    .replace(/\bmodels?\b/g, "")
+    .split(/\s+and\s+|,|\//)
+    .map((n) => n.trim().replace(/\s+/g, "-"))
+    .filter(Boolean);
+
 /**
- * The Antigravity model to think with when `model`'s quota is gone: the account refused it (kept by its base model,
- * `PlanUsage.models`, since its thinking levels share one quota) or `tried` this run already. Another catalog model
- * whose quota isn't held, at the same thinking level when it has one. Undefined: `model` holds (or none is known:
- * `auto`, the CLI's default), or every model is held (the run waits as for any refusal).
+ * Whether the `/usage` reading says `base`'s model group is out now: a window of its own that is full and has not
+ * reset (Argon's, Claude and GPT's), else, for the group the account's own windows are (Gemini's), those.
+ */
+function antigravityGroupFull(base: string, windows: readonly AgyWindow[] | undefined, now: number): boolean {
+  const all = windows ?? [];
+  const own = all.filter((w) => w.kind === "other" && w.label && agyGroupNames(w.label).some((n) => base.includes(n)));
+  const ofGroup = own.length > 0 ? own : all.filter((w) => w.kind !== "other");
+  return ofGroup.some((w) => (w.usedPercent ?? 0) >= 100 && (!w.resetsAt || Date.parse(w.resetsAt) > now));
+}
+
+/**
+ * The Antigravity model to think with when `model`'s quota is gone: the `/usage` reading says its group is full, the
+ * account refused it (kept by its base model, `PlanUsage.models`, since its thinking levels share one quota) or
+ * `tried` this run already. Another catalog model whose quota isn't gone, at the same thinking level when it has one;
+ * never one of a group the reading says is full. Undefined: `model` holds (or none is known: `auto`, the CLI's
+ * default), or no model is free (the run goes on as it is, or waits as for any refusal).
  */
 export function antigravityStandIn(
   model: string | null | undefined,
-  usage: { models?: Parameters<typeof modelLimitOf>[0] } | null | undefined,
+  usage: { models?: Parameters<typeof modelLimitOf>[0]; windows?: readonly AgyWindow[] } | null | undefined,
   tried: ReadonlySet<string> = new Set(),
   now = Date.now(),
 ): string | undefined {
   if (!model || model === "auto") return undefined;
-  const held = (id: string) => tried.has(id) || modelLimitOf(usage?.models, id, now) !== null;
+  const held = (id: string) =>
+    tried.has(id) || modelLimitOf(usage?.models, id, now) !== null || antigravityGroupFull(id, usage?.windows, now);
   if (!held(antigravityBaseModel(model))) return undefined;
   const level = /-(low|medium|high)$/.exec(model)?.[1];
   const free = ANTIGRAVITY_MODELS.filter((m) => !held(antigravityBaseModel(m.id)));
   return (free.find((m) => level && m.id.endsWith(`-${level}`)) ?? free[0])?.id;
+}
+
+/** How near (ms) a refusal's reset must be to a usage window's to name that window's model group. */
+const REFUSAL_RESET_SLACK_MS = 90_000;
+
+/**
+ * The base models an Antigravity refusal holds, and whether its reset can be trusted. Its 429 names no model group,
+ * but a "Resets in …" that is the reset of a window of the `/usage` reading (`matched`) says whose quota is out: another
+ * group's (Argon's, Claude and GPT's) holds that group's catalog models, not `model`, which that quota never stopped;
+ * the account's own windows (Gemini's) hold `model`'s base. A reset no window shares (or none given) says nothing:
+ * `model` is held, not matched, for the short hold only and the caller keeps no reset from it.
+ */
+export function antigravityRefusedBases(
+  model: string,
+  usage: { windows: readonly AgyWindow[] } | null | undefined,
+  resetsAt: string | undefined,
+): { bases: string[]; matched: boolean } {
+  const own = { bases: [antigravityBaseModel(model)], matched: false };
+  const at = resetsAt ? Date.parse(resetsAt) : Number.NaN;
+  if (!usage || !Number.isFinite(at)) return own;
+  const near = usage.windows
+    .flatMap((w) => {
+      const r = w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN;
+      return Number.isFinite(r) && Math.abs(r - at) <= REFUSAL_RESET_SLACK_MS ? [{ w, gap: Math.abs(r - at) }] : [];
+    })
+    .sort((x, y) => x.gap - y.gap)[0]?.w;
+  if (!near) return own;
+  if (near.kind !== "other" || !near.label) return { ...own, matched: true };
+  const names = agyGroupNames(near.label);
+  const bases = new Set(ANTIGRAVITY_MODELS.map((m) => antigravityBaseModel(m.id)));
+  return { bases: [...bases].filter((b) => names.some((n) => b.includes(n))), matched: true };
 }

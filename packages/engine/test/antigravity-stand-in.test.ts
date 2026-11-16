@@ -44,7 +44,8 @@ const statusOf = (machineId: string): MachineStatus => ({
 });
 
 /** An Antigravity account on a runner, the agent on `FLASH`, the account read with room in Gemini's own windows. */
-async function geminiAgent(fx: Fixture) {
+// `argonUsed`: how much of Argon's own week the reading says is used.
+async function geminiAgent(fx: Fixture, argonUsed: number) {
   const paired = await pairMachine({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, {
     name: "box",
     hostname: "box",
@@ -62,7 +63,7 @@ async function geminiAgent(fx: Fixture) {
     windows: [
       { kind: "seven_day", usedPercent: 3, resetsAt: new Date(Date.now() + 5 * 86_400_000).toISOString() },
       { kind: "five_hour", usedPercent: 2, resetsAt: new Date(Date.now() + 4 * 3600_000).toISOString() },
-      { kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: 100, resetsAt: ARGON_WEEK },
+      { kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: argonUsed, resetsAt: ARGON_WEEK },
     ],
   };
   await fx.db.insert(schema.machineAccounts).values({
@@ -124,7 +125,7 @@ const refused = (resetsAt: string): BrainEvent[] => [
 
 test("a refused model: the turn goes again at once on another model with quota, and later runs start there", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
-  const { accountId } = await geminiAgent(f);
+  const { accountId } = await geminiAgent(f, 0);
   const week = new Date(Date.now() + 5 * 86_400_000).toISOString();
   const { brain, seen } = scripted((n) => (n === 0 ? refused(week) : [{ type: "done", text: "feito" }]));
   await post(f, "@dev oi");
@@ -143,7 +144,7 @@ test("a refused model: the turn goes again at once on another model with quota, 
 
 test("every model refused: the run waits for that model's reset instead of asking again and again", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
-  await geminiAgent(f);
+  await geminiAgent(f, 0);
   const week = new Date(Date.now() + 5 * 86_400_000).toISOString();
   const { brain, seen } = scripted(() => refused(week));
   await post(f, "@dev oi");
@@ -161,7 +162,7 @@ test("every model refused: the run waits for that model's reset instead of askin
 
 test("a refusal that resets when Argon's week does is Argon's: Flash is not held and the run waits", async () => {
   f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
-  const { accountId } = await geminiAgent(f);
+  const { accountId } = await geminiAgent(f, 100);
   const { brain, seen } = scripted(() => refused(ARGON_WEEK));
   await post(f, "@dev oi");
   await drainOutbox(f.db, handlers(f, brain));
@@ -171,4 +172,28 @@ test("a refusal that resets when Argon's week does is Argon's: Flash is not held
   expect(usage?.models?.["gemini-4-argon"]).toMatchObject({ until: ARGON_WEEK });
   expect(usage?.models?.["gemini-3.8-flash"]).toBeUndefined();
   expect((await runs(f))[0]?.status).toBe("waiting_input");
+});
+
+test("a reset no window of the reading shares is nobody's: Flash is held for the short hold, and the run waits on the re-checks", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const { accountId } = await geminiAgent(f, 100);
+  const ambiguous = new Date(Date.now() + 3 * 86_400_000).toISOString();
+  const { brain, seen } = scripted(() => refused(ambiguous));
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers(f, brain));
+  // Argon's week is full in the reading: nothing to go again on, and the CLI's days are not taken for Flash's.
+  expect(seen.map((t) => t.model)).toEqual([FLASH]);
+  const usage = await accountUsage(f, accountId);
+  expect(usage?.models?.["gemini-3.8-flash"]).toBeDefined();
+  expect(usage?.models?.["gemini-3.8-flash"]?.until).toBeUndefined();
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  const wait = (run?.transcript as { waitingForBrain?: Record<string, unknown> } | undefined)?.waitingForBrain;
+  expect(wait).toMatchObject({ code: "plan_limit", scope: "model" });
+  expect(wait?.resetsAt).toBeUndefined();
+  // While Flash is held and Argon is full, the next run still asks Flash, never Argon.
+  await post(f, "@dev e agora?");
+  await drainOutbox(f.db, handlers(f, brain));
+  expect(seen.at(-1)?.model).toBe(FLASH);
+  expect(seen.map((t) => t.model)).not.toContain(ARGON);
 });

@@ -3803,14 +3803,16 @@ async function executeRunInner(
     if (plan.kind === "antigravity" && account && plan.model && plan.model !== "auto") {
       // Whose quota it is comes from when it resets (`antigravityRefusedBases`): Argon's out says nothing of Flash.
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, account.id).catch(() => null);
-      for (const base of antigravityRefusedBases(plan.model, stored ?? plan.usage, error.resetsAt)) {
+      const { bases, matched } = antigravityRefusedBases(plan.model, stored ?? plan.usage, error.resetsAt);
+      // A reset no window of the reading shares is no one's: the model is held for the short hold, and the run
+      // waits on the re-checks, not on days the CLI said for something else.
+      const until = matched ? error.resetsAt : undefined;
+      for (const base of bases) {
         antigravityTried.add(base);
-        await noteModelLimit(db, run.orgId, account.id, base, error.resetsAt ? { until: error.resetsAt } : {}).catch(
-          () => {},
-        );
+        await noteModelLimit(db, run.orgId, account.id, base, until ? { until } : {}).catch(() => {});
       }
       publishAccountsChanged(deps.pubsub, run.orgId, machineId).catch(() => {});
-      return { scope: "model", ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}) };
+      return { scope: "model", ...(until ? { resetsAt: until } : {}) };
     }
     const ownModel = ownLimitsModel(account?.provider, plan.model);
     if (!account || !ownModel) return error.resetsAt ? { resetsAt: error.resetsAt } : {};
