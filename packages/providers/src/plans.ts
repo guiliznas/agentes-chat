@@ -634,3 +634,23 @@ export const providerFitsChoice = (provider: string | null | undefined, choice: 
 
 /** An Antigravity model slug's model in the catalog: `gemini-4-argon-high` → `gemini-4-argon`. */
 export const antigravityBaseModel = (slug: string) => slug.replace(/-(?:low|medium|high)$/, "");
+
+/**
+ * The Antigravity model to think with when `model`'s quota is gone: the account refused it (kept by its base model,
+ * `PlanUsage.models`, since its thinking levels share one quota) or `tried` this run already. Another catalog model
+ * whose quota isn't held, at the same thinking level when it has one. Undefined: `model` holds (or none is known:
+ * `auto`, the CLI's default), or every model is held (the run waits as for any refusal).
+ */
+export function antigravityStandIn(
+  model: string | null | undefined,
+  usage: { models?: Parameters<typeof modelLimitOf>[0] } | null | undefined,
+  tried: ReadonlySet<string> = new Set(),
+  now = Date.now(),
+): string | undefined {
+  if (!model || model === "auto") return undefined;
+  const held = (id: string) => tried.has(id) || modelLimitOf(usage?.models, id, now) !== null;
+  if (!held(antigravityBaseModel(model))) return undefined;
+  const level = /-(low|medium|high)$/.exec(model)?.[1];
+  const free = ANTIGRAVITY_MODELS.filter((m) => !held(antigravityBaseModel(m.id)));
+  return (free.find((m) => level && m.id.endsWith(`-${level}`)) ?? free[0])?.id;
+}

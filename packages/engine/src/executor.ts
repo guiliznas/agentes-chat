@@ -34,7 +34,15 @@ import {
   type ToolImage,
   textOf,
 } from "@agenteschat/providers";
-import { autoPlanModel, droppedPlanModel, ownLimitsModel, planModel, planOf } from "@agenteschat/providers/plans";
+import {
+  antigravityBaseModel,
+  antigravityStandIn,
+  autoPlanModel,
+  droppedPlanModel,
+  ownLimitsModel,
+  planModel,
+  planOf,
+} from "@agenteschat/providers/plans";
 import { PLAN_NOTICE, PLAN_PAUSE } from "@agenteschat/ui/plan-state";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
@@ -3021,6 +3029,14 @@ async function executeRunInner(
   // The context budget reads the model's window: an OpenRouter model's comes with its list.
   await modelInfoFor(db, thinker.model, run.orgId);
   let plan: BrainPlan = brainPlan;
+  /** Antigravity models (by base) its account refused in this run: the turn goes on another one that still has quota. */
+  const antigravityTried = new Set<string>();
+  // Antigravity's model groups each have a quota, and the account's refusal of one is kept by its model
+  // (`refusalOf`): a model known to be out gives way before the turn is asked, not after its refusal.
+  if (plan.kind === "antigravity") {
+    const to = antigravityStandIn(plan.model, plan.usage, antigravityTried);
+    if (to) plan = { ...plan, model: to };
+  }
   /**
    * What the turn-end judge reads (ADR 0109), filled only when it runs: the run's general means (`turnMeans`, its
    * computer's own tools on a computer brain) and every call it tried (`triedCalls`). An `untried` nudge names them.
@@ -3782,6 +3798,21 @@ async function executeRunInner(
     error: BrainFailure,
   ): Promise<Pick<BrainUnavailability, "scope" | "resetsAt">> => {
     const account = plan.account;
+    // Antigravity's refusal is one model's (its CLI's 429 doesn't say whose, so the one asked): kept by its base
+    // model with the reset the CLI gave, never the whole account's (`onLimit`).
+    if (plan.kind === "antigravity" && account && plan.model && plan.model !== "auto") {
+      antigravityTried.add(antigravityBaseModel(plan.model));
+      await noteModelLimit(
+        db,
+        run.orgId,
+        account.id,
+        antigravityBaseModel(plan.model),
+        error.resetsAt ? { until: error.resetsAt } : {},
+      )
+        .then(() => publishAccountsChanged(deps.pubsub, run.orgId, machineId))
+        .catch(() => {});
+      return { scope: "model", ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}) };
+    }
     const ownModel = ownLimitsModel(account?.provider, plan.model);
     if (!account || !ownModel) return error.resetsAt ? { resetsAt: error.resetsAt } : {};
     const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, account.id).catch(() => null);
@@ -4834,6 +4865,20 @@ async function executeRunInner(
               : error.resetsAt
                 ? { resetsAt: error.resetsAt }
                 : {};
+          // Antigravity refused this model (`refusalOf` kept it): the turn goes again at once on another model of its
+          // catalog that still has quota, as many times as there are models; none left waits as it did.
+          if (turnPlan.kind === "antigravity" && refusal.scope === "model" && machineId) {
+            const stored = await storedPlanUsage(db, run.orgId, machineId, turnPlan.kind, turnPlan.account?.id).catch(
+              () => null,
+            );
+            const from = turnPlan.model;
+            const to = antigravityStandIn(from, stored, antigravityTried);
+            if (to) {
+              plan = { ...plan, model: to };
+              later(() => addRunStep(db, run, "context", { antigravityStandIn: { from: from ?? null, to } }));
+              continue;
+            }
+          }
           // "Automático" refused on one model: the turn goes again at once, once a run, on a model the key serves
           // (`autoPlanModel`), and the reply says so (`meta.modelStandIn`).
           if (autoBrain && refusal.scope && refusal.scope !== "inactive" && machineId && !transcript.modelStandIn) {

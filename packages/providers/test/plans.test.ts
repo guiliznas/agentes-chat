@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MODEL_CATALOG } from "../src/catalog";
 import {
+  antigravityStandIn,
   autoPlanModel,
   CODING_PLANS,
   claudeCodeModel,
@@ -412,4 +413,47 @@ test("before this process has read the plan's live list, no model counts as drop
 console.log(JSON.stringify([droppedPlanModel("opencode", "glm-9"), droppedPlanModel("opencode", "hy3")]));`;
   const run = Bun.spawnSync([process.execPath, "-e", code]);
   expect(run.stdout.toString().trim()).toBe("[null,null]");
+});
+
+describe("antigravityStandIn", () => {
+  const now = Date.parse("2026-11-16T03:00:00.000Z");
+  const at = new Date(now - 60_000).toISOString();
+  const week = "2026-11-21T22:00:00.000Z";
+  const heldBy = (...bases: string[]) => ({
+    models: Object.fromEntries(bases.map((b) => [b, { at, until: week }])),
+  });
+
+  test("a model whose quota is not held stays, and so does one the CLI picks (auto, none)", () => {
+    expect(antigravityStandIn("gemini-3.8-flash-medium", heldBy("gemini-4-argon"), new Set(), now)).toBeUndefined();
+    expect(antigravityStandIn("auto", heldBy("gemini-3.8-flash"), new Set(), now)).toBeUndefined();
+    expect(antigravityStandIn(undefined, heldBy("gemini-3.8-flash"), new Set(), now)).toBeUndefined();
+  });
+
+  test("a held model gives way to another one's, at the same thinking level", () => {
+    const held = heldBy("gemini-3.8-flash");
+    expect(antigravityStandIn("gemini-3.8-flash-medium", held, new Set(), now)).toBe("gemini-4-argon-medium");
+    expect(antigravityStandIn("gemini-3.8-flash-high", held, new Set(), now)).toBe("gemini-4-argon-high");
+    // Argon has no low: the first free model stands in.
+    expect(antigravityStandIn("gemini-3.8-flash-low", held, new Set(), now)).toBe("gemini-4-argon-high");
+  });
+
+  test("its thinking levels share one quota: a refusal of any holds them all", () => {
+    expect(antigravityStandIn("gemini-4-argon-high", heldBy("gemini-4-argon"), new Set(), now)).toBe(
+      "gemini-3.8-flash-high",
+    );
+  });
+
+  test("a model refused in this run counts as held before the account's reading says so", () => {
+    expect(antigravityStandIn("gemini-3.8-flash-medium", null, new Set(["gemini-3.8-flash"]), now)).toBe(
+      "gemini-4-argon-medium",
+    );
+  });
+
+  test("every model held: none stands in; a limit whose reset passed no longer holds", () => {
+    expect(
+      antigravityStandIn("gemini-3.8-flash-medium", heldBy("gemini-3.8-flash", "gemini-4-argon"), new Set(), now),
+    ).toBeUndefined();
+    const passed = { models: { "gemini-3.8-flash": { at, until: "2026-11-16T02:00:00.000Z" } } };
+    expect(antigravityStandIn("gemini-3.8-flash-medium", passed, new Set(), now)).toBeUndefined();
+  });
 });
