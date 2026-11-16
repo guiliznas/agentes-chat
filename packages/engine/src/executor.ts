@@ -3848,7 +3848,9 @@ async function executeRunInner(
     // The account's windows say nothing about when a model's own limit resets.
     if (!budget && !scope && !(at > now) && machineId) {
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
-      at = bindingReset(stored, now) ?? Number.NaN;
+      // Antigravity's refusal may be one model group's: with no window of the account full, its reset is unknown
+      // (the re-checks of `LIMIT_LADDER_MS`), not the first window's, which can be hours away and not used at all.
+      at = bindingReset(stored, now, { guess: plan.kind !== "antigravity" }) ?? Number.NaN;
     }
     const known = at > now;
     // An unknown reset: only the head of the line asks the plan again (one re-check an hour per plan, not one per
