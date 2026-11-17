@@ -92,8 +92,8 @@ export const APP_LINK_PATTERNS = [
 ];
 /** The app icons (ADR 0179), one folder each: packages/ui/scripts/app-icons.mjs writes them. */
 const ICONS = "./assets/app-icons";
-// Our EAS project on expo.dev (not a secret: it only names the project).
-const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
+// This fork's EAS project on expo.dev (not a secret: it only names the project); `EAS_PROJECT_ID` overrides it.
+const projectId = process.env.EAS_PROJECT_ID ?? "bede4dc1-0899-4de2-a7ee-ccff564abbcf";
 // expo-image-picker and expo-camera both set iOS's camera text: one text for both uses.
 const CAMERA_USE = "To take pictures for your conversations and scan QR codes.";
 
@@ -302,4 +302,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ...(projectId ? { eas: { projectId } } : {}),
   },
   runtimeVersion: { policy: "appVersion" },
+  // Over-the-air updates (`eas update`): JS and assets only; a native change needs a new build.
+  updates: { url: `https://u.expo.dev/${projectId}` },
 });
