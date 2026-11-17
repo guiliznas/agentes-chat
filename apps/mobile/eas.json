@@ -8,7 +8,7 @@
       "node": "24.11.0",
       "bun": "1.4.4",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app.agentes.chat"
+        "EXPO_PUBLIC_API_URL": "https://agentes.tailf15795.ts.net"
       }
     },
     "development": {
@@ -22,11 +22,13 @@
     "preview": {
       "extends": "base",
       "distribution": "internal",
+      "channel": "preview",
       "env": {
         "APP_VARIANT": "preview"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a --max-workers=2"
       }
     },
     "production": {
