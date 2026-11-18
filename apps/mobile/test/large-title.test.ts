@@ -32,10 +32,9 @@ describe("large titles settle", () => {
         "{ snap: !collapsed }",
         "<LargeTitleHead y=",
         "ref={scroll.ref}",
-        // The tabs' screen settles the title inside its own end handlers, which also let the faces move again.
-        ...(file === "ui/LargeTitleScreen.tsx"
-          ? ["const { onScrollEndDrag: settleTitleOnRelease, onMomentumScrollEnd: settleTitleOnStop } = scroll;"]
-          : ["onScrollEndDrag={scroll.onScrollEndDrag}", "onMomentumScrollEnd={scroll.onMomentumScrollEnd}"]),
+        // The title settles at either end through the list's still handlers, which let the faces move again first.
+        "onScrollEndDrag: scroll.onScrollEndDrag,",
+        "onMomentumScrollEnd: scroll.onMomentumScrollEnd,",
       ])
         expect({ file, piece, there: screen.includes(piece) }).toEqual({ file, piece, there: true });
       // No numbers of their own, and not the scroll view's snapToOffsets (it stops a fling at its last offset).
@@ -98,22 +97,27 @@ describe("large titles settle", () => {
       });
   });
 
-  test("a tab's list holds the faces still while it moves, as the conversation does", () => {
-    // Agentes draws up to eight moving faces, each recorded on the thread that places the rows: while the list drags or
-    // glides the shared clock holds (`useStillWhileScrolling`), and lets go once the glide has stopped.
-    const screen = src("ui/LargeTitleScreen.tsx");
-    expect(screen).toContain("const still = useListStill(onScrollBeginDrag);");
-    expect(screen.match(/const still = useListStill\(onScrollBeginDrag\);/g)?.length).toBe(2);
-    for (const piece of ["onScrollBeginDrag={still.onScrollBeginDrag}", "onMomentumScrollBegin={still.hold}"])
-      expect({ piece, count: screen.split(piece).length - 1 }).toEqual({ piece, count: 2 });
-    // The system title's screen lets go at both ends; the drawn title's settles the title too, after letting go.
-    expect(screen).toContain("onScrollEndDrag={still.settle}");
-    expect(screen).toContain("onMomentumScrollEnd={still.settle}");
-    expect(screen).toContain("still.settle();\n      settleTitleOnRelease(e);");
-    expect(screen).toContain("still.settle();\n      settleTitleOnStop(e);");
-    expect(screen).toContain("onScrollEndDrag={onScrollEndDrag}");
-    expect(screen).toContain("onMomentumScrollEnd={onMomentumScrollEnd}");
-    // The screen's own drag start (Conversas' swipe marks) still runs.
-    expect(screen).toContain("hold();\n    onScrollBeginDrag?.();");
+  test("every list screen holds the faces still while it moves, as the conversation does", () => {
+    // Agentes draws up to eight moving faces on the thread that places the rows: while a list drags or glides the shared
+    // clock holds, and lets go once it has stopped (`useListStill` over `useStillWhileScrolling`).
+    const live = src("agent/live.tsx");
+    expect(live).toContain("export function useListStill<E>(");
+    expect(live).toContain(
+      "return { onScrollBeginDrag, onScrollEndDrag, onMomentumScrollBegin: hold, onMomentumScrollEnd };",
+    );
+    for (const file of ["ui/LargeTitleScreen.tsx", "features/shared/PushedLargeTitle.tsx"]) {
+      const screen = src(file);
+      // Both scroll views of each (the system title's and the drawn one's) take the handlers, the screen's own drag
+      // start passed in; nothing sets a scroll handler past them.
+      expect({ file, spread: screen.split("{...still}").length - 1 }).toEqual({ file, spread: 2 });
+      expect({ file, hooks: screen.split("useListStill({").length - 1 }).toEqual({ file, hooks: 2 });
+      expect({
+        file,
+        own: /onScrollBeginDrag=\{|onScrollEndDrag=\{|onMomentumScroll(Begin|End)=\{/.test(screen),
+      }).toEqual({
+        file,
+        own: false,
+      });
+    }
   });
 });
