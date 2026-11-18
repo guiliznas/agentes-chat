@@ -32,8 +32,10 @@ describe("large titles settle", () => {
         "{ snap: !collapsed }",
         "<LargeTitleHead y=",
         "ref={scroll.ref}",
-        "onScrollEndDrag={scroll.onScrollEndDrag}",
-        "onMomentumScrollEnd={scroll.onMomentumScrollEnd}",
+        // The tabs' screen settles the title inside its own end handlers, which also let the faces move again.
+        ...(file === "ui/LargeTitleScreen.tsx"
+          ? ["const { onScrollEndDrag: settleTitleOnRelease, onMomentumScrollEnd: settleTitleOnStop } = scroll;"]
+          : ["onScrollEndDrag={scroll.onScrollEndDrag}", "onMomentumScrollEnd={scroll.onMomentumScrollEnd}"]),
       ])
         expect({ file, piece, there: screen.includes(piece) }).toEqual({ file, piece, there: true });
       // No numbers of their own, and not the scroll view's snapToOffsets (it stops a fling at its last offset).
@@ -94,5 +96,24 @@ describe("large titles settle", () => {
         file,
         inRender: false,
       });
+  });
+
+  test("a tab's list holds the faces still while it moves, as the conversation does", () => {
+    // Agentes draws up to eight moving faces, each recorded on the thread that places the rows: while the list drags or
+    // glides the shared clock holds (`useStillWhileScrolling`), and lets go once the glide has stopped.
+    const screen = src("ui/LargeTitleScreen.tsx");
+    expect(screen).toContain("const still = useListStill(onScrollBeginDrag);");
+    expect(screen.match(/const still = useListStill\(onScrollBeginDrag\);/g)?.length).toBe(2);
+    for (const piece of ["onScrollBeginDrag={still.onScrollBeginDrag}", "onMomentumScrollBegin={still.hold}"])
+      expect({ piece, count: screen.split(piece).length - 1 }).toEqual({ piece, count: 2 });
+    // The system title's screen lets go at both ends; the drawn title's settles the title too, after letting go.
+    expect(screen).toContain("onScrollEndDrag={still.settle}");
+    expect(screen).toContain("onMomentumScrollEnd={still.settle}");
+    expect(screen).toContain("still.settle();\n      settleTitleOnRelease(e);");
+    expect(screen).toContain("still.settle();\n      settleTitleOnStop(e);");
+    expect(screen).toContain("onScrollEndDrag={onScrollEndDrag}");
+    expect(screen).toContain("onMomentumScrollEnd={onMomentumScrollEnd}");
+    // The screen's own drag start (Conversas' swipe marks) still runs.
+    expect(screen).toContain("hold();\n    onScrollBeginDrag?.();");
   });
 });
