@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 import { Platform, type RefreshControlProps, ScrollView, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useListStill } from "@/agent/live";
 import { BAR_TITLE_FROM, BAR_TITLE_TO, type HeaderAction, LargeTitleHead, useLargeTitleScroll } from "@/ui";
 import { FadingHeaderTitle } from "@/ui/cover";
 import { useColors } from "./hooks";
@@ -58,6 +59,7 @@ function SystemLargeTitle({
 }: PushedLargeTitleProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const still = useListStill({ onScrollBeginDrag });
   return (
     <>
       <PushedHeader
@@ -73,7 +75,7 @@ function SystemLargeTitle({
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           style={[styles.screen, { backgroundColor: grouped ? c.grouped : c.bg }]}
-          onScrollBeginDrag={onScrollBeginDrag}
+          {...still}
           refreshControl={refreshControl}
           keyboardDismissMode={keyboard ? "interactive" : "on-drag"}
           automaticallyAdjustKeyboardInsets={keyboard}
@@ -108,6 +110,11 @@ function DrawnLargeTitle({
   const headerHeight = useHeaderHeight();
   // iOS insets the scroll view by the bar (automatic adjustment): at rest the offset is minus its height.
   const scroll = useLargeTitleScroll(Platform.OS === "ios" ? headerHeight : 0, { snap: !collapsed });
+  const still = useListStill({
+    onScrollBeginDrag,
+    onScrollEndDrag: scroll.onScrollEndDrag,
+    onMomentumScrollEnd: scroll.onMomentumScrollEnd,
+  });
   return (
     <View style={[styles.screen, { backgroundColor: grouped ? c.grouped : c.bg }]}>
       <PushedHeader
@@ -122,9 +129,7 @@ function DrawnLargeTitle({
         <Animated.ScrollView
           ref={scroll.ref}
           onScroll={scroll.onScroll}
-          onScrollBeginDrag={onScrollBeginDrag}
-          onScrollEndDrag={scroll.onScrollEndDrag}
-          onMomentumScrollEnd={scroll.onMomentumScrollEnd}
+          {...still}
           scrollEventThrottle={16}
           contentInsetAdjustmentBehavior="automatic"
           refreshControl={refreshControl}

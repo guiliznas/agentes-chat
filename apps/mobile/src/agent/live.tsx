@@ -49,6 +49,40 @@ export function useStillWhileScrolling() {
   return { hold, settle };
 }
 
+/**
+ * A list screen's scroll handlers with the faces held still while it drags or glides (`useStillWhileScrolling`): spread
+ * on its scroll view. Each moving face is drawn again on the thread that places the rows; Agentes shows up to eight of
+ * them, and on Android its list dropped to a few frames a second while it moved. The screen's own handlers (a drag's
+ * start, a large title settling at either end) still run, after the clock is held or let go.
+ */
+export function useListStill<E>(own: {
+  onScrollBeginDrag?: (() => void) | undefined;
+  onScrollEndDrag?: ((e: E) => void) | undefined;
+  onMomentumScrollEnd?: ((e: E) => void) | undefined;
+}) {
+  const { hold, settle } = useStillWhileScrolling();
+  const { onScrollBeginDrag: began, onScrollEndDrag: released, onMomentumScrollEnd: stopped } = own;
+  const onScrollBeginDrag = useCallback(() => {
+    hold();
+    began?.();
+  }, [hold, began]);
+  const onScrollEndDrag = useCallback(
+    (e: E) => {
+      settle();
+      released?.(e);
+    },
+    [settle, released],
+  );
+  const onMomentumScrollEnd = useCallback(
+    (e: E) => {
+      settle();
+      stopped?.(e);
+    },
+    [settle, stopped],
+  );
+  return { onScrollBeginDrag, onScrollEndDrag, onMomentumScrollBegin: hold, onMomentumScrollEnd };
+}
+
 /** The longest a screen's slide holds the clock, in case its end is never told. */
 const SLIDE_HOLD_MAX_MS = 900;
 let slideRelease: (() => void) | null = null;
