@@ -1,10 +1,10 @@
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { createContext, type ReactNode, useContext, useMemo } from "react";
-import { Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { createContext, type ReactNode, useCallback, useContext, useMemo } from "react";
+import { Platform, RefreshControl, type ScrollEvent, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { type AnimatedRef } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LivePause } from "@/agent/live";
+import { LivePause, useStillWhileScrolling } from "@/agent/live";
 import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
 import { LargeTitleHead, useLargeTitleScroll } from "./LargeTitleHead";
@@ -109,6 +109,7 @@ function SystemTitleScreen({
   const focused = useIsFocused();
   const foot = useContext(TabFoot);
   const bar = useScrollUnderPushedOptions();
+  const still = useListStill(onScrollBeginDrag);
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
   const options = useMemo<NativeStackNavigationOptions>(
@@ -131,7 +132,10 @@ function SystemTitleScreen({
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           style={[styles.screen, { backgroundColor: grouped ? colors.grouped : colors.bg }]}
-          onScrollBeginDrag={onScrollBeginDrag}
+          onScrollBeginDrag={still.onScrollBeginDrag}
+          onScrollEndDrag={still.settle}
+          onMomentumScrollBegin={still.hold}
+          onMomentumScrollEnd={still.settle}
           refreshControl={pull ? <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} /> : undefined}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
@@ -185,6 +189,22 @@ function DrawnTitleScreen({
   // under the bar. Folded away for a search, there is no title to settle.
   const scroll = useLargeTitleScroll(IOS ? headerHeight : 0, { snap: !collapsed });
   const { y } = scroll;
+  const still = useListStill(onScrollBeginDrag);
+  const { onScrollEndDrag: settleTitleOnRelease, onMomentumScrollEnd: settleTitleOnStop } = scroll;
+  const onScrollEndDrag = useCallback(
+    (e: ScrollEvent) => {
+      still.settle();
+      settleTitleOnRelease(e);
+    },
+    [still, settleTitleOnRelease],
+  );
+  const onMomentumScrollEnd = useCallback(
+    (e: ScrollEvent) => {
+      still.settle();
+      settleTitleOnStop(e);
+    },
+    [still, settleTitleOnStop],
+  );
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
   const options = useMemo<NativeStackNavigationOptions>(
@@ -206,9 +226,10 @@ function DrawnTitleScreen({
         <Animated.ScrollView
           ref={scroll.ref}
           onScroll={scroll.onScroll}
-          onScrollBeginDrag={onScrollBeginDrag}
-          onScrollEndDrag={scroll.onScrollEndDrag}
-          onMomentumScrollEnd={scroll.onMomentumScrollEnd}
+          onScrollBeginDrag={still.onScrollBeginDrag}
+          onScrollEndDrag={onScrollEndDrag}
+          onMomentumScrollBegin={still.hold}
+          onMomentumScrollEnd={onMomentumScrollEnd}
           scrollEventThrottle={16}
           // The pixel orbit stands in for the wheel, hidden on iOS (Android keeps its own over the content).
           refreshControl={
@@ -256,6 +277,20 @@ function DrawnTitleScreen({
       {foot?.node}
     </View>
   );
+}
+
+/**
+ * The faces hold still while a tab's list drags or glides (`useStillWhileScrolling`, as the conversation): each moving
+ * face is drawn again on the thread that places the rows, and Agentes shows up to eight of them, so on Android the list
+ * dropped to a few frames a second while it moved. The screen's own `onScrollBeginDrag` still runs.
+ */
+function useListStill(onScrollBeginDrag: (() => void) | undefined) {
+  const { hold, settle } = useStillWhileScrolling();
+  const onDragStart = useCallback(() => {
+    hold();
+    onScrollBeginDrag?.();
+  }, [hold, onScrollBeginDrag]);
+  return useMemo(() => ({ onScrollBeginDrag: onDragStart, hold, settle }), [onDragStart, hold, settle]);
 }
 
 const IOS = Platform.OS === "ios";
