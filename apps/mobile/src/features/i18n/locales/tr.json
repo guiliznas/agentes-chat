@@ -12,7 +12,6 @@
     "channelCount_one": "{{count}} kanal",
     "channelCount_other": "{{count}} kanal",
     "none": "Henüz kategori yok.",
-    "manageHelp": "Yeniden adlandırmak, taşımak veya silmek için bir kategoriye dokunun.",
     "manageHint": "Sıra, adlar ve silme",
     "deleteTitle": "{{name}} silinsin mi?",
     "order": "Listedeki yeri",
@@ -343,6 +342,7 @@
     "replies_other": "{{count}} yanıt",
     "repliesWord_one": "yanıt",
     "repliesWord_other": "yanıt",
+    "dayAt": "{{day}} {{time}}",
     "thread": "İleti dizisi",
     "closed": "kapalı",
     "options": "Seçenekler",
@@ -379,9 +379,7 @@
       "delivered": "{{name}} aldı",
       "held": "{{name}} kararınızdan sonra okuyacak",
       "read": "{{name}} okudu",
-      "resolved": "{{name}} yardım isteğini kapattı",
-      "well": "Notunuzu okudu",
-      "wellNow": "Notunuzu okumak için durdu"
+      "resolved": "{{name}} yardım isteğini kapattı"
     },
     "stopped": {
       "byYou": "Burada durdu",
@@ -564,8 +562,6 @@
     "file": "Dosya",
     "media": "GIF'ler",
     "noCamera": "Kamera erişimi yok. Telefonun Ayarlar bölümünden izin verin.",
-    "mission": "Misyon başlat",
-    "missionHint": "Baştan sona, planlı uzun bir iş",
     "summary": "Sohbeti özetle",
     "summaryHint": "Siz yokken olanlar",
     "remind": "Daha sonra hatırlat",
@@ -802,7 +798,7 @@
   "agentEdit": {
     "missing": "Bu ajan artık yok.",
     "saved": "Değişiklikler kaydedildi",
-    "adminsOnly": "Adı, rolü ve talimatları yalnızca yöneticiler değiştirebilir.",
+    "adminsOnly": "Rolünü ve talimatlarını yalnızca bu ajanı düzenleyebilenler değiştirebilir. Adını yalnızca yöneticiler.",
     "discardTitle": "Değişikliklerden vazgeçilsin mi?",
     "discardText": "Değiştirdikleriniz henüz kaydedilmedi.",
     "discard": "At",
@@ -814,15 +810,14 @@
     "handleMention": "Çağırmak için @{{handle}} yazın.",
     "handleFromName": "Sohbette: @{{handle}}. Ajanın adından gelir. Değiştirebilirsiniz.",
     "handleFromNameEmpty": "Sohbetteki @ adı, ajanın adından gelir.",
-    "reviewLead": "Değiştirmek için bir satıra dokunun.",
     "planHint": "Ya da yapay zeka planınızı bağlayın: {{name}} anahtarı harcamadan onunla düşünür.",
     "partly": "Ajan oluşturuldu ama rolünün getirdiklerinin bir kısmı eklenemedi. Profilinden düzenleyin.",
     "import": {
       "where": {
         "openbotrun": "openbot-import.json (OpenBot Migrator'dan) veya openbot-transfer.json (örnek aktarımından) dosyasını seçin. .zip dosyası önce Dosyalar uygulamasında açılır: bir dokunuş arşivi açar.",
         "openmausbot": "OpenMausBot'ta: ekibe sağ tıklayın › Ekibi paylaş… › Dosyayı kaydet. Sonra o dosyayı burada seçin.",
-        "hermes": "Hermes terminalden dışa aktarır (hermes profile export), telefonun açamadığı bir .tar.gz olarak. Bilgisayardan içe aktarın ya da profilin .md ve .yaml dosyalarını burada seçin.",
-        "openclaw": "OpenClaw ajanları bilgisayardaki ~/.openclaw klasöründe tutar. Bir çalışma alanının .md dosyalarını burada seçin ya da tüm klasörü bilgisayardan içe aktarın.",
+        "hermes": "Hermes terminalden dışa aktarır (`hermes profile export`), telefonun açamadığı bir .tar.gz olarak. Bilgisayardan içe aktarın ya da profilin .md ve .yaml dosyalarını burada seçin.",
+        "openclaw": "OpenClaw ajanları bilgisayardaki `~/.openclaw` klasöründe tutar. Bir çalışma alanının .md dosyalarını burada seçin ya da tüm klasörü bilgisayardan içe aktarın.",
         "paperclip": "Paketin GitHub bağlantısını aşağıya yapıştırın ya da COMPANY.md ve diğer .md dosyalarını seçin.",
         "agenteschat": "Diğer çalışma alanında: Ayarlar › İçe ve dışa aktar › Dosyayı indir. Sonra .json dosyasını burada seçin."
       },
@@ -1117,7 +1112,7 @@
     "agentStyle": "Ajanlar nasıl konuşur",
     "workspaces": "Çalışma alanları",
     "workspacesIn": "Bulunduğunuz yerler",
-    "workspacesFoot": "Her birinde oturumun açık kalır ve hepsinden bildirim alırsın. Açmak için bir çalışma alanına dokun.",
+    "workspacesFoot": "Her birinde oturumun açık kalır ve hepsinden bildirim alırsın.",
     "workspacesUnreachable": "Şu an yanıt yok",
     "addWorkspace": "Çalışma alanı ekle",
     "addWorkspaceCreate": "Yeni bir çalışma alanı oluştur",
@@ -1964,7 +1959,7 @@
       "tooOld": "Bu iPhone iOS {{version}} kullanıyor ve ajanlar iOS 17 veya daha yenisini gerektirir. Mümkünse güncelleyin ya da daha yeni bir iPhone kullanın.",
       "xcodeOld": "Bu iPhone iOS {{version}} kullanıyor, bu {{host}} üzerindeki Xcode'un bildiğinden yeni. Oraya Xcode {{major}} yükleyin, ardından Terminal'de xcrun devicectl manage ddis update komutunu çalıştırın.",
       "teamMissing": "Xcode'da oturum açık ama henüz bir ekip görünmüyor. Xcode'da herhangi bir iOS uygulaması oluşturun, Signing & Capabilities altında ekibinizi seçin ve uygulamayı bu iPhone'da bir kez çalıştırın.",
-      "uiRefused": "Bu iPhone, test yardımcısının dokunuşlarını reddetti. Kilidini açın ve isterse parolanızı girin. Tekrar olursa Ayarlar › Geliştirici › UI Otomasyonunu Etkinleştir seçeneğini kapatıp açın.",
+      "uiRefused": "Ajanlar bu iPhone'un ekranını görüyor ama iOS dokunmalarını reddediyor.",
       "pluggedIn": "Taktım",
       "wifi": {
         "also": "{{host}} Wi-Fi ağında da var: {{name}}",
@@ -2222,7 +2217,6 @@
   },
   "crash": {
     "title": "Bu ekranda bir şeyler ters gitti",
-    "subtitle": "Uygulama bunu gösterirken bir hatayla karşılaştı. Tekrar deneyin.",
     "retry": "Tekrar deneyin"
   },
   "notFound": {
@@ -2251,9 +2245,8 @@
     "deleteIntro": "{{name}} herkes için hemen salt okunur olur ve 7 gün sonra kalıcı olarak silinir.",
     "holdDelete": "Silmek için basılı tutun",
     "deleteFailed": "Çalışma alanı silinemedi. Tekrar deneyin.",
-    "access": {
-      "how": "Düzeyini değiştirmek için bir satıra dokunun: Erişim yok, Okuma, Okuma ve yazma."
-    },
+    "holdReset": "Sıfırlamak için basılı tutun",
+    "resetFailed": "Çalışma alanı sıfırlanamadı. Tekrar deneyin.",
     "logo": {
       "failed": "Logo yüklenemedi",
       "tooBig": "Bu görsel çok büyük. Başka birini deneyin."
@@ -2398,9 +2391,9 @@
       "everyone": "Herkes konuşur",
       "gate": "Yalnızca {{name}} rolüne sahip olanlar ajanlarla konuşmaz.",
       "gateOn": "Ajanlarla konuşmayı aç",
-      "locked": "Bunu yalnızca {{name}} sorumlusu {{owner}} ya da herhangi bir ajanı düzenleyen biri değiştirir.",
-      "locked_female": "Bunu yalnızca {{name}} sorumlusu {{owner}} ya da herhangi bir ajanı düzenleyen biri değiştirir.",
-      "lockedNoOwner": "Bunu yalnızca herhangi bir ajanı düzenleyen biri değiştirir.",
+      "locked": "Bunu yalnızca {{name}} sorumlusu {{owner}} ya da ajanları düzenleyen biri değiştirir.",
+      "locked_female": "Bunu yalnızca {{name}} sorumlusu {{owner}} ya da ajanları düzenleyen biri değiştirir.",
+      "lockedNoOwner": "Bunu yalnızca ajanları düzenleyen biri değiştirir.",
       "none": "Henüz ajan yok.",
       "some": "Yalnızca bazı roller ve kişiler",
       "addPerson": "Kişi ekle",
@@ -2511,7 +2504,7 @@
       "sealedHelp": "Güvenlik için burada kaydedilenler bir daha gösterilmez. Değiştirmek için yeniden yazın.",
       "changePassword": "Şifreyi değiştir",
       "changeValue": "Değeri değiştir",
-      "changeHelp": "Saklamak için Kaydet'e dokunun. Ajanlar bundan sonra yenisini kullanır.",
+      "changeHelp": "Kaydettikten sonra ajanlar yenisini kullanır.",
       "hidden": "Gizli",
       "saved": "Kaydedildi",
       "delete": "Sil",
@@ -2530,7 +2523,7 @@
       "newPassword": "Yeni şifre",
       "keyName": "Değişken",
       "keyNamePlaceholder": "ACME_API_KEY",
-      "keyNameHelp": "Büyük harf, rakam ve _, örneğin ACME_API_KEY. Ajanlar anahtarı bu adla ister.",
+      "keyNameHelp": "Büyük harf, rakam ve _, örneğin `ACME_API_KEY`. Ajanlar anahtarı bu adla ister.",
       "value": "Değer",
       "newValue": "Yeni değer",
       "description": "Açıklama",
@@ -2656,7 +2649,7 @@
     "bySelfUntil": "Yazan: {{name}} · {{when}}"
   },
   "dashboards": {
-    "homeRow": "Yalnızca siz · kendi widget'larınız",
+    "homeRow": "Yalnızca siz",
     "create": "Oluştur",
     "routineTarget": "widget'ı",
     "pin": {
@@ -2738,11 +2731,11 @@
     },
     "drive": {
       "title": "Ekibin ürettiği her şey tek yerde",
-      "text": "Ajanların ve kişilerin raporları, tabloları ve dosyaları burada kalır, kolayca bulunur.",
+      "text": "Ajanların ve kişilerin raporları, tabloları ve dosyaları burada kalır.",
       "viewerTitle": "Ekibin ürettiklerini bulun",
       "viewerText": "Ajanların ve kişilerin sohbetlerde oluşturdukları burada görünür.",
       "titlePersonal": "Ajanlarınızın ürettiği her şey tek yerde",
-      "textPersonal": "Ajanlarınızın raporları, tabloları ve dosyaları burada kalır, kolayca bulunur.",
+      "textPersonal": "Ajanlarınızın raporları, tabloları ve dosyaları burada kalır.",
       "viewerTitlePersonal": "Ajanlarınızın ürettiklerini bulun",
       "viewerTextPersonal": "Ajanların sohbetlerinizde oluşturdukları burada görünür."
     },
@@ -2808,7 +2801,7 @@
       "viewerTextPersonal": "Biri katıldığında burada görünür."
     },
     "chat": {
-      "title": "Her şey bir mesajla başlar",
+      "title": "Sohbeti başlatın",
       "text": "Aşağıya yazın, buradaki herkes görsün.",
       "viewerTitle": "Mesajlar burada görünür",
       "viewerText": "Biri yazınca burada okursunuz."
@@ -2849,8 +2842,8 @@
     "board": {
       "title": "Önemli olanı tek panoda görün",
       "text": "Bir widget ekleyin, bir ajandan isteyin veya sohbetten bir blok sabitleyin.",
-      "viewerTitle": "Bu pano şekilleniyor",
-      "viewerText": "Bu panoyu düzenleyen kişi widget'ları ekler ve burada görünürler."
+      "viewerTitle": "Widget'lar burada görünür",
+      "viewerText": "Bu panoyu düzenleyen kişi ekler."
     },
     "computers": {
       "title": "Ajanlarınıza başka bir bilgisayar verin",
@@ -2859,7 +2852,7 @@
       "viewerText": "Bilgisayarları bağlayan kişi ekler ve burada görünürler."
     },
     "connectors": {
-      "title": "Ajanlarınıza gerçek araçlar verin",
+      "title": "Ajanlarınıza araçlar verin",
       "text": "Bir hizmet bağlayın, orada okumaya ve işlem yapmaya başlasınlar.",
       "viewerTitle": "Ajanlarınızın araçları burada görünür",
       "viewerText": "Bağlayıcıları yöneten kişi aşağıdaki hizmetleri bağlar."
@@ -3012,7 +3005,7 @@
       "done": "Bitti",
       "placeholder": "Metni yazın",
       "titlePlaceholder": "Başlığı yazın",
-      "hint": "Her satır bir paragraftır. Yazdıklarınız siz yazarken dosyaya gider."
+      "hint": "Her satır bir paragraftır."
     },
     "show": {
       "nothing": "Tüm slaytlar gizli, bu yüzden gösterilecek bir şey yok.",

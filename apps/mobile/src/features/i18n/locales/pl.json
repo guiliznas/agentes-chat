@@ -14,7 +14,6 @@
     "channelCount_many": "{{count}} kanałów",
     "channelCount_other": "{{count}} kanału",
     "none": "Nie ma jeszcze kategorii.",
-    "manageHelp": "Stuknij kategorię, aby zmienić jej nazwę, przenieść ją albo usunąć.",
     "manageHint": "Kolejność, nazwy i usuwanie",
     "deleteTitle": "Usunąć {{name}}?",
     "order": "Miejsce na liście",
@@ -369,6 +368,7 @@
     "repliesWord_few": "odpowiedzi",
     "repliesWord_many": "odpowiedzi",
     "repliesWord_other": "odpowiedzi",
+    "dayAt": "{{day}} {{time}}",
     "thread": "Wątek",
     "closed": "zamknięty",
     "options": "Opcje",
@@ -409,9 +409,7 @@
       "delivered": "{{name}} ma to już u siebie",
       "held": "{{name}} przeczyta to po twojej decyzji",
       "read": "Przeczytane przez: {{name}}",
-      "resolved": "{{name}} zamyka prośbę o pomoc",
-      "well": "Przeczytane",
-      "wellNow": "Przerwa na przeczytanie twojej uwagi"
+      "resolved": "{{name}} zamyka prośbę o pomoc"
     },
     "stopped": {
       "byYou": "Zatrzymano tutaj",
@@ -596,8 +594,6 @@
     "file": "Plik",
     "media": "GIF-y",
     "noCamera": "Brak dostępu do aparatu. Zezwól na niego w Ustawieniach telefonu.",
-    "mission": "Rozpocznij misję",
-    "missionHint": "Długa praca, z planem, od początku do końca",
     "summary": "Podsumuj czat",
     "summaryHint": "Co się działo, gdy cię nie było",
     "remind": "Przypomnij mi później",
@@ -850,7 +846,7 @@
   "agentEdit": {
     "missing": "Ten agent już nie istnieje.",
     "saved": "Zmiany zapisane",
-    "adminsOnly": "Tylko administratorzy zmieniają nazwę, rolę i instrukcje.",
+    "adminsOnly": "Rolę i instrukcje zmienia tylko ktoś, kto może edytować tego agenta. Nazwę tylko administratorzy.",
     "discardTitle": "Odrzucić zmiany?",
     "discardText": "Twoje zmiany nie zostały jeszcze zapisane.",
     "discard": "Odrzuć",
@@ -862,15 +858,14 @@
     "handleMention": "Napisz @{{handle}}, aby go zawołać.",
     "handleFromName": "Na czacie: @{{handle}}. Pochodzi z nazwy. Możesz to zmienić.",
     "handleFromNameEmpty": "Jego @ na czacie pochodzi z nazwy.",
-    "reviewLead": "Stuknij wiersz, aby go zmienić.",
     "planHint": "Albo połącz swój plan AI: wtedy {{name}} myśli za jego pomocą, bez zużywania klucza.",
     "partly": "Agent został utworzony, ale część tego, co przynosi jego rola, nie przeszła. Popraw to w jego profilu.",
     "import": {
       "where": {
         "openbotrun": "Wybierz openbot-import.json (z Migratora OpenBot) albo openbot-transfer.json (z przeniesienia instancji). Plik .zip najpierw otwórz w aplikacji Pliki: jedno stuknięcie go rozpakuje.",
         "openmausbot": "W OpenMausBot: kliknij prawym przyciskiem zespół › Udostępnij zespół… › Zapisz plik. Potem wybierz ten plik tutaj.",
-        "hermes": "Hermes eksportuje z terminala (hermes profile export) do pliku .tar.gz, którego telefon nie otworzy. Zaimportuj go na komputerze albo wybierz tutaj pliki .md i .yaml profilu.",
-        "openclaw": "OpenClaw trzyma agentów w folderze ~/.openclaw na komputerze. Wybierz tutaj pliki .md z przestrzeni roboczej albo zaimportuj cały folder na komputerze.",
+        "hermes": "Hermes eksportuje z terminala (`hermes profile export`) do pliku .tar.gz, którego telefon nie otworzy. Zaimportuj go na komputerze albo wybierz tutaj pliki .md i .yaml profilu.",
+        "openclaw": "OpenClaw trzyma agentów w folderze `~/.openclaw` na komputerze. Wybierz tutaj pliki .md z przestrzeni roboczej albo zaimportuj cały folder na komputerze.",
         "paperclip": "Wklej poniżej link GitHub do pakietu albo wybierz jego COMPANY.md i pozostałe pliki .md.",
         "agenteschat": "W drugiej przestrzeni roboczej: Ustawienia › Import i eksport › Pobierz plik. Potem wybierz tutaj plik .json."
       },
@@ -1275,7 +1270,7 @@
     "agentStyle": "Jak mówią agenci",
     "workspaces": "Przestrzenie robocze",
     "workspacesIn": "Należysz do",
-    "workspacesFoot": "Pozostajesz zalogowany w każdym i dostajesz powiadomienia ze wszystkich. Stuknij workspace, aby go otworzyć.",
+    "workspacesFoot": "Pozostajesz zalogowany w każdym i dostajesz powiadomienia ze wszystkich.",
     "workspacesUnreachable": "Na razie brak odpowiedzi",
     "addWorkspace": "Dodaj workspace",
     "addWorkspaceCreate": "Utwórz nowy workspace",
@@ -2164,7 +2159,7 @@
       "tooOld": "Ten iPhone ma iOS {{version}}, a agenci potrzebują iOS 17 lub nowszego. Zaktualizuj go, jeśli się da, albo użyj nowszego iPhone'a.",
       "xcodeOld": "Ten iPhone ma iOS {{version}}, nowszy niż zna Xcode na {{host}}. Zainstaluj tam Xcode {{major}}, a potem uruchom xcrun devicectl manage ddis update w Terminalu.",
       "teamMissing": "Xcode jest zalogowany, ale nie pokazuje jeszcze zespołu. W Xcode utwórz dowolną aplikację iOS, wybierz swój zespół w Signing & Capabilities i uruchom ją raz na tym iPhonie.",
-      "uiRefused": "Ten iPhone odrzucił stuknięcia pomocnika testowego. Odblokuj go i wpisz kod, jeśli poprosi. Jeśli to się powtarza, wyłącz i włącz Ustawienia › Deweloper › Włącz automatyzację UI.",
+      "uiRefused": "Agenci widzą ekran tego iPhone'a, ale iOS odrzuca ich stuknięcia.",
       "pluggedIn": "Jest podłączony",
       "wifi": {
         "also": "Też w sieci Wi-Fi komputera {{host}}: {{name}}",
@@ -2434,7 +2429,6 @@
   },
   "crash": {
     "title": "Coś poszło nie tak na tym ekranie",
-    "subtitle": "Aplikacja napotkała błąd przy wyświetlaniu tego widoku. Spróbuj ponownie.",
     "retry": "Spróbuj ponownie"
   },
   "notFound": {
@@ -2463,9 +2457,8 @@
     "deleteIntro": "{{name}} od razu staje się dla wszystkich tylko do odczytu, a po 7 dniach zostaje trwale usunięta.",
     "holdDelete": "Przytrzymaj, aby usunąć",
     "deleteFailed": "Nie udało się usunąć przestrzeni roboczej. Spróbuj ponownie.",
-    "access": {
-      "how": "Stuknij wiersz, aby zmienić poziom: Brak dostępu, Odczyt, Odczyt i zapis."
-    },
+    "holdReset": "Przytrzymaj, aby zresetować",
+    "resetFailed": "Nie udało się zresetować przestrzeni roboczej. Spróbuj ponownie.",
     "logo": {
       "failed": "Nie udało się wgrać logo",
       "tooBig": "Ten obraz jest za duży. Spróbuj innego."
@@ -2620,9 +2613,9 @@
       "everyone": "Rozmawiają wszyscy",
       "gate": "Kto ma tylko {{name}}, nie rozmawia z agentami.",
       "gateOn": "Włącz Rozmowę z agentami",
-      "locked": "Zmienić to może tylko {{owner}}, osoba odpowiedzialna za {{name}}, albo ktoś, kto edytuje każdego agenta.",
-      "locked_female": "Zmienić to może tylko {{owner}}, osoba odpowiedzialna za {{name}}, albo ktoś, kto edytuje każdego agenta.",
-      "lockedNoOwner": "Zmienić to może tylko ktoś, kto edytuje każdego agenta.",
+      "locked": "Zmienić to może tylko {{owner}}, osoba odpowiedzialna za {{name}}, albo ktoś, kto edytuje agentów.",
+      "locked_female": "Zmienić to może tylko {{owner}}, osoba odpowiedzialna za {{name}}, albo ktoś, kto edytuje agentów.",
+      "lockedNoOwner": "Zmienić to może tylko ktoś, kto edytuje agentów.",
       "none": "Nie ma jeszcze agentów.",
       "some": "Tylko niektóre role i osoby",
       "addPerson": "Dodaj osobę",
@@ -2739,7 +2732,7 @@
       "sealedHelp": "Ze względów bezpieczeństwa to, co tu zapisano, nie jest już pokazywane. Aby to zmienić, wpisz ponownie.",
       "changePassword": "Zmień hasło",
       "changeValue": "Zmień wartość",
-      "changeHelp": "Stuknij Zapisz, aby to zachować. Od tej chwili agenci używają nowej wartości.",
+      "changeHelp": "Agenci używają nowej wartości, gdy ją zapiszesz.",
       "hidden": "Ukryte",
       "saved": "Zapisano",
       "delete": "Usuń",
@@ -2758,7 +2751,7 @@
       "newPassword": "Nowe hasło",
       "keyName": "Zmienna",
       "keyNamePlaceholder": "ACME_API_KEY",
-      "keyNameHelp": "Wielkie litery, cyfry i _, na przykład ACME_API_KEY. Agenci proszą o klucz pod tą nazwą.",
+      "keyNameHelp": "Wielkie litery, cyfry i _, na przykład `ACME_API_KEY`. Agenci proszą o klucz pod tą nazwą.",
       "value": "Wartość",
       "newValue": "Nowa wartość",
       "description": "Opis",
@@ -2892,7 +2885,7 @@
     "bySelfUntil": "Ustawione przez: {{name}} · {{when}}"
   },
   "dashboards": {
-    "homeRow": "Tylko ty · twoje własne widżety",
+    "homeRow": "Tylko ty",
     "create": "Utwórz",
     "routineTarget": "jego widżet",
     "pin": {
@@ -2980,11 +2973,11 @@
     },
     "drive": {
       "title": "Wszystko, co tworzy zespół, w jednym miejscu",
-      "text": "Raporty, tabele i pliki agentów i osób zostają tutaj, łatwe do znalezienia.",
+      "text": "Raporty, tabele i pliki agentów i osób zostają tutaj.",
       "viewerTitle": "Znajdź to, co tworzy zespół",
       "viewerText": "Tutaj pojawia się to, co agenci i osoby tworzą na czatach.",
       "titlePersonal": "Wszystko, co tworzą twoi agenci, w jednym miejscu",
-      "textPersonal": "Raporty, tabele i pliki twoich agentów zostają tutaj, łatwe do znalezienia.",
+      "textPersonal": "Raporty, tabele i pliki twoich agentów zostają tutaj.",
       "viewerTitlePersonal": "Znajdź to, co tworzą twoi agenci",
       "viewerTextPersonal": "To, co agenci tworzą w twoich rozmowach, pojawia się tutaj."
     },
@@ -3050,7 +3043,7 @@
       "viewerTextPersonal": "Gdy ktoś dołączy, pojawi się tutaj."
     },
     "chat": {
-      "title": "Wszystko zaczyna się od wiadomości",
+      "title": "Rozpocznij rozmowę",
       "text": "Napisz poniżej, a wszyscy tutaj to zobaczą.",
       "viewerTitle": "Tutaj pojawiają się wiadomości",
       "viewerText": "Gdy ktoś napisze, przeczytasz to tutaj."
@@ -3091,8 +3084,8 @@
     "board": {
       "title": "Zobacz to, co ważne, na jednym panelu",
       "text": "Dodaj widżet, poproś o niego agenta albo przypnij blok z czatu.",
-      "viewerTitle": "Ten panel nabiera kształtu",
-      "viewerText": "Osoba edytująca ten panel doda widżety, a one pojawią się tutaj."
+      "viewerTitle": "Widżety pojawią się tutaj",
+      "viewerText": "Dodaje je osoba edytująca ten panel."
     },
     "computers": {
       "title": "Daj agentom kolejny komputer",
@@ -3101,7 +3094,7 @@
       "viewerText": "Osoba łącząca komputery doda je, a one pojawią się tutaj."
     },
     "connectors": {
-      "title": "Daj agentom prawdziwe narzędzia",
+      "title": "Daj agentom narzędzia",
       "text": "Połącz usługę, a zaczną w niej czytać i działać.",
       "viewerTitle": "Tutaj pojawiają się narzędzia agentów",
       "viewerText": "Osoba zarządzająca konektorami połączy usługi poniżej."
@@ -3276,7 +3269,7 @@
       "done": "Gotowe",
       "placeholder": "Wpisz tekst",
       "titlePlaceholder": "Wpisz tytuł",
-      "hint": "Każdy wiersz to akapit. To, co wpisujesz, trafia do pliku na bieżąco."
+      "hint": "Każdy wiersz to akapit."
     },
     "show": {
       "nothing": "Wszystkie slajdy są ukryte, więc nie ma czego pokazać.",

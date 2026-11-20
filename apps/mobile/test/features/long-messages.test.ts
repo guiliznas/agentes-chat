@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { chatScreenSource } from "./chat-screen-source";
 
 const src = (file: string) => readFileSync(join(import.meta.dir, "../../src", file), "utf8");
 
@@ -17,18 +18,25 @@ describe("long messages on the phone", () => {
     // The screen keeps which are open (its list unmounts rows off screen), and opening one stops it following the end.
     expect(clip).toContain("const open = fullMessages || tapped || Boolean(screen?.has(id));");
     expect(clip).toContain("screen?.open(id);");
-    const screen = src("features/chat/ChatScreen.tsx");
+    const screen = chatScreenSource();
     expect(screen).toContain("<OpenedMessagesContext.Provider value={openedMessages}>");
     expect(screen).toMatch(
       /open: \(id\) => \{\s*setOpened\(\(s\) => new Set\(s\)\.add\(id\)\);\s*if \(atEndRef\.current\) setReadHold\(true\);/,
     );
-    // It grows down from the fold, at once with Reduce Motion, and the reader's screen reader goes to the words.
-    expect(clip).toContain("layout={tapped && !reduced ? REVEAL : undefined}");
+    // It opens at once, never with a layout transition: inside the list an animated height left the words' frame at
+    // the fold under a bubble already as tall as the whole words. The reader's screen reader goes to the words.
+    expect(clip).not.toContain("layout=");
+    expect(clip).not.toContain("<Animated.View");
     expect(clip).toContain('AccessibilityInfo.sendAccessibilityEvent(words.current, "focus")');
     // A fade, never an ellipsis: no line count cuts the words.
     expect(clip).not.toContain("numberOfLines");
     const row = src("features/chat/MessageRow.tsx");
     expect(row.match(/<ClippedMessage /g)?.length).toBe(2);
+    // Opened, its row mounts again at its whole height, no entrance played again: grown in place, the bubble's frame
+    // stayed taller than its words, an empty block under the last line.
+    expect(row).toContain("const opened = useContext(OpenedMessagesContext)?.has(props.message.id) === true;");
+    expect(row).toContain('<LayoutAnimationConfig key={opened ? "opened" : "row"} skipEntering>');
+    expect(clip).toContain("focusOnOpen = id;");
   });
 
   test("an agent's long message to another agent opens in place too: no push to its thread", () => {
@@ -60,7 +68,7 @@ describe("long messages on the phone", () => {
     const row = src("features/chat/MessageRow.tsx");
     expect(row).toContain("{sendFailureText(t, m.sendFailure, i18n.language)}");
     expect(row).toContain('t(sendNeedsEdit(m.sendFailure) ? "channel.editSend" : "channel.retrySend")');
-    const screen = src("features/chat/ChatScreen.tsx");
+    const screen = chatScreenSource();
     expect(screen).toContain('if (!waits) toast({ title: errorText(t, error, i18n.language), icon: "x" });');
     expect(screen).toMatch(/else if \(sendNeedsEdit\(m\.sendFailure\)\) \{[\s\S]*?setCaptionBack\(\{ text: m\.body/);
     // The row leaves the list, so its text must reach the field even when something is being typed there.
@@ -74,6 +82,6 @@ describe("long messages on the phone", () => {
     expect(composer).toContain("if ((!value && !sendEmpty) || tooLong) return;");
     expect(composer).toContain("{tooLongText(t, i18n.language, text.trim().length)}");
     expect(composer).toContain('t("channel.tooLong.asFile")');
-    expect(src("features/chat/ChatScreen.tsx")).toContain('new File(dir, t("channel.tooLong.fileName"))');
+    expect(chatScreenSource()).toContain('new File(dir, t("channel.tooLong.fileName"))');
   });
 });

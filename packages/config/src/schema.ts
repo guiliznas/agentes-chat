@@ -394,6 +394,28 @@ export const envVars = {
       "Jev model for judgments over images (an agent finding a target on a screenshot of its browser or desktop). Needs a release that takes images.",
     section: "Agents",
   },
+  SCREEN_JUDGMENTS: {
+    schema: z.enum(["full", "small", "shadow"]).default("full"),
+    description:
+      "What an agent's screen checks and finds send the judge. `full` (default): the whole page, up to 60k characters. `small`: what matters of a long page (its top, what changed, the lines with the check's words), and no judgment when the quoted words a check names are on the screen. `shadow`: both at once; `full` decides, `small` is only compared, and each judgment writes a `screen judgment shadow` log line (a warning when they disagree) with both decisions and sizes, never the page's text. `shadow` asks the judge twice. Applies to `SCREEN_JUDGMENTS_ORGS`.",
+    section: "Agents",
+  },
+  SCREEN_JUDGMENTS_ORGS: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.uuid()).optional()),
+    description:
+      "The organization ids (separated by commas) that get `SCREEN_JUDGMENTS`; every other organization gets `full`. Unset (default): every organization gets it.",
+    section: "Agents",
+    example: "00000000-0000-4000-8000-000000000000",
+  },
   OPENAI_CHEAP_MODEL: {
     schema: modelId.default("gpt-6-luna"),
     description:
@@ -414,6 +436,12 @@ export const envVars = {
   AGENT_MAX_OUTPUT_TOKENS: {
     schema: z.coerce.number().int().min(256).max(128_000).default(16_000),
     description: "Upper bound on tokens an agent may generate in one reply.",
+    section: "Agents",
+  },
+  CLAUDE_PLAN_CONCURRENCY: {
+    schema: z.coerce.number().int().min(0).max(50).default(6),
+    description:
+      "How many agent runs one Claude plan sign-in (a subscription, never an API key) works on at once. Past it, the next run waits in line like any other and starts as soon as one ends. 0 turns the limit off.",
     section: "Agents",
   },
   AGENT_MAX_TOOL_TURNS: {
@@ -1284,6 +1312,12 @@ export const envVars = {
   TELEMETRY_URL: {
     schema: z.url().default("https://telemetry.agentes.chat/v1/report"),
     description: "Where the usage report is sent (the report as JSON in a POST).",
+    section: "Usage report",
+  },
+  PROBLEM_REPORT_URL: {
+    schema: z.union([z.literal("off"), z.url()]).default("https://telemetry.agentes.chat/v1/problem-report"),
+    description:
+      "Where Send a report sends a report someone chose to send after seeing it in full (versions, which settings are set, what failed, recent log lines; never messages, pages, names or keys). Sent even with `TELEMETRY=off`, since a person clicked Send. `off`: the button only copies the report.",
     section: "Usage report",
   },
   INSTALL_MODE: {

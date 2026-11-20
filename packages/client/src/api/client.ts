@@ -144,6 +144,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  DriveFolder,
   EmailChange,
   EndpointCheck,
   EndpointModel,
@@ -181,6 +182,7 @@ import type {
   InviteLinkChanged,
   InviteLinkChoices,
   InviteLinkMade,
+  IphoneRepairView,
   Issue,
   IssueActivity,
   IssueColumn,
@@ -268,6 +270,9 @@ import type {
   PlanServes,
   Poll,
   PostMedia,
+  ProblemReportPreview,
+  ProblemReportPreviewInput,
+  ProblemReportSendInput,
   Proposal,
   PushDeviceInput,
   ReactionCount,
@@ -395,6 +400,10 @@ export interface ApiClient {
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
+    /** A problem report to show in full before it's sent (self-hosted servers; 404 on agentes.chat itself). */
+    previewProblemReport(input: ProblemReportPreviewInput): Promise<ProblemReportPreview>;
+    /** Sends the previewed report, with the person's note and reply address: answers its code (`R-7K3QXM`). */
+    sendProblemReport(input: ProblemReportSendInput): Promise<{ id: string }>;
     /** By email to whoever runs the server; only where it takes feedback (`AuthConfig.feedback`). */
     sendFeedback(input: FeedbackInput): Promise<void>;
     /** A picture or a video for the feedback being written: kept an hour unless it is sent. */
@@ -582,6 +591,13 @@ export interface ApiClient {
     deleteWorkspace(orgId: string, input?: DeletionProofInput): Promise<{ dueAt: string }>;
     /** Owners, before its date: it opens again. `org.not_restorable` (409) once the date passed. */
     restore(orgId: string): Promise<void>;
+    /** Owners: emails me the code that resetting this workspace takes (a deletion's code doesn't). */
+    resetCode(orgId: string): Promise<CodeSent>;
+    /**
+     * Owners: erases everything made in the workspace and starts it over, keeping its people, plan, AI accounts and
+     * computers; its apps hear `org.reset` once done. Proof as `deleteWorkspace`'s; 429 after 3 resets of it in a day.
+     */
+    reset(orgId: string, input?: DeletionProofInput): Promise<{ startedAt: string }>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
@@ -1020,7 +1036,7 @@ export interface ApiClient {
     messages(
       orgId: string,
       channelId: string,
-      options?: { threadId?: string; before?: string; limit?: number },
+      options?: { threadId?: string; before?: string; after?: string; around?: string; limit?: number },
     ): Promise<Message[]>;
     post(
       orgId: string,
@@ -1230,6 +1246,8 @@ export interface ApiClient {
     cancelXcodeFix(orgId: string, machineId: string): Promise<XcodeFixView>;
     /** Opens Xcode on the Mac (its owner or an admin): it shows Developer Mode on a plugged iPhone. */
     openXcode(orgId: string, machineId: string): Promise<{ opened: boolean }>;
+    /** Repairs a real iPhone's test helper on its Mac (the Mac's owner or an admin): stopped, rebuilt and checked. */
+    repairIphone(orgId: string, phoneId: string): Promise<IphoneRepairView>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {
@@ -1898,13 +1916,13 @@ export interface ApiClient {
     ): string;
     create(
       orgId: string,
-      input: { title: string; channelId?: string | null; content: ArtifactContent },
+      input: { title: string; channelId?: string | null; folderId?: string | null; content: ArtifactContent },
     ): Promise<ArtifactDetail>;
     /** Uploads a file as is (multipart, ≤ 50 MB) to the Drive or to a channel. */
     upload(
       orgId: string,
       file: File,
-      options?: { title?: string; channelId?: string | null; threadId?: string | null },
+      options?: { title?: string; channelId?: string | null; threadId?: string | null; folderId?: string | null },
     ): Promise<ArtifactDetail>;
     /** A new version of an uploaded file (multipart, ≤ 50 MB). */
     uploadVersion(orgId: string, id: string, file: File, options?: { note?: string }): Promise<ArtifactDetail>;
@@ -1924,6 +1942,17 @@ export interface ApiClient {
     ): Promise<Artifact>;
     /** To the trash for 30 days (403 `artifact.delete_forbidden`). */
     remove(orgId: string, id: string): Promise<void>;
+    /** A Drive file's new name (no new version). */
+    rename(orgId: string, id: string, title: string): Promise<Artifact>;
+    /** Puts Drive files in a folder (null: the top level). Who sees them doesn't change. */
+    move(orgId: string, ids: string[], folderId: string | null): Promise<{ moved: number }>;
+    /** Every Drive folder of the workspace. */
+    folders(orgId: string): Promise<DriveFolder[]>;
+    createFolder(orgId: string, input: { name: string; parentId?: string | null }): Promise<DriveFolder>;
+    /** Rename, or move (`parentId`, null: the top level); 400 `drive.folder_into_itself`. */
+    updateFolder(orgId: string, id: string, patch: { name?: string; parentId?: string | null }): Promise<DriveFolder>;
+    /** The folder and its folders go; my files in them to the trash, the rest move up (`kept`). */
+    deleteFolder(orgId: string, id: string): Promise<{ trashed: number; kept: number }>;
     trash(orgId: string): Promise<TrashedArtifact[]>;
     /** Back from the trash (409 `artifact.purged` after 30 days). */
     restore(orgId: string, id: string): Promise<ArtifactDetail | undefined>;

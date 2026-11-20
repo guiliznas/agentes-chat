@@ -1,5 +1,5 @@
 import { keys, useChannels, useMuteChannel } from "@agenteschat/client";
-import { canTalk } from "@agenteschat/client/lib/audience";
+import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { WORKING_POLL_MS } from "@agenteschat/client/lib/working";
@@ -123,6 +123,8 @@ function Home() {
   const active = useActiveWork();
   const waiting = useWaitingItems();
   const { collapsed, toggle } = useCollapsedSections();
+  // The widgets' section is memoized: its toggle stays one function.
+  const toggleWidgets = useCallback(() => toggle("widgets"), [toggle]);
   // An administrator reads every channel (ADR 0151): the ones they aren't in wait at the end of the home.
   const others = (useChannels(orgId).data ?? []).filter((c) => c.seenAsAdmin);
   const menus = useRowMenus();
@@ -144,10 +146,13 @@ function Home() {
   const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
   const { hidden } = useHiddenAgents();
   // An agent waiting for its offline computer isn't working (its run only waits), and the count matches Agentes,
-  // which it opens: my lists can leave some agents out.
+  // which it opens: my lists can leave some agents out (`listsAgent`; one I only edit is in them, its DM isn't).
   const working = workByAgent(work)
     .map((w) => w.agentId)
-    .filter((id) => dir.agentById.has(id) && !hidden.has(id) && !offline.has(id));
+    .filter((id) => {
+      const a = dir.agentById.get(id);
+      return a !== undefined && listsAgent(org, a) && !offline.has(id);
+    });
   const finished = useFinished(active, list.rows);
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
   const openDm = useOpenDm();
@@ -156,6 +161,8 @@ function Home() {
   // outside its audience, none.
   const rightHand = rightHandOf(dir.agents);
   const pinned = rightHandPin(list.rows, rightHand && canTalk(rightHand) ? rightHand : undefined);
+  // The team's agents never talked to, as ones to start (a pinned one stands on the strip): only those whose DM the
+  // server opens for me (`agentStarters`), never one I only edit.
   const starters = useMemo(
     () =>
       agentStarters(
@@ -181,8 +188,10 @@ function Home() {
     PEEK && !(ACCESSORY && along) && !list.loading && !failed
       ? teamPeekers(rightHand && canTalk(rightHand) ? rightHand.id : null, recent, hidden).join(" ")
       : "";
-  // Agents already in the team (in Agentes, a pinned one on the strip) leave out the invitation to make the first one.
-  const empty = !list.loading && !failed && pinned.rows.length === 0 && starters.length === 0;
+  // Agents already in the team (in Agentes, a pinned one on the strip) leave out the invitation to make the first one:
+  // every one the Agents tab lists (`listsAgent`), those I only edit included, though none of them is one to start.
+  const teamListed = dir.agents.some((a) => !isRightHand(a) && listsAgent(org, a));
+  const empty = !list.loading && !failed && pinned.rows.length === 0 && !teamListed;
 
   // The first Conversas after the splash arrives as one gesture (once per launch, never holding a tap back): the sky
   // comes up from the splash's, the greeting rises, the right hand's field follows and its face wakes with a small
@@ -263,7 +272,7 @@ function Home() {
       ) : (
         <>
           {/* Início's widgets, and the way to Dashboards ("See all"), not a tab (ADR 0135 §15). */}
-          <HomeWidgets collapsed={collapsed.includes("widgets")} onToggle={() => toggle("widgets")} />
+          <HomeWidgets collapsed={collapsed.includes("widgets")} onToggle={toggleWidgets} />
           <PinnedStrip
             items={strip}
             collapsed={collapsed.includes("pinned")}
@@ -298,7 +307,7 @@ function Home() {
                   facts={factsOf(r, agentStates.get(r.key))}
                   divider={i > 0}
                   live={!collapsed.includes("recent") && live++ < LIVE_ROWS}
-                  pinLabel={menus.rowActionsOf(r).find((a) => a.key === "pin")?.label ?? null}
+                  pinLabel={menus.pinLabelOf(r)}
                   onHold={menus.openRowMenu}
                   holdLabel={holdLabel}
                   holdActions={menus.rowActionsOf}

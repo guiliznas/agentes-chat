@@ -235,6 +235,8 @@ export interface ArtifactView {
   inDrive: boolean;
   /** Who sees it past its conversation (ADR 0157). */
   sharing: FileSharing;
+  /** The Drive folder it is in; null = the Drive's top level. */
+  folderId: string | null;
 }
 
 /**
@@ -1037,6 +1039,7 @@ function view(a: ArtifactRow, canEdit: boolean): ArtifactView {
     untrusted: a.untrusted,
     inDrive: a.inDrive,
     sharing: sharingOf(a),
+    folderId: a.folderId,
   };
 }
 
@@ -1143,7 +1146,7 @@ async function placeNew(
   db: Database,
   actor: ArtifactActor,
   orgId: string,
-  input: { title: string; channelId?: string | null; threadId?: string | null },
+  input: { title: string; channelId?: string | null; threadId?: string | null; folderId?: string | null },
 ) {
   const membership = await requireMember(db, actor, orgId);
   if (membership && !can(membership, "upload_files")) throw new ForbiddenError();
@@ -1154,7 +1157,20 @@ async function placeNew(
   if (channelId && actor.type === "person" && !(await readsWhereItLives(db, actor.userId, orgId, channelId))) {
     throw new NotFoundError("Channel not found");
   }
-  return { title, channelId, threadId };
+  const folderId = input.folderId ? await folderInOrg(db, orgId, input.folderId) : null;
+  return { title, channelId, threadId, folderId };
+}
+
+/** A folder id of this workspace, or "not found". */
+async function folderInOrg(db: Database, orgId: string, folderId: string) {
+  const [f] = UUID.test(folderId)
+    ? await db
+        .select({ id: schema.driveFolders.id })
+        .from(schema.driveFolders)
+        .where(and(eq(schema.driveFolders.orgId, orgId), eq(schema.driveFolders.id, folderId)))
+    : [];
+  if (!f) throw new NotFoundError("Folder not found");
+  return f.id;
 }
 
 /**
@@ -1167,7 +1183,7 @@ async function placeFile(
   db: Database,
   actor: ArtifactActor,
   orgId: string,
-  input: { title: string; channelId?: string | null; threadId?: string | null },
+  input: { title: string; channelId?: string | null; threadId?: string | null; folderId?: string | null },
 ) {
   const place = await placeNew(db, actor, orgId, input);
   if (actor.type !== "agent" || !actor.runId) return place;
@@ -1193,6 +1209,7 @@ async function insertArtifact(
     title: string;
     channelId: string | null;
     threadId: string | null;
+    folderId?: string | null;
     untrusted: boolean;
     /** False for what lives only in its conversation (ADR 0113): out of the Drive and of search. */
     inDrive?: boolean;
@@ -1227,6 +1244,7 @@ async function insertArtifact(
         title: input.title,
         channelId: input.channelId,
         threadId: input.threadId,
+        folderId: input.folderId ?? null,
         untrusted: input.untrusted,
         inDrive: input.inDrive ?? true,
         excerpt: input.excerpt,
@@ -1364,6 +1382,7 @@ export async function createArtifact(
     content: unknown;
     channelId?: string | null;
     threadId?: string | null;
+    folderId?: string | null;
     /** Version 1's note (where it came from, ADR 0198). */
     note?: string | null;
   },
@@ -1391,7 +1410,14 @@ async function createDocument(
   deps: ArtifactDeps,
   actor: ArtifactActor,
   orgId: string,
-  input: { title: string; markdown: string; channelId?: string | null; threadId?: string | null; note?: string | null },
+  input: {
+    title: string;
+    markdown: string;
+    channelId?: string | null;
+    threadId?: string | null;
+    folderId?: string | null;
+    note?: string | null;
+  },
 ): Promise<ArtifactDetailView> {
   const doc = documentFromMarkdown(input.markdown, originOfActor(actor));
   try {
@@ -1404,6 +1430,7 @@ async function createDocument(
       title: input.title,
       channelId: input.channelId,
       threadId: input.threadId,
+      folderId: input.folderId,
       doc,
       note: input.note ?? null,
     });
@@ -1520,6 +1547,7 @@ export async function createFileArtifact(
     contentType?: string | null;
     channelId?: string | null;
     threadId?: string | null;
+    folderId?: string | null;
     note?: string | null;
     author?: ArtifactAuthor;
     /** What a tool brought back for the agent to work on, not saved for anyone: it stays in the run's conversation. */
@@ -2000,6 +2028,8 @@ export interface ArtifactFilters {
   since?: Date;
   /** Agents: also the conversations this person shares with the agent (see `requesterSharedChannels`). */
   requesterUserId?: string | null;
+  /** In this Drive folder; null = at the Drive's top level; absent = anywhere. */
+  folderId?: string | null;
 }
 
 export type ArtifactSort = "recent" | "name" | "kind";
@@ -2056,6 +2086,11 @@ async function artifactScope(db: Database, actor: ArtifactActor, orgId: string, 
       ownRoom,
       widened,
     ),
+    filters.folderId === null
+      ? isNull(artifacts.folderId)
+      : filters.folderId
+        ? eq(artifacts.folderId, filters.folderId)
+        : undefined,
     filters.channelId ? eq(artifacts.channelId, filters.channelId) : undefined,
     filters.channelIds?.length ? inArray(artifacts.channelId, filters.channelIds) : undefined,
     filters.since ? gte(artifacts.updatedAt, filters.since) : undefined,
@@ -2680,6 +2715,92 @@ export async function setFileSharing(
     await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: a.channelId, artifact });
   }
   // Who sees it changed: the Drive lists, and the open pages of a file of the Drive itself, read it again.
+  await publishListChanged(deps.pubsub, orgId, "artifacts");
+  return artifact;
+}
+
+/**
+ * Who may arrange a file in the Drive (a folder, its name): a person who reads it and adds to the Drive, an agent where
+ * it may change the file (`writable`). Only Drive files: what lives in a conversation has no place in a folder.
+ */
+async function arrangeable(deps: ArtifactDeps, actor: ArtifactActor, orgId: string, id: string) {
+  const a = await writable(deps, actor, orgId, id);
+  if (actor.type === "person" && !(await addsToDrive(deps.db, orgId, actor.userId))) throw new ForbiddenError();
+  if (!a.inDrive) throw new ValidationError(`a ${a.kind} lives in its conversation`, "artifact.not_in_drive");
+  return a;
+}
+
+/** Puts files in a Drive folder (null: the top level). A folder never changes who sees a file. Returns how many moved. */
+export async function moveArtifacts(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  ids: string[],
+  folderId: string | null,
+) {
+  const target = folderId ? await folderInOrg(deps.db, orgId, folderId) : null;
+  const files = [];
+  for (const id of new Set(ids)) files.push(await arrangeable(deps, actor, orgId, id));
+  const moving = files.filter((a) => a.folderId !== target);
+  if (moving.length === 0) return 0;
+  await deps.db.transaction(async (tx) => {
+    await tx
+      .update(artifacts)
+      .set({ folderId: target })
+      .where(
+        and(
+          eq(artifacts.orgId, orgId),
+          inArray(
+            artifacts.id,
+            moving.map((a) => a.id),
+          ),
+        ),
+      );
+    await recordAudit(tx, {
+      orgId,
+      actor: authorOf(actor),
+      action: "artifact.moved_to_folder",
+      target: { type: "drive_folder", id: target },
+      details: { artifactIds: moving.map((a) => a.id) },
+    });
+  });
+  await publishListChanged(deps.pubsub, orgId, "artifacts");
+  return moving.length;
+}
+
+/** Renames a Drive file: its title only, no new version. */
+export async function renameArtifact(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  artifactId: string,
+  rawTitle: string,
+): Promise<ArtifactView> {
+  const a = await arrangeable(deps, actor, orgId, artifactId);
+  const title = rawTitle.trim().slice(0, ARTIFACT_LIMITS.titleChars);
+  if (!title) throw new ValidationError("title is required");
+  if (title === a.title) return view(a, editableKind(a.kind));
+  const row = await deps.db.transaction(async (tx) => {
+    const [saved] = await tx
+      .update(artifacts)
+      .set({ title })
+      .where(and(eq(artifacts.id, a.id), eq(artifacts.orgId, orgId)))
+      .returning();
+    if (!saved) throw new NotFoundError("Artifact not found");
+    await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });
+    await recordAudit(tx, {
+      orgId,
+      actor: authorOf(actor),
+      action: "artifact.renamed",
+      target: { type: "artifact", id: a.id },
+      details: { from: a.title, title },
+    });
+    return saved;
+  });
+  const artifact = view(row, editableKind(row.kind));
+  if (row.channelId) {
+    await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: row.channelId, artifact });
+  }
   await publishListChanged(deps.pubsub, orgId, "artifacts");
   return artifact;
 }
@@ -3389,6 +3510,7 @@ export async function insertLiveArtifact(
     title: string;
     channelId?: string | null;
     threadId?: string | null;
+    folderId?: string | null;
     doc: Y.Doc;
     note?: string | null;
     /** A live file of this workspace whose pictures the new one takes (its copy). */

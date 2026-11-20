@@ -15,14 +15,14 @@ import {
   useBrowserHandoffActions,
 } from "@agenteschat/client";
 import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
+import { managesAgent } from "@agenteschat/client/lib/audience";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can } from "@agenteschat/client/lib/permissions";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { type AgentColorName, bodyTones } from "@agenteschat/ui/agent/engine";
 import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import * as Clipboard from "expo-clipboard";
-import { Stack } from "expo-router";
+import { Stack, useIsFocused } from "expo-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Keyboard, type LayoutChangeEvent, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -970,22 +970,30 @@ function Trackpad({
     demo.value = l;
     ghost.value = { x: l.cursorX, y: l.cursorY, scale: l.cursorScale };
   }, false);
+  // The lesson is due until the first touch (read once, with the pad), and runs only while the screen shows: a screen
+  // pushed over it stops it, and it starts again when it comes back.
+  const focused = useIsFocused();
+  const [due, setDue] = useState(false);
+  const over = useRef(false);
   const lessonOver = () => {
-    lesson.setActive(false);
+    over.current = true;
+    setDue(false);
     void writeValue(STORED.trackpadTaught, "1");
   };
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the lesson starts once, with the pad
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the lesson is read once, with the pad
   useEffect(() => {
     let alive = true;
     void readValue(STORED.trackpadTaught).then((v) => {
-      if (alive && v !== "1" && !reduced) lesson.setActive(true);
+      if (alive && !over.current && v !== "1" && !reduced) setDue(true);
     });
     return () => {
       alive = false;
-      lesson.setActive(false);
       ghost.value = GHOST_REST;
     };
   }, []);
+  useEffect(() => {
+    lesson.setActive(due && focused);
+  }, [lesson, due, focused]);
 
   const touch = (px: number, py: number) => {
     "worklet";
@@ -1459,12 +1467,13 @@ function Watching({
     api.chat.post(orgId, channelId, { body: body.trim(), ...steer }).catch(failed);
   };
   const atWork = run !== null && (run.status === "thinking" || run.status === "queued" || run.status === "running");
-  // Who may stop it here: its owner and who manages agents (the conversation's own rule also lets its asker).
+  // Who may stop it here: its owner and who manages it (the server's `canManage`; the conversation's own rule also
+  // lets its asker).
   const mayStop =
     run !== null &&
     mayStopRun(run, {
       meId,
-      manageAgents: can(org, "manage_agents"),
+      manageAgents: managesAgent(dir.agentById.get(agentId)),
       agentOwnerId: dir.agentById.get(agentId)?.ownerUserId,
       messages: [],
     });

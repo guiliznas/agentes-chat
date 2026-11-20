@@ -11,7 +11,6 @@
     "endOfList": "对所有人移到列表末尾。",
     "channelCount_other": "{{count}} 个频道",
     "none": "还没有分类。",
-    "manageHelp": "点按分类可重命名、移动或删除。",
     "manageHint": "排序、名称和删除",
     "deleteTitle": "删除 {{name}}？",
     "order": "在列表中的位置",
@@ -330,6 +329,7 @@
     "startedWith": "始于与 {{name}} 的对话",
     "replies_other": "{{count}} 条回复",
     "repliesWord_other": "回复",
+    "dayAt": "{{day}} {{time}}",
     "thread": "话题",
     "closed": "已关闭",
     "options": "选项",
@@ -364,9 +364,7 @@
       "delivered": "{{name}} 已收到",
       "held": "{{name}} 会在你做出决定后读取",
       "read": "{{name}} 已读",
-      "resolved": "{{name}} 已关闭求助请求",
-      "well": "已读你的留言",
-      "wellNow": "停下来读了你的留言"
+      "resolved": "{{name}} 已关闭求助请求"
     },
     "stopped": {
       "byYou": "在这里停止",
@@ -548,8 +546,6 @@
     "file": "文件",
     "media": "GIF",
     "noCamera": "无法访问相机。请在手机的设置中允许。",
-    "mission": "开始专项任务",
-    "missionHint": "有计划、从头到尾的长期工作",
     "summary": "总结聊天",
     "summaryHint": "你不在时发生了什么",
     "remind": "稍后提醒我",
@@ -778,7 +774,7 @@
   "agentEdit": {
     "missing": "此智能体已不存在。",
     "saved": "更改已保存",
-    "adminsOnly": "只有管理员可以更改名称、角色和指令。",
+    "adminsOnly": "只有能编辑这个智能体的人可以更改它的角色和指令。名称只有管理员可以更改。",
     "discardTitle": "放弃你的更改？",
     "discardText": "你的更改还没有保存。",
     "discard": "放弃",
@@ -790,15 +786,14 @@
     "handleMention": "提及 @{{handle}} 即可呼叫。",
     "handleFromName": "聊天中：@{{handle}}。根据名字生成，可以更改。",
     "handleFromNameEmpty": "聊天中的 @ 根据名字生成。",
-    "reviewLead": "点按一行即可更改。",
     "planHint": "或者连接你的 AI 套餐：之后 {{name}} 会用它思考，不消耗密钥。",
     "partly": "智能体已创建，但其角色附带的部分内容没有成功。请在它的资料中调整。",
     "import": {
       "where": {
         "openbotrun": "选择 openbot-import.json（来自 OpenBot 的 Migrator）或 openbot-transfer.json（来自实例迁移）。.zip 文件需先在“文件”应用中打开：点按一下即可解压。",
         "openmausbot": "在 OpenMausBot 中：右键点击团队 › 分享团队… › 保存文件。然后在这里选择该文件。",
-        "hermes": "Hermes 通过终端导出（hermes profile export），生成手机无法打开的 .tar.gz 文件。请在电脑上导入，或在这里选择该配置的 .md 和 .yaml 文件。",
-        "openclaw": "OpenClaw 将智能体保存在电脑上的 ~/.openclaw 文件夹中。请在这里选择某个工作区的 .md 文件，或在电脑上导入整个文件夹。",
+        "hermes": "Hermes 通过终端导出（`hermes profile export`），生成手机无法打开的 .tar.gz 文件。请在电脑上导入，或在这里选择该配置的 .md 和 .yaml 文件。",
+        "openclaw": "OpenClaw 将智能体保存在电脑上的 `~/.openclaw` 文件夹中。请在这里选择某个工作区的 .md 文件，或在电脑上导入整个文件夹。",
         "paperclip": "在下方粘贴该包的 GitHub 链接，或选择它的 COMPANY.md 和其他 .md 文件。",
         "agenteschat": "在另一个工作区中：设置 › 导入和导出 › 下载文件。然后在这里选择该 .json 文件。"
       },
@@ -1038,7 +1033,7 @@
     "agentStyle": "智能体的说话方式",
     "workspaces": "工作区",
     "workspacesIn": "你所在的",
-    "workspacesFoot": "你在每个工作区都保持登录,并接收所有工作区的通知。点按工作区即可打开。",
+    "workspacesFoot": "你在每个工作区都保持登录，并接收所有工作区的通知。",
     "workspacesUnreachable": "暂时没有响应",
     "addWorkspace": "添加工作区",
     "addWorkspaceCreate": "创建新工作区",
@@ -1864,7 +1859,7 @@
       "tooOld": "这台 iPhone 运行 iOS {{version}}，而智能体需要 iOS 17 或更新版本。能更新就更新，或者换一台更新的 iPhone。",
       "xcodeOld": "这台 iPhone 运行 iOS {{version}}，比 {{host}} 上的 Xcode 支持的版本更新。请在那台 Mac 上安装 Xcode {{major}}，然后在终端中运行 xcrun devicectl manage ddis update。",
       "teamMissing": "Xcode 已登录，但还没有显示团队。在 Xcode 中新建任意 iOS App，在 Signing & Capabilities 下选择你的团队，然后在这台 iPhone 上运行一次。",
-      "uiRefused": "这台 iPhone 拒绝了测试助手的点按。请解锁它，如有要求就输入密码。如果反复出现，把 设置 › 开发者 › 启用 UI 自动化 关闭再打开。",
+      "uiRefused": "智能体能看到这台 iPhone 的屏幕，但 iOS 拒绝了它们的点按。",
       "pluggedIn": "已经插好了",
       "wifi": {
         "also": "也在 {{host}} 的 Wi-Fi 上：{{name}}",
@@ -2116,7 +2111,6 @@
   },
   "crash": {
     "title": "此页面出了点问题",
-    "subtitle": "应用在显示这些内容时出错了。请重试。",
     "retry": "重试"
   },
   "notFound": {
@@ -2145,9 +2139,8 @@
     "deleteIntro": "{{name}} 会立即对所有人变为只读，并在 7 天后永久删除。",
     "holdDelete": "长按以删除",
     "deleteFailed": "无法删除工作区，请重试。",
-    "access": {
-      "how": "点按一行可更改其级别：无权限、读取、读写。"
-    },
+    "holdReset": "长按以重置",
+    "resetFailed": "无法重置工作区。请重试。",
     "logo": {
       "failed": "无法上传标志",
       "tooBig": "图片太大了，请换一张。"
@@ -2287,9 +2280,9 @@
       "everyone": "所有人都可对话",
       "gate": "只拥有 {{name}} 的人不与智能体对话。",
       "gateOn": "开启与智能体对话",
-      "locked": "只有 {{name}} 的负责人 {{owner}} 或能编辑任何智能体的人可以更改。",
-      "locked_female": "只有 {{name}} 的负责人 {{owner}} 或能编辑任何智能体的人可以更改。",
-      "lockedNoOwner": "只有能编辑任何智能体的人可以更改。",
+      "locked": "只有 {{name}} 的负责人 {{owner}} 或能编辑智能体的人可以更改。",
+      "locked_female": "只有 {{name}} 的负责人 {{owner}} 或能编辑智能体的人可以更改。",
+      "lockedNoOwner": "只有能编辑智能体的人可以更改。",
       "none": "还没有智能体。",
       "some": "仅部分角色和成员",
       "addPerson": "添加成员",
@@ -2397,7 +2390,7 @@
       "sealedHelp": "为了安全，这里保存的内容不会再显示。如需更改，请重新输入。",
       "changePassword": "更改密码",
       "changeValue": "更改值",
-      "changeHelp": "点按“保存”即可保留。之后智能体会使用新的值。",
+      "changeHelp": "保存后，智能体就会使用新的值。",
       "hidden": "已隐藏",
       "saved": "已保存",
       "delete": "删除",
@@ -2416,7 +2409,7 @@
       "newPassword": "新密码",
       "keyName": "变量",
       "keyNamePlaceholder": "ACME_API_KEY",
-      "keyNameHelp": "使用大写字母、数字和 _，例如 ACME_API_KEY。智能体按这个名称请求密钥。",
+      "keyNameHelp": "使用大写字母、数字和 _，例如 `ACME_API_KEY`。智能体按这个名称请求密钥。",
       "value": "值",
       "newValue": "新值",
       "description": "描述",
@@ -2538,7 +2531,7 @@
     "bySelfUntil": "由 {{name}} 填写 · {{when}}"
   },
   "dashboards": {
-    "homeRow": "仅你自己 · 你自己的小组件",
+    "homeRow": "仅你自己",
     "create": "创建",
     "routineTarget": "它的小组件",
     "pin": {
@@ -2617,11 +2610,11 @@
     },
     "drive": {
       "title": "团队创作的一切，都在一处",
-      "text": "智能体和成员的报告、表格和文件都留在这里，方便查找。",
+      "text": "智能体和成员的报告、表格和文件都留在这里。",
       "viewerTitle": "查找团队创作的内容",
       "viewerText": "智能体和成员在聊天中创建的内容会显示在这里。",
       "titlePersonal": "智能体创作的一切，都在一处",
-      "textPersonal": "你的智能体的报告、表格和文件都留在这里，方便查找。",
+      "textPersonal": "你的智能体的报告、表格和文件都留在这里。",
       "viewerTitlePersonal": "查找你的智能体创作的内容",
       "viewerTextPersonal": "智能体在你的聊天中创建的内容会显示在这里。"
     },
@@ -2687,7 +2680,7 @@
       "viewerTextPersonal": "有人加入后，会显示在这里。"
     },
     "chat": {
-      "title": "一切从一条消息开始",
+      "title": "开始对话吧",
       "text": "在下方输入，这里的每个人都能看到。",
       "viewerTitle": "消息会显示在这里",
       "viewerText": "有人发消息后，你可以在这里查看。"
@@ -2728,8 +2721,8 @@
     "board": {
       "title": "在一个看板上查看重点",
       "text": "添加小组件，请智能体添加，或固定聊天中的内容块。",
-      "viewerTitle": "这个看板正在成形",
-      "viewerText": "能编辑这个看板的人添加小组件后，它们会显示在这里。"
+      "viewerTitle": "小组件会显示在这里",
+      "viewerText": "由能编辑这个看板的人添加。"
     },
     "computers": {
       "title": "给智能体再添一台电脑",
@@ -2738,7 +2731,7 @@
       "viewerText": "能连接电脑的人添加后，它们会显示在这里。"
     },
     "connectors": {
-      "title": "给智能体真正的工具",
+      "title": "为智能体配备工具",
       "text": "连接一个服务，它们就能在其中读取和操作。",
       "viewerTitle": "智能体的工具会显示在这里",
       "viewerText": "管理连接器的人会连接下方的服务。"
@@ -2880,7 +2873,7 @@
       "done": "完成",
       "placeholder": "输入文字",
       "titlePlaceholder": "输入标题",
-      "hint": "每一行是一个段落。你输入的内容会实时写进文件。"
+      "hint": "每一行是一个段落。"
     },
     "show": {
       "nothing": "所有幻灯片都已隐藏，没有可以展示的内容。",

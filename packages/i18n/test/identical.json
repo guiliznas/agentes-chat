@@ -333,7 +333,8 @@
       "live.shell.formats.docx",
       "live.shell.formats.md",
       "live.doc.link.title",
-      "live.doc.keys.link"
+      "live.doc.keys.link",
+      "audit.operatorReview.items"
     ],
     "es": [
       "devices.iphone.path.general",
@@ -1249,6 +1250,7 @@
       "chat.work.seconds",
       "code.source",
       "common.code",
+      "common.details",
       "composer.format.code",
       "composer.format.link",
       "composer.pc",
@@ -1604,7 +1606,8 @@
       "settings.account.chat.wallpaper.neutral.sand",
       "newAgentCard.proposal.routine.label",
       "newAgentCard.proposal.routine.lead",
-      "orgAccent.sampleMention"
+      "orgAccent.sampleMention",
+      "teamWeek.budget.item"
     ],
     "it": [
       "live.sheet.args.a1",
@@ -1997,7 +2000,8 @@
       "onboarding.import.choose.skill",
       "onboarding.import.choose.step.video",
       "newAgentCard.proposal.routine.label",
-      "newAgentCard.proposal.routine.lead"
+      "newAgentCard.proposal.routine.lead",
+      "teamWeek.budget.item"
     ],
     "nl": [
       "usage.kinds.routines",
@@ -2155,6 +2159,7 @@
       "code.source",
       "common.chartItem",
       "common.code",
+      "common.details",
       "composer.format.code",
       "composer.format.link",
       "composer.pc",
@@ -2655,7 +2660,9 @@
       "live.sheet.args.criteria1",
       "live.sheet.args.criteria2",
       "live.sheet.args.k",
-      "live.sheet.args.x"
+      "live.sheet.args.x",
+      "audit.operatorReview.items",
+      "teamWeek.budget.item"
     ],
     "ja": [
       "live.sheet.args.k",
@@ -3162,6 +3169,9 @@
       "storage.connect.provider.b2"
     ],
     "id": [
+      "drive.folder",
+      "drive.folders",
+      "drive.moveTo",
       "artifacts.kind.spreadsheet",
       "live.kinds.spreadsheet",
       "live.slides.chart.item",
@@ -3698,6 +3708,7 @@
       "onboarding.import.choose.step.video"
     ],
     "pl": [
+      "drive.folder",
       "devices.cpus",
       "devices.memory",
       "devices.system.android",

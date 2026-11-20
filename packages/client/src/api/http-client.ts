@@ -106,6 +106,7 @@ import type {
   DevicesList,
   DirectMessage,
   DmRead,
+  DriveFolder,
   EmailChange,
   EndpointCheck,
   EndpointModel,
@@ -135,6 +136,7 @@ import type {
   InviteLink,
   InviteLinkChanged,
   InviteLinkMade,
+  IphoneRepairView,
   Issue,
   IssueActivity,
   IssueColumn,
@@ -201,6 +203,7 @@ import type {
   PhoneSignIn,
   PlanServes,
   Poll,
+  ProblemReportPreview,
   Proposal,
   ReactionCount,
   Reminder,
@@ -319,6 +322,7 @@ const artifactQuery = (f: ArtifactFilters) => ({
   authors: csv(f.authors?.map((a) => `${a.type}:${a.id}`)),
   who: f.who,
   sort: f.sort && f.sort !== "recent" ? f.sort : undefined,
+  folder: f.folderId === null ? "root" : f.folderId,
 });
 
 /**
@@ -589,6 +593,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       instance: () => request<Instance>("/api/instance"),
       telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
+      previewProblemReport: (input) =>
+        request<ProblemReportPreview>("/api/app/problem-reports/preview", { json: input }),
+      sendProblemReport: (input) => request<{ id: string }>("/api/app/problem-reports/send", { json: input }),
       sendFeedback: (input) => request<void>("/api/app/feedback", { json: input }),
       uploadFeedbackFile: (file) => {
         const form = new FormData();
@@ -679,6 +686,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       deleteWorkspace: async (orgId, input = {}) =>
         (await request<{ deletion: { dueAt: string } }>(`${org(orgId)}/deletion`, { json: input })).deletion,
       restore: (orgId) => request<void>(`${org(orgId)}/deletion`, { method: "DELETE" }),
+      resetCode: (orgId) => request<CodeSent>(`${org(orgId)}/reset/code`, { json: {} }),
+      reset: async (orgId, input = {}) =>
+        (await request<{ reset: { startedAt: string } }>(`${org(orgId)}/reset`, { json: input })).reset,
       setAvatar: (orgId, input) =>
         request<{ avatarUrl: string }>(`${org(orgId)}/me/avatar`, { method: "PUT", json: input }),
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
@@ -1168,7 +1178,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         })) ?? null,
       messages: async (orgId, channelId, options = {}) => {
         const path = `${org(orgId)}/channels/${enc(channelId)}/messages`;
-        const query = { threadId: options.threadId, before: options.before, limit: options.limit };
+        const { threadId, before, after, around, limit } = options;
+        const query = { threadId, before, after, around, limit };
         const { messages } = await request<{ messages: Message[] }>(path, { query });
         steerStore.seed(channelId, messages);
         return messages;
@@ -1348,6 +1359,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<XcodeFixView>(`${org(orgId)}/devices/computers/${enc(machineId)}/xcode-fix`, { method: "DELETE" }),
       openXcode: (orgId, machineId) =>
         request<{ opened: boolean }>(`${org(orgId)}/devices/computers/${enc(machineId)}/xcode-open`, { json: {} }),
+      repairIphone: (orgId, phoneId) =>
+        request<IphoneRepairView>(`${org(orgId)}/devices/phones/${enc(phoneId)}/repair`, { json: {} }),
     },
     machines: {
       list: async (orgId) => (await request<{ machines: Machine[] }>(`${org(orgId)}/machines`)).machines,
@@ -1603,6 +1616,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         if (options.title) form.append("title", options.title);
         if (options.channelId) form.append("channelId", options.channelId);
         if (options.threadId) form.append("threadId", options.threadId);
+        if (options.folderId) form.append("folderId", options.folderId);
         return files.upload<ArtifactDetail>(`${org(orgId)}/artifacts/files`, form);
       },
       uploadVersion: (orgId, id, file, options = {}) => {
@@ -1619,6 +1633,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       setSharing: (orgId, id, sharing) =>
         request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}/sharing`, { method: "PUT", json: sharing }),
       remove: (orgId, id) => request<void>(`${org(orgId)}/artifacts/${enc(id)}`, { method: "DELETE" }),
+      rename: (orgId, id, title) =>
+        request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}`, { method: "PATCH", json: { title } }),
+      move: (orgId, ids, folderId) =>
+        request<{ moved: number }>(`${org(orgId)}/artifacts/move`, { json: { ids, folderId } }),
+      folders: async (orgId) => (await request<{ folders: DriveFolder[] }>(`${org(orgId)}/drive-folders`)).folders,
+      createFolder: (orgId, input) => request<DriveFolder>(`${org(orgId)}/drive-folders`, { json: input }),
+      updateFolder: (orgId, id, patch) =>
+        request<DriveFolder>(`${org(orgId)}/drive-folders/${enc(id)}`, { method: "PATCH", json: patch }),
+      deleteFolder: (orgId, id) =>
+        request<{ trashed: number; kept: number }>(`${org(orgId)}/drive-folders/${enc(id)}`, { method: "DELETE" }),
       trash: async (orgId) => {
         // The server answers `{ files }`.
         const res = await request<{ files?: TrashedArtifact[]; artifacts?: TrashedArtifact[] } | TrashedArtifact[]>(

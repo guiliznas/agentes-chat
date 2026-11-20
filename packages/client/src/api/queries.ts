@@ -168,6 +168,8 @@ import type {
   Person,
   PersonalTokenInput,
   PersonLimits,
+  ProblemReportPreviewInput,
+  ProblemReportSendInput,
   Proposal,
   ReactionCount,
   ReminderInput,
@@ -256,6 +258,29 @@ export const channelsQuery = (api: ApiClient, orgId: string) =>
     queryFn: () => api.chat.channels(orgId),
     staleTime: 30_000,
     ...BACK_TO_TAB,
+  });
+
+/** The workspace's people (`usePeople`); also for a `select` of one person. */
+export const peopleQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({ queryKey: keys.people(orgId), queryFn: () => api.orgs.people(orgId), staleTime: 30_000 });
+
+/** The agents' statuses (`useAgentStatuses`); also for a `select` of one agent. */
+export const agentStatusQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({
+    queryKey: keys.agentStatus(orgId),
+    queryFn: () => api.agents.statuses(orgId),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    enabled: orgId.length > 0,
+  });
+
+/** Which agents have an AI (`useAiStatus`); also for a `select` of one agent. */
+export const aiStatusQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({
+    queryKey: keys.aiStatus(orgId),
+    queryFn: () => api.agents.aiStatus(orgId),
+    staleTime: 30_000,
+    enabled: orgId.length > 0,
   });
 /**
  * An invitation's preview (its page, and the sign-in that leads to it). One that got no answer is asked twice more:
@@ -389,6 +414,28 @@ export function useSetServerTelemetry() {
   return useMutation({
     mutationFn: (enabled: boolean) => api.system.setTelemetry(enabled),
     onSuccess: (telemetry) => qc.setQueryData(keys.telemetry, telemetry),
+  });
+}
+
+/** A problem report gathered for the person to read before sending; asked again each time the dialog opens. */
+export const useProblemReportPreview = (input: ProblemReportPreviewInput, enabled: boolean) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["problem-report", input] as const,
+    queryFn: () => api.system.previewProblemReport(input),
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+  });
+};
+
+export function useSendProblemReport() {
+  const api = useApi();
+  // The dialog says why it failed, with its way out, under its buttons.
+  return useMutation({
+    mutationFn: (input: ProblemReportSendInput) => api.system.sendProblemReport(input),
+    meta: { silent: true },
   });
 }
 
@@ -540,6 +587,15 @@ export function useDeleteWorkspace(orgId: string) {
       });
       void qc.invalidateQueries({ queryKey: keys.me });
     },
+  });
+}
+
+/** Resets a workspace (owners): its apps read everything again when it is done (`org.reset`). */
+export function useResetWorkspace(orgId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (proof: DeletionProofInput) => api.orgs.reset(orgId, proof),
+    meta: { silent: true },
   });
 }
 
@@ -810,6 +866,10 @@ export function useRevokeInvitation(orgId: string) {
 
 // ── Agents ──────────────────────────────────────────────────────────────────
 
+/** The agents my lists and pickers name: a private agent (`listed: false`) stays out for whom it is unlisted. */
+const listedAgents = (list: Agent[]) => list.filter((a) => a.listed !== false);
+
+/** The team's agents my lists name (`listed`); the directories resolve every agent's name and face (`useAllAgents`). */
 export const useAgents = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
@@ -817,6 +877,21 @@ export const useAgents = (orgId: string, enabled = true) => {
     queryFn: () => api.agents.list(orgId),
     staleTime: 30_000,
     enabled,
+    select: listedAgents,
+    ...BACK_TO_TAB,
+  });
+};
+
+/**
+ * Every agent of the team the server sent, unlisted ones too (`listed: false`): only for the directories, which name a
+ * message's author and open a link to its public card. A list or picker reads `useAgents`.
+ */
+export const useAllAgents = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agents(orgId),
+    queryFn: () => api.agents.list(orgId),
+    staleTime: 30_000,
     ...BACK_TO_TAB,
   });
 };
@@ -3040,7 +3115,7 @@ function levelsChanged(qc: QueryClient, orgId: string) {
 
 export const usePeople = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.people(orgId), queryFn: () => api.orgs.people(orgId), staleTime: 30_000 });
+  return useQuery(peopleQuery(api, orgId));
 };
 
 /**
@@ -3262,13 +3337,7 @@ export function useCancelUsageQueue(orgId: string, agentId: string) {
  */
 export const useAgentStatuses = (orgId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.agentStatus(orgId),
-    queryFn: () => api.agents.statuses(orgId),
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    enabled: enabled && orgId.length > 0,
-  });
+  return useQuery({ ...agentStatusQuery(api, orgId), enabled: enabled && orgId.length > 0 });
 };
 
 /**
@@ -3631,9 +3700,7 @@ export const useAiStatus = (
 ) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.aiStatus(orgId),
-    queryFn: () => api.agents.aiStatus(orgId),
-    staleTime: 30_000,
+    ...aiStatusQuery(api, orgId),
     enabled: enabled && orgId.length > 0,
     refetchInterval: typeof pollMs === "function" ? (query) => pollMs(query.state.data) : pollMs,
   });
@@ -4476,6 +4543,44 @@ export function useArtifacts(orgId: string, filters: ArtifactFilters) {
   return { ...query, artifacts: query.data ? artifacts : undefined, counts: pages?.[0]?.counts ?? null };
 }
 
+/** Every Drive folder of the workspace (the apps build the tree from `parentId`). */
+export const useDriveFolders = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.driveFolders(orgId), queryFn: () => api.artifacts.folders(orgId) });
+};
+
+/**
+ * Arranging the Drive: folders made, renamed, moved and deleted, files moved and renamed. Each refreshes the Drive's
+ * lists and folders.
+ */
+export function useDriveArrange(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) });
+  const options = { onSettled: refresh };
+  return {
+    createFolder: useMutation({
+      mutationFn: (input: { name: string; parentId?: string | null }) => api.artifacts.createFolder(orgId, input),
+      ...options,
+    }),
+    updateFolder: useMutation({
+      mutationFn: (input: { id: string; name?: string; parentId?: string | null }) =>
+        api.artifacts.updateFolder(orgId, input.id, { name: input.name, parentId: input.parentId }),
+      ...options,
+    }),
+    deleteFolder: useMutation({ mutationFn: (id: string) => api.artifacts.deleteFolder(orgId, id), ...options }),
+    move: useMutation({
+      mutationFn: (input: { ids: string[]; folderId: string | null }) =>
+        api.artifacts.move(orgId, input.ids, input.folderId),
+      ...options,
+    }),
+    rename: useMutation({
+      mutationFn: (input: { id: string; title: string }) => api.artifacts.rename(orgId, input.id, input.title),
+      ...options,
+    }),
+  };
+}
+
 /** One artifact at a version (latest when omitted). */
 /** `GET …/artifacts-trash`: deleted files (30 days). */
 export const useArtifactTrash = (orgId: string) => {
@@ -4729,12 +4834,17 @@ export function useUploadFile(orgId: string) {
       file: File;
       title?: string;
       channelId?: string | null;
+      folderId?: string | null;
       artifactId?: string;
       note?: string;
     }): Promise<ArtifactDetail> =>
       input.artifactId
         ? api.artifacts.uploadVersion(orgId, input.artifactId, input.file, { note: input.note })
-        : api.artifacts.upload(orgId, input.file, { title: input.title, channelId: input.channelId }),
+        : api.artifacts.upload(orgId, input.file, {
+            title: input.title,
+            channelId: input.channelId,
+            folderId: input.folderId,
+          }),
     meta: { silent: true },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
   });
@@ -7055,17 +7165,22 @@ export function useTasksUnread(orgId: string) {
  * read per client, however many members hear it.
  */
 export const UNREAD_REFRESH_MS = 2000;
+/** And up to this much more, at random: every member hears the same message, and their reads must not land at once. */
+export const UNREAD_SPREAD_MS = 3000;
 const activityTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-/** Runs `read` once `UNREAD_REFRESH_MS` after the first call for `key`; calls meanwhile join it. */
+/** Runs `read` once, `UNREAD_REFRESH_MS` plus some of `UNREAD_SPREAD_MS` after the first call for `key`; calls meanwhile join it. */
 function readOncePerBurst(key: string, read: () => void) {
   if (activityTimers.has(key)) return;
   activityTimers.set(
     key,
-    setTimeout(() => {
-      activityTimers.delete(key);
-      read();
-    }, UNREAD_REFRESH_MS),
+    setTimeout(
+      () => {
+        activityTimers.delete(key);
+        read();
+      },
+      UNREAD_REFRESH_MS + Math.random() * UNREAD_SPREAD_MS,
+    ),
   );
 }
 
@@ -7077,6 +7192,25 @@ function readOncePerBurst(key: string, read: () => void) {
 export function readConversationListsOncePerBurst(qc: QueryClient, orgId: string) {
   readOncePerBurst(`${orgId}:dms`, () => void qc.invalidateQueries({ queryKey: keys.dms(orgId) }));
   readOncePerBurst(`${orgId}:channels`, () => void qc.invalidateQueries({ queryKey: keys.channels(orgId) }));
+}
+
+/**
+ * The conversation lists read now (news of a DM or a mention shows at once; a read under way serves it). A read that
+ * starts here comes after every `channel.activity` heard so far, so the burst read those asked for is dropped; with a
+ * read already under way (it may predate them) the burst read stays.
+ */
+export function readConversationListsNow(qc: QueryClient, orgId: string) {
+  for (const [list, queryKey] of [
+    ["dms", keys.dms(orgId)],
+    ["channels", keys.channels(orgId)],
+  ] as const) {
+    const underWay = qc.isFetching({ queryKey }) > 0;
+    void qc.invalidateQueries({ queryKey }, { cancelRefetch: false });
+    const timer = activityTimers.get(`${orgId}:${list}`);
+    if (underWay || timer === undefined) continue;
+    clearTimeout(timer);
+    activityTimers.delete(`${orgId}:${list}`);
+  }
 }
 
 /**
@@ -7140,8 +7274,15 @@ export function applyUnreadEvent(qc: QueryClient, orgId: string, event: { type: 
     }
   } else if (e.type === "channel.read") {
     clearUnread(qc, orgId, e.channelId);
-    void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
-    void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+    // The counts already show it: a list whose burst read is on its way reads with it (each message of a conversation
+    // open here marks it read, and that read comes back here too). One with no burst, or a read under way that may
+    // predate this one, reads at once.
+    for (const [list, queryKey] of [
+      ["channels", keys.channels(orgId)],
+      ["dms", keys.dms(orgId)],
+    ] as const)
+      if (!activityTimers.has(`${orgId}:${list}`) || qc.isFetching({ queryKey }) > 0)
+        void qc.invalidateQueries({ queryKey });
     void qc.invalidateQueries({ queryKey: keys.unreadThreads(orgId) });
   } else if (e.type === "channel.muted") setMuted(qc, orgId, e.channelId, e.muted);
   else if (e.type === "chat.prefs") putChatPrefs(qc, orgId, e.chatPrefs);
@@ -7656,6 +7797,17 @@ export function useIphoneDevMode(orgId: string, machineId: string | null) {
     meta: { silent: true },
   });
   return { look, openXcode };
+}
+
+/** The iPhone guide's Repair: its Mac stops the iPhone's test helper, builds it again and checks it (devices refetch). */
+export function useIphoneRepair(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (phoneId: string) => api.devices.repairIphone(orgId, phoneId),
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.devices(orgId) }),
+  });
 }
 
 /**

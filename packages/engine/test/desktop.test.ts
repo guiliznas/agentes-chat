@@ -936,7 +936,10 @@ describe("folders and tools on the machine (protocol 10)", () => {
 
   test("the containers block: Docker's commands, the agent's own containers, ports above 1024 (ADR 0169)", () => {
     const text = containersText("Build box");
-    expect(text).toStartWith('# Containers on "Build box"\ndocker, docker compose and podman work there');
+    expect(text).toStartWith(
+      '# Containers on "Build box"\ndocker, docker compose, docker buildx and podman work there, rootless',
+    );
+    expect(text).toContain("Root inside a container is yours");
     expect(text).toContain("never another agent's containers or files");
     expect(text).toContain("-p 8080:80");
     expect(text).toContain("restart: always come back");
@@ -953,6 +956,9 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(text).toContain('exit code 137, "Killed"');
     // A finished build's daemons hold their memory for hours unless stopped.
     expect(text).toContain("./gradlew --stop");
+    // Each agent's home is private there: a path handed to another agent leads nowhere.
+    expect(text).toContain("as a git branch or pull request");
+    expect(text).toContain("never as a path in your own home");
     // A size the runner never reported: no numbers.
     expect(sharingText("Build box", null)).toContain("share its CPUs and memory, with no part");
   });

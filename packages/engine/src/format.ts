@@ -8,6 +8,15 @@ export const cutText = (text: string, max: number) => text.slice(0, max).replace
 /** `cutText` for text people read: a cut ends in "…", never passing for the whole. */
 export const cutMarked = (text: string, max: number) => (text.length > max ? `${cutText(text, max - 1)}…` : text);
 
+/** A sentence's words as they compare: lower case, no accents, no punctuation or emoji, single spaces. */
+export const plainWords = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
 /** "Ana's", for the English the agents read. */
 export const possessive = (name: string) => `${name}'s`;
 
@@ -55,6 +64,18 @@ export const stringsOf = (value: unknown): string[] =>
 /** `value` when it is a whole number from `min` to `max`, else null: a stored hour or weekday that may hold anything. */
 export const wholeIn = (value: unknown, min: number, max: number): number | null =>
   typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : null;
+
+/** A JSON object, never an array: what Postgres's `jsonb_typeof` calls `object`. */
+export const isJsonObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** `value` when it is a finite number from `min` to `max`, else null: a stored measure that may hold anything. */
+export const numberIn = (value: unknown, min: number, max: number): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : null;
+
+/** A measure the database worked out, to the nearest whole; null where it measured nothing. */
+export const wholeOrNull = (value: unknown): number | null =>
+  value === null || value === undefined ? null : Math.round(Number(value));
 
 /** Postgres text and jsonb refuse NUL and lone UTF-16 surrogates: `text` without either. */
 export const pgSafeText = (text: string) =>

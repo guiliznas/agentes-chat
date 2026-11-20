@@ -76,16 +76,17 @@ export class TtlCache<V> {
   }
 
   /**
-   * Returns the cached value or loads, caches and returns it (`undefined`/null results are cached too). A load an
-   * invalidation overtook (here or from another process) is returned but not kept: its read may predate the write.
+   * Returns the cached value or loads, caches and returns it (`undefined`/null results are cached too, unless `keep`
+   * refuses them). A load an invalidation overtook (here or from another process) is returned but not kept: its read
+   * may predate the write.
    */
-  async getOrLoad(key: string, load: () => Promise<V>): Promise<V> {
+  async getOrLoad(key: string, load: () => Promise<V>, keep?: (value: V) => boolean): Promise<V> {
     if (!enabled) return load();
     const hit = this.entries.get(key);
     if (hit && hit.expires >= Date.now()) return hit.value;
     const started = this.generation;
     const value = await load();
-    if (this.generation === started) this.set(key, value);
+    if (this.generation === started && (keep?.(value) ?? true)) this.set(key, value);
     return value;
   }
 }
@@ -107,6 +108,11 @@ export const caches = {
   rangeVisible: new TtlCache<unknown>(TTL_MS),
   /** A person's time zone in an org, else the org's (`orgId:userId`): the "Now" block of every run. */
   zones: new TtlCache<unknown>(TTL_MS),
+  /**
+   * A person's membership (`getMembership`, `orgId:userId`), read by nearly every request and socket check. Only a
+   * membership is kept, never its absence, so someone who just joined is let in at once.
+   */
+  membership: new TtlCache<unknown>(5_000),
   /** An org's standing (`standing.ts`), read before every model and computer call: a hold bites within 5 s everywhere. */
   standing: new TtlCache<unknown>(5_000),
   /** Whether an org spent its platform AI for the month (`limits.ts`), read before every Jev call and route. */
@@ -120,8 +126,17 @@ export const caches = {
   readOutsideRuns: new TtlCache<true>(3600_000, 20_000),
   /** The workspace's devices by name (`deviceRoster`): a run's prompt and its tool lists read it once. */
   deviceRoster: new TtlCache<unknown>(5_000),
+  /** A week of usage per routine (`orgId:routineIds`), summed for the routines list. */
+  routineWeekUsage: new TtlCache<unknown>(60_000, 1000),
   /** Registered hosts by name (`hostLook`, ADR 0194), read by the origin check of every write. */
   hosts: new TtlCache<unknown>(TTL_MS),
+  /**
+   * Jev's answers to a text-only request sent the same way before (`orgId:hash`): a routine whose conversation hasn't
+   * moved, or a retry, asks again within minutes. Never an image's: a screen changes under the same words.
+   */
+  jevAnswers: new TtlCache<unknown>(15 * 60_000, 2000),
+  /** Automático's choice for a routine's prompt (`orgId:agentId:routineId:hash`): the same work every firing. */
+  routineAutoModel: new TtlCache<unknown>(24 * 3600_000, 5000),
 };
 
 /** `caches.contextPresence`'s key for whether an agent holds a rule people gave (`rulesForRun`). */

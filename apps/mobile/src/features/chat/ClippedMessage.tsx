@@ -4,9 +4,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { type ComponentRef, createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessibilityInfo, AppState, Pressable, StyleSheet, View } from "react-native";
-import Animated, { Easing, LinearTransition } from "react-native-reanimated";
+import { Easing, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { motion, Text, useReducedMotion } from "@/ui";
+import { motion, Text } from "@/ui";
 import { keepSize, keptHeightAfter, keptSize, keptWordHeights, PAST_RULE, restoreWordHeights } from "./kept-sizes";
 import { useLayoutKey } from "./look";
 import { withOpacity } from "./turn";
@@ -47,7 +47,10 @@ function readSavedHeights(lang: string) {
   });
 }
 
-/** Folded words growing down to their whole height once "Ver mais" opens them: what is above them stays still. */
+/**
+ * Folded words growing down to their whole height once "Ver mais" opens them, on a page (`FoldedBody`): what is above
+ * them stays still. Never in a conversation's list, where the words open at once (`ClippedMessage`).
+ */
 export const REVEAL = LinearTransition.duration(motion.base).easing(Easing.bezier(...motion.out));
 
 /**
@@ -61,10 +64,13 @@ export interface OpenedMessages {
 }
 export const OpenedMessagesContext = createContext<OpenedMessages | null>(null);
 
+/** The message whose "See more" was just tapped: its words take the screen reader's focus once they show open. */
+let focusOnOpen: string | null = null;
+
 /**
  * A message's words in a conversation (the web's `ClippedBody`, the same heights): one taller than the shared rule
  * shows its start, fading into what is behind it, with "Ver mais", and so does an agent's long message to another
- * agent, folded to its `lead` (ADR 0034). "Ver mais" opens the words in place, for good: they grow down from the fold.
+ * agent, folded to its `lead` (ADR 0034). "Ver mais" opens the words in place, at once and for good.
  * `behind`: the colours painted behind the words, bottom layer first (a tint over the screen's colour is two), so the
  * fade ends on exactly what is there.
  */
@@ -85,10 +91,9 @@ export function ClippedMessage({
   children: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
-  const reduced = useReducedMotion();
   const screen = useContext(OpenedMessagesContext);
   readSavedHeights(i18n.language);
-  // Opened from this row: it grows. One the screen kept open comes back open, still.
+  // Opened from this row, or one the screen kept open coming back: open, whole.
   const [tapped, setTapped] = useState(false);
   const fullMessages = useOrg().org?.chatPrefs?.fullMessages === true;
   const open = fullMessages || tapped || Boolean(screen?.has(id));
@@ -108,14 +113,19 @@ export function ClippedMessage({
   // folded and whole on every layout, covering the next message each time it opened (seen on a phone).
   const folded = shows !== null || unmeasured;
   const words = useRef<ComponentRef<typeof View>>(null);
+  // The screen reader goes to the words "See more" opened, here or in the row drawn anew for them (`MessageRow`).
   useEffect(() => {
-    if (tapped && words.current) AccessibilityInfo.sendAccessibilityEvent(words.current, "focus");
-  }, [tapped]);
+    if (!open || focusOnOpen !== id || !words.current) return;
+    focusOnOpen = null;
+    AccessibilityInfo.sendAccessibilityEvent(words.current, "focus");
+  }, [open, id]);
   return (
     // One tree whether it clips or not: the words never remount when their height is first known.
     <View>
-      <Animated.View
-        layout={tapped && !reduced ? REVEAL : undefined}
+      {/* Opened at once, never with a layout transition: inside the conversation's list an animated height left the
+          words' frame at the fold while the bubble already took their whole height, an empty bubble under the cut
+          words (seen on a phone). */}
+      <View
         style={
           foldable
             ? [styles.clip, shows === null ? undefined : { maxHeight: shows }]
@@ -147,13 +157,14 @@ export function ClippedMessage({
             style={styles.fade}
           />
         ))}
-      </Animated.View>
+      </View>
       {foldable && !open ? (
         // A 20-point line: 12 of slop around it gives the 44-point target.
         <Pressable
           accessibilityRole="button"
           hitSlop={12}
           onPress={() => {
+            focusOnOpen = id;
             setTapped(true);
             screen?.open(id);
           }}

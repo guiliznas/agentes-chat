@@ -2,7 +2,11 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters/machine-protocol";
+import {
+  MACHINE_PROTOCOL_VERSION,
+  type RunnerReportParts,
+  type ServerFrame,
+} from "@agenteschat/adapters/machine-protocol";
 import { CONTROL_PROTOCOL_VERSION, type ControlEvent, type ControlOut } from "@agenteschat/adapters/runner-control";
 import { configPath, readStoredConfig, type StoredConfig, writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
@@ -352,6 +356,24 @@ test("Grok Build's models are the ones a signed-in account listed, not the compu
   const c = control(home, { executors: undefined, executorRun });
   const s = await c.connect();
   expect(s.of("hello")[0]?.executors).toEqual({ grok: { ...grok, models: [{ id: "grok-4.7" }, { id: "grok-4.6" }] } });
+});
+
+test("Antigravity's models are the ones its signed-in accounts listed: the computer's own `agy models` lists none", async () => {
+  const { home } = pairedHome();
+  // Signed out, the computer's own look finds the CLI and no models.
+  const antigravity = { version: "agy 1.5.12" };
+  writeFileSync(path.join(home, "executors.json"), JSON.stringify({ antigravity }));
+  const account = "0193eeee-0000-7000-8000-0000000000f1";
+  mkdirSync(path.join(home, "accounts", "antigravity", account), { recursive: true });
+  const listed = [
+    { id: "gemini-4-neon-high", label: "Gemini 4 Neon (High)" },
+    { id: "gemini-4-hydrogen-medium", label: "Gemini 4 Hydrogen (Medium)" },
+  ];
+  writeFileSync(path.join(home, "accounts", "agy-models.json"), JSON.stringify({ [account]: listed }));
+  const executorRun = () => new Promise<never>(() => {});
+  const c = control(home, { executors: undefined, executorRun });
+  const s = await c.connect();
+  expect(s.of("hello")[0]?.executors).toEqual({ antigravity: { ...antigravity, models: listed } });
 });
 
 test("a new install's hello leaves the CLIs out until the first look, then sends what it found", async () => {
@@ -738,6 +760,37 @@ test("folders, tools and settings from the app: system folders refused, everythi
   const diag = await c.data<{ text: string }>({ type: "diagnostics" });
   expect(diag.text).toContain(`agentes runner ${RUNNER_VERSION}`);
   expect(diag.text).not.toContain(TOKEN);
+});
+
+test("report: facts and the end of the log, with no paths, names, addresses or token", async () => {
+  const { home } = pairedHome();
+  const logFile = path.join(home, "logs", "runner.log");
+  mkdirSync(path.dirname(logFile), { recursive: true });
+  writeFileSync(
+    logFile,
+    [
+      `started in ${home} for Acme`,
+      `connected to https://agentes.test/api/machines/connect as box with ${TOKEN}`,
+      "C:\\Users\\someone\\.agentes-runner\\runner.log from someone@example.com",
+    ].join("\n"),
+  );
+  const c = control(home, { logFile });
+  const parts = await c.data<RunnerReportParts>({ type: "report" });
+  expect(parts).toMatchObject({
+    runner: RUNNER_VERSION,
+    protocol: MACHINE_PROTOCOL_VERSION,
+    managedBy: "desktop",
+    compiled: true,
+    tools: { claude: false, codex: false, commands: false },
+  });
+  const text = JSON.stringify(parts);
+  for (const secret of [home, "Acme", "agentes.test", TOKEN, "someone"]) {
+    expect(text).not.toContain(secret);
+  }
+  expect(parts.logTail).toHaveLength(3);
+  expect(parts.logTail[0]).toContain("[computer]");
+  expect(parts.logTail[1]).toContain("https://[server]/…");
+  expect(parts.logTail[2]).toStartWith("~\\.agentes-runner");
 });
 
 test("device pairing from the app: code, confirmation, a desktop home with safe defaults; unpair forgets the token", async () => {

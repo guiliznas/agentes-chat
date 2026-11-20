@@ -5,6 +5,7 @@
   },
   "common": {
     "close": "Tutup",
+    "details": "Detail",
     "joinSentences": "{{a}} {{b}}",
     "cantUndo": "Ini tidak bisa diurungkan.",
     "removeName": "Hapus {{name}}",
@@ -299,8 +300,8 @@
       "noTalk": "Yang hanya punya {{name}} tidak berbicara dengan agen.",
       "turnOnTalk": "Nyalakan Bicara dengan agen",
       "search": "Cari agen",
-      "notYours": "Hanya {{owner}}, penanggung jawab {{name}}, atau yang mengedit agen mana pun yang mengubahnya.",
-      "notYoursNoOwner": "Hanya yang mengedit agen mana pun yang mengubahnya.",
+      "notYours": "Hanya {{owner}}, penanggung jawab {{name}}, atau yang mengedit agen yang mengubahnya.",
+      "notYoursNoOwner": "Hanya yang mengedit agen yang mengubahnya.",
       "none": "Belum ada agen.",
       "noMatch": "Tidak ada agen dengan “{{q}}”."
     },
@@ -380,7 +381,7 @@
     },
     "view_all_agents": {
       "title": "Lihat semua agen",
-      "desc": "Di Tim dan bilah samping. Tanpa ini, hanya agen yang menjawab orang itu.",
+      "desc": "Di Tim dan bilah samping, kecuali agen pribadi orang lain. Tanpa ini, hanya agen yang menjawab orang itu.",
       "short": "lihat semua agen",
       "say": "melihat semua agen"
     },
@@ -392,9 +393,9 @@
     },
     "manage_routines": {
       "title": "Buat rutinitas",
-      "desc": "Pekerjaan yang dilakukan agen sendiri pada waktu tertentu.",
+      "desc": "Pekerjaan yang dilakukan agen sendiri pada waktu tertentu, di agen yang diajak bicara orang itu.",
       "short": "buat rutinitas",
-      "say": "membuat rutinitas"
+      "say": "membuat rutinitas di agen yang diajak bicara"
     },
     "approve_actions": {
       "title": "Setujui tindakan agen",
@@ -409,10 +410,10 @@
       "say": "membuat agen"
     },
     "manage_agents": {
-      "title": "Ubah agen mana pun",
-      "desc": "Instruksi, otak, anggaran, dan apa yang dipakai masing-masing.",
+      "title": "Edit agen",
+      "desc": "Instruksi, otak, anggaran, dan apa yang dipakai masing-masing, di agen yang diajak bicara orang itu. Agen pribadi milik orang lain tidak termasuk.",
       "short": "edit agen",
-      "say": "mengedit agen mana pun"
+      "say": "mengedit agen yang diajak bicara"
     },
     "pair_computers": {
       "title": "Hubungkan komputer",
@@ -587,6 +588,7 @@
     "hidePassword": "Sembunyikan kata sandi",
     "capsLock": "Caps Lock menyala",
     "tooManyTries": "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.",
+    "passwordTries_other": "Terlalu banyak percobaan kata sandi di akun ini. Coba lagi dalam {{count}} menit.",
     "accountBlocked": "Akun ini tidak bisa masuk.",
     "passwordHelp": "Minimal 8 karakter.",
     "passwordOk": "Kata sandi oke.",
@@ -625,7 +627,7 @@
       "change": "Ubah",
       "password": "Senang bertemu lagi.",
       "passwordLead": "Sekarang kata sandimu.",
-      "wrong": "Hmm, kata sandi itu tidak cocok.",
+      "wrong": "Kata sandi itu tidak cocok.",
       "social": "Kamu masuk dengan {{providers}}.",
       "socialLead": "Akun ini tidak punya kata sandi. Lanjutkan di sini.",
       "createPassword": "Aku lebih suka membuat kata sandi",
@@ -744,7 +746,7 @@
     "expiredText": "Undangan berlaku 7 hari.",
     "askNew": "Minta undangan baru",
     "askedNew": "Permintaan terkirim",
-    "askNewFailed": "Kami tidak bisa memintanya dari sini: tautan ini mungkin sudah diganti undangan yang lebih baru atau dibatalkan. Cari email undangan terbaru, atau tanyakan ke orang yang mengundangmu.",
+    "askNewFailed": "Kami tidak bisa memintanya dari sini. Seseorang mungkin sudah membatalkan tautan ini atau mengirim undangan yang lebih baru. Cari email undangan terbaru, atau tanyakan ke orang yang mengundangmu.",
     "from": "Diundang oleh {{name}}",
     "crew_other": "{{names}} bekerja di sana",
     "crewYours_other": "{{names}} akan bekerja denganmu",
@@ -1278,8 +1280,8 @@
       "where": {
         "openbotrun": "Letakkan openbot-import.json (dari Migrator milik OpenBot) atau openbot-transfer.json (dari transfer instans), atau .zip tempat file itu berada.",
         "openmausbot": "Di OpenMausBot: klik kanan tim → Share team… → Save file.",
-        "hermes": "Di terminal, jalankan hermes profile export dengan nama profilnya lalu letakkan .tar.gz di sini. Atau seret folder ~/.hermes untuk membawa semua profil.",
-        "openclaw": "Seret seluruh folder ~/.openclaw (membawa semua agen) atau satu ruang kerja saja. Di Mac, ⌘⇧. menampilkan folder tersembunyi di pemilih file.",
+        "hermes": "Di terminal, jalankan `hermes profile export` dengan nama profilnya lalu letakkan .tar.gz di sini. Atau seret folder `~/.hermes` untuk membawa semua profil.",
+        "openclaw": "Seret seluruh folder `~/.openclaw` (membawa semua agen) atau satu ruang kerja saja. Di Mac, ⌘⇧. menampilkan folder tersembunyi di pemilih file.",
         "paperclip": "Seret folder paket (yang berisi COMPANY.md), letakkan .zip-nya, atau tempel tautan GitHub-nya.",
         "agenteschat": "Di ruang kerja lain: Pengaturan → Impor dan ekspor → Unduh file. Lalu letakkan .json di sini."
       },
@@ -1969,7 +1971,7 @@
     "riskyOn": "Orang ini juga memutuskan ini.",
     "lock": "Selalu di tanganmu: uang, orang dan peran, kunci AI, kotak suratmu, dan menghapus.",
     "coveringTitle": "Kamu menyetujui untuk",
-    "coveringSubtitle": "Yang diminta dari orang-orang ini juga sampai padamu, dan kamu memutuskan atas nama mereka. Tidak pernah yang kamu minta sendiri.",
+    "coveringSubtitle": "Permintaan ke orang-orang ini juga sampai padamu, dan kamu memutuskan atas nama mereka, kecuali permintaan yang kamu buat sendiri.",
     "coveringWhileOut": "Saat orang itu tidak ada",
     "coveringUntil": "sampai {{date}}",
     "coveringNow": "Sedang menggantikan",
@@ -2140,7 +2142,7 @@
       "help": "Kamu tetap memakai akun yang sama, di workspace yang sama, dengan paket yang sama.",
       "change": "Ubah email",
       "sent": "Kami mengirim tautan ke {{email}}. Email kamu berubah saat kamu membukanya.",
-      "changed": "Selesai: sekarang kamu masuk dengan {{email}}.",
+      "changed": "Sekarang kamu masuk dengan {{email}}.",
       "same": "Itu sudah email kamu.",
       "noMail": "Server ini tidak mengirim email, jadi alamat baru tidak bisa dikonfirmasi. Minta pengelola server untuk mengatur pengiriman email.",
       "held": "Email ini baru saja keluar dari akun lain dan dicadangkan untuk akun itu selama 7 hari. Pakai email lain.",
@@ -2602,11 +2604,10 @@
     "reply": "Balas",
     "quoteOf": "Balasan untuk {{name}}: {{excerpt}}. Lihat pesannya",
     "quoteGone": "Pesan asli dihapus",
-    "jumpTooFar": "Pesan itu terlalu jauh ke belakang untuk dibuka dari sini.",
     "quoteNoWords": "Pesan tanpa teks",
     "replyingTo": "Membalas {{name}}",
     "cancelReply": "Batalkan balasan",
-    "jumpMissing": "Pesan itu tidak bisa dijangkau di sini. Mungkin sudah dihapus atau terlalu jauh ke belakang.",
+    "jumpMissing": "Pesan itu tidak tersedia. Mungkin sudah dihapus, atau kamu tidak bisa melihatnya.",
     "emoji": "Emoji",
     "uploading": "mengunggah…",
     "uploadFailed": "tidak terunggah",
@@ -2732,13 +2733,12 @@
     "failed_other": "{{names}} tidak bisa menjawab",
     "asking_other": "{{names}} menunggu jawaban",
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
-    "queued_other": "{{names}} sedang antre untuk komputer",
+    "queued_other": "{{names}} dalam antrean",
     "away_other": "{{names}} menunggu komputer",
     "plan_other": "{{names}} sedang menunggu paket",
     "budget_other": "{{names}} menjawab saat anggaran diperbarui",
     "line_other": "{{names}} mulai setelah pekerjaan lain selesai",
     "canceled_other": "{{names}} tidak akan menjawab",
-    "queuedNext": "{{names}} mengantre untuk komputer · berikutnya",
     "nobody": "Tidak ada agen yang akan menjawab",
     "status": {
       "seen": "Sudah melihat",
@@ -2747,7 +2747,7 @@
       "waiting": "Menunggu persetujuan",
       "asking": "Menunggu jawaban",
       "outage": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
-      "queued": "Antre untuk komputer",
+      "queued": "Dalam antrean",
       "away": "Menunggu komputer",
       "plan": "Menunggu paket",
       "budget": "Menjawab saat anggaran diperbarui",
@@ -2958,7 +2958,7 @@
         "delete": "Hanya admin yang menghapus agen",
         "audience": "Hanya admin dan penanggung jawabnya yang mengubah siapa yang bicara dengannya",
         "channels": "Hanya admin dan penanggung jawabnya yang mengubah kanalnya",
-        "skill": "Hanya admin yang mengubah skill agen",
+        "skill": "Hanya yang bisa mengedit agen yang mengubah skill-nya",
         "ai_account": "Hanya pemilik akun yang memberikannya",
         "name": "Hanya admin yang mengganti nama agen",
         "look": "Hanya admin dan penanggung jawabnya yang mengubah tampilannya",
@@ -3093,15 +3093,16 @@
     "approvals": {
       "title_other": "{{count}} permintaan dari {{name}} menunggumu",
       "line": "Menunggu sejak {{since}}.",
-      "action": "Lihat dan setujui",
-      "hide": "Tutup"
+      "action": "Lihat dan setujui"
     },
     "budget": {
       "title": "Anggaran {{name}}: {{from}} → {{to}}",
+      "item": "Anggaran: {{from}} → {{to}}",
       "line_other": "Berhenti {{count}} kali di batas bulanan."
     },
     "channel": {
       "title": "Masukkan {{name}} ke #{{channel}}",
+      "item": "Masukkan ke #{{channel}}",
       "line": "{{name}} tidak ada di kanal mana pun, jadi tidak ada yang mengajaknya bicara sepanjang minggu."
     },
     "unanswered": {
@@ -3113,6 +3114,7 @@
     },
     "routine": {
       "title": "Rutinitas {{name}} setiap hari pukul {{time}}",
+      "item": "Rutinitas setiap hari pukul {{time}}",
       "line_other": "Kamu meminta ini pada {{count}} hari minggu ini: “{{text}}”",
       "action": "Buat rutinitas",
       "done": "Rutinitas dibuat"
@@ -3121,6 +3123,9 @@
       "title": "{{name}} belajar: {{what}}",
       "line": "Dipakai {{uses}}×. Jadikan skill?",
       "action": "Jadikan skill",
+      "uses": "Dipakai {{uses}}×",
+      "group_other": "{{name}} belajar {{count}} cara kerja",
+      "applyAll_other": "Jadikan {{count}} skill",
       "done": "Dikonfirmasi"
     },
     "stalled": {
@@ -3152,11 +3157,13 @@
     },
     "retire": {
       "title": "Arsipkan {{name}}",
+      "item": "Arsipkan",
       "line": "Tidak ada pekerjaan selama 4 minggu, tanpa rutinitas dan tanpa tugas terbuka.",
       "action": "Arsipkan"
     },
     "model": {
       "title": "{{name}} bisa memakai {{to}}.",
+      "item": "Bisa memakai {{to}}",
       "line": "Sekarang memakai {{from}}."
     },
     "skip": "Abaikan",
@@ -3238,7 +3245,7 @@
       "opencode_female": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}."
     },
     "card": {
-      "connected": "Beres: {{name}} sekarang punya AI.",
+      "connected": "{{name}} sekarang punya AI.",
       "answerNow": "Jawab sekarang",
       "answering": "{{name}} sedang menjawab…",
       "stillMissing": "{{name}} masih belum terhubung ke AI."
@@ -3273,7 +3280,7 @@
         "ended": "Saya akan menjawab di sini setelah workspace berlangganan agentes.chat lagi."
       },
       "askAdmin": "Saya akan menjawab di sini setelah admin membereskan paket agentes.chat.",
-      "plan": "Paket ini membawa komputer agen, selalu menyala. AI-nya yang sudah kamu bayar: Claude, ChatGPT dan lainnya, atau kunci API.",
+      "plan": "Paket ini membawa komputer agen. AI-nya yang sudah kamu bayar: Claude, ChatGPT dan lainnya, atau kunci API.",
       "activeTitle": "Paket aktif",
       "activeLine": "Hubungkan AI dan {{name}} menjawab di sini.",
       "receipt": "Disimpan",
@@ -3447,7 +3454,7 @@
       "useForAll": "Gunakan kunci ini untuk semua",
       "untested": "Belum ada model {{name}} yang lolos uji.",
       "testModels": "Uji model",
-      "savedUnchecked": "Tersimpan, tetapi {{provider}} tidak menjawab, jadi kunci tidak bisa diperiksa. Jika gagal, percakapan memberi tahu alasannya.",
+      "savedUnchecked": "Tersimpan, tetapi {{provider}} tidak menjawab, jadi kami tidak bisa memeriksa kuncinya. Jika gagal, percakapan memberi tahu alasannya.",
       "closed": "Kunci API terbuka bersama paket agentes.chat workspace.",
       "notPlan": "Kunci paket coding dimasukkan di opsinya sendiri di atas.",
       "billing": "Aktifkan penagihan untuk proyek kunci ini. Tanpa penagihan, Google bisa memakai apa yang dikirim agenmu.",
@@ -3537,11 +3544,13 @@
   },
   "keyGuard": {
     "title": "Ini sepertinya kunci API",
-    "text": "Semua yang ada di chat terlihat oleh orang dan agen. Simpan sebagai kunci ruang kerja saja: kunci itu dienkripsi dan tidak ada yang bisa melihatnya.",
-    "textMember": "Semua yang ada di chat terlihat oleh orang dan agen. Kunci itu seperti kata sandi.",
-    "save": "Simpan sebagai kunci",
+    "titleSecret": "Ini sepertinya kunci atau kata sandi",
+    "vaultText": "Semua yang ada di chat terlihat oleh orang dan agen. Simpan di Vault: dienkripsi, dan agen yang kamu izinkan menggunakannya tanpa melihatnya.",
+    "vault": "Simpan di Vault",
+    "useAsAi": "Gunakan sebagai kunci AI",
     "remove": "Hapus",
-    "send": "Tetap kirim"
+    "send": "Tetap kirim",
+    "saved": "Agen yang punya akses menggunakannya dengan nama {{name}}."
   },
   "costlyCard": {
     "go": "Lanjutkan",
@@ -3585,7 +3594,7 @@
   },
   "brakes": {
     "title": "Pekerjaan yang tidak diminta siapa pun",
-    "subtitle": "Apa yang dimulainya sendiri, dari rutinitas, peringatan, atau agen lain. Yang diminta seseorang tidak pernah ditahan.",
+    "subtitle": "Apa yang dimulainya sendiri, dari rutinitas, peringatan, atau agen lain.",
     "costly": "Tanya sebelum pekerjaan mahal",
     "costlyHelp": "Sebelum membuka pull request, memasang paket, atau pekerjaan panjang, ia bertanya kepada orang yang bertanggung jawab.",
     "costlyAsk": "Tanya dulu",
@@ -3777,10 +3786,10 @@
     "added": "{{name}} bergabung ke kanal.",
     "allow": "Izinkan {{person}} bicara dengannya",
     "allow_female": "Izinkan {{person}} bicara dengannya",
-    "allowed": "Beres: {{person}} sekarang bisa bicara dengan {{name}}.",
+    "allowed": "{{person}} sekarang bisa bicara dengan {{name}}.",
     "allowMe": "Izinkan saya bicara dengannya",
     "allowMe_female": "Izinkan saya bicara dengannya",
-    "allowedMe": "Selesai: sekarang kamu bisa bicara dengan {{name}}.",
+    "allowedMe": "Sekarang kamu bisa bicara dengan {{name}}.",
     "mailLossTitle": "Hapus akses kotak surat?",
     "mailLoss": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi.",
     "mailLoss_female": "{{name}} punya akses ke kotak surat milik {{owners}}. Jika lebih banyak orang bicara dengannya, mereka bisa menjangkau email itu melaluinya, jadi akses ini dihapus. Orang yang menghubungkan kotak surat itu bisa memberikannya lagi.",
@@ -4123,7 +4132,7 @@
     "former": "Sudah tidak ada di ruang kerja ini",
     "askAccess": "Minta akses",
     "detailsHiddenTitle": "Cara kerjanya",
-    "detailsHidden": "Hanya orang yang dilayani {{name}}, penanggung jawabnya, dan admin yang bisa melihat instruksi, alat, memori, dan pemakaiannya."
+    "detailsHidden": "Hanya orang yang dilayani {{name}}, yang bisa mengeditnya, penanggung jawabnya, dan admin yang bisa melihat instruksi, alat, memori, dan pemakaiannya."
   },
   "presence": {
     "online": "Online",
@@ -4200,7 +4209,7 @@
       "waiting_approval": "Menunggu persetujuan",
       "waiting_answer": "Menunggu jawaban",
       "waiting_computer": "Menunggu komputer",
-      "queued_computer": "Antre untuk komputer",
+      "queued_computer": "Dalam antrean",
       "waiting_plan": "Menunggu paket",
       "waiting_budget": "Menunggu anggaran diatur ulang",
       "provider_down": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
@@ -4469,7 +4478,7 @@
     "error": {
       "title": "Beri nama.",
       "website": "Gunakan alamat https, misalnya app.example.com.",
-      "keyName": "Gunakan huruf kapital, angka, dan _, diawali huruf, misalnya ACME_API_KEY.",
+      "keyName": "Gunakan huruf kapital, angka, dan _, diawali huruf, misalnya `ACME_API_KEY`.",
       "password": "Ketik kata sandinya.",
       "value": "Ketik nilainya.",
       "contact": "Isi setidaknya satu kolom."
@@ -4617,7 +4626,7 @@
       "show": "Tampilkan nilai {{name}}",
       "hide": "Sembunyikan nilai {{name}}",
       "problem": {
-        "name": "Nama harus seperti ACME_API_KEY",
+        "name": "Nama harus seperti `ACME_API_KEY`",
         "reserved": "Nama dicadangkan",
         "empty": "Tanpa nilai",
         "tooLarge": "Nilai terlalu besar"
@@ -5621,7 +5630,8 @@
         },
         "speedText": "Menjawab lebih cepat dalam percakapan dan menghabiskan paket 2,5× lebih cepat. Rutinitas dan tugas panjang tetap standar.",
         "modelLine": {
-          "opus": "Paling mampu. Menghabiskan paket lebih cepat.",
+          "fable": "Paling mampu. Menghabiskan paket jauh lebih cepat.",
+          "opus": "Sangat mampu. Menghabiskan paket lebih cepat.",
           "sonnet": "Seimbang. Cocok untuk hampir semua hal.",
           "haiku": "Cepat dan ringan. Untuk tugas sederhana."
         },
@@ -5883,6 +5893,7 @@
       "budget": "Anggaran",
       "owner": "Pemilik",
       "audience": "Siapa yang bisa bicara",
+      "editors": "Siapa yang bisa mengedit",
       "channels": "Kanal",
       "machine": "Komputer",
       "brain": "Siapa yang berpikir",
@@ -5917,12 +5928,9 @@
       "memberPersonal": "Kamu melihat cara kerja {{name}}. Hanya orang yang mengelola ruang ini yang bisa mengedit.",
       "memberOwner": "Kamu melihat cara kerja {{name}}. Yang bisa mengedit: admin dan {{owner}} (pemilik).",
       "memberOwnerPersonal": "Kamu melihat cara kerja {{name}}. Yang bisa mengedit: {{owner}} (pemilik) dan orang yang mengelola ruang ini.",
-      "owner": "Kamu pemilik {{name}}: kamu bisa mengubah tampilan, siapa yang bisa bicara, kanal, dan komputernya. Sisanya hanya admin.",
-      "ownerKeeper": "Kamu pemilik {{name}}: kamu bisa mengubah tampilan, siapa yang bisa bicara, percakapan grup, dan komputernya. Sisanya hanya {{keeper}}.",
-      "ownerPersonal": "Kamu pemilik {{name}}: kamu bisa mengubah tampilan, siapa yang bisa bicara, percakapan grup, dan komputernya. Sisanya hanya orang yang mengelola ruang ini.",
-      "ownerInstructions": "Hanya admin yang bisa mengedit instruksi. Sebagai pemilik, kamu menyetujui perubahan yang diusulkan.",
-      "ownerInstructionsKeeper": "Hanya {{keeper}} yang bisa mengedit instruksi. Sebagai pemilik, kamu menyetujui perubahan yang diusulkan.",
-      "ownerInstructionsPersonal": "Hanya orang yang mengelola ruang ini yang bisa mengedit instruksi. Sebagai pemilik, kamu menyetujui perubahan yang diusulkan.",
+      "owner": "Kamu pemilik {{name}}: kamu bisa mengubah instruksi, peran, skill, tampilan, siapa yang bisa bicara atau mengedit, kanal, dan komputernya. Sisanya hanya admin.",
+      "ownerKeeper": "Kamu pemilik {{name}}: kamu bisa mengubah instruksi, peran, skill, tampilan, siapa yang bisa bicara atau mengedit, percakapan grup, dan komputernya. Sisanya hanya {{keeper}}.",
+      "ownerPersonal": "Kamu pemilik {{name}}: kamu bisa mengubah instruksi, peran, skill, tampilan, siapa yang bisa bicara atau mengedit, percakapan grup, dan komputernya. Sisanya hanya orang yang mengelola ruang ini.",
       "ownerAccess": "Hanya admin yang bisa memberi atau mencabut akses dan repositori.",
       "ownerAccessKeeper": "Hanya {{keeper}} yang bisa memberi atau mencabut akses dan repositori.",
       "ownerAccessPersonal": "Hanya orang yang mengelola ruang ini yang bisa memberi atau mencabut akses dan repositori."
@@ -6047,13 +6055,13 @@
       "forgotten": "Dilupakan. Ada di Arsip jika kamu ingin mengembalikannya.",
       "saved": "Tersimpan. Sekarang dihitung terverifikasi.",
       "rules": "Aturan dari orang-orang",
-      "rulesNote": "Berlaku di semua pekerjaan untuk orang yang memberinya, dari mana pun permintaannya datang. Aturan dari penanggung jawab atau admin berlaku untuk semua.",
+      "rulesNote": "Setiap aturan berlaku untuk orang yang memberinya, dari mana pun permintaannya datang. Aturan dari penanggung jawab atau admin berlaku untuk semua.",
       "rulesNoteRightHand": "Aturan yang Anda beri di DM Anda hanya berlaku untuk Anda. Hanya Anda yang melihatnya.",
       "ruleBy": "Dari {{name}} · {{date}}",
       "removeRule": "Hapus",
       "ruleRemoved": "Aturan dihapus. Ada di Arsip jika kamu ingin mengembalikannya.",
       "playbook": "Cara kerja {{name}}",
-      "playbookNote": "Cara kerja yang disimpannya untuk dirinya sendiri. Tidak muncul di obrolan. Yang didapatnya dari luar dan tidak pernah dipakai lagi hilang sendiri dan tetap ada di Diarsipkan.",
+      "playbookNote": "Cara kerja yang disimpannya untuk dirinya sendiri. Tidak muncul di obrolan. Yang didapatnya dari luar dan tidak pernah dipakai lagi pindah sendiri ke Diarsipkan.",
       "details": "Detail teknis",
       "skills": "Skill yang dibuatnya",
       "skillUses_other": "dimuat {{count}} kali",
@@ -6137,12 +6145,13 @@
         "computer_busy": "Komputer terus sibuk dengan tugas lain.",
         "computer_failed": "Komputer mengalami masalah dan berhenti.",
         "computer_timeout": "Komputer terlalu lama menjawab.",
+        "disk_full": "Disk komputer ini penuh. Hapus file yang tidak kamu perlukan lagi di sana (agen bisa melakukannya setelah ada sedikit ruang), atau minta admin mengosongkan ruang.",
         "cli_failed": "Program {{brain}} berhenti karena kesalahan: {{detail}}",
         "cli_stopped": "Program {{brain}} berhenti karena kesalahan.",
         "cli_closed": "Program {{brain}} tertutup tiba-tiba.",
         "cli_sandbox": "Program {{brain}} tidak bisa menjalankan sandbox-nya di komputer ini. Pilih AI lain di pengaturan agen.",
         "account_missing": "Akun yang dipilih untuk agen ini sudah tidak ada di komputernya. Pilih akun lain di pengaturan agen, atau tambahkan lagi.",
-        "windows_sandbox": "Komputer Windows ini tidak dapat mengisolasi perintah Codex: perlu Windows 11 24H2 atau yang lebih baru.",
+        "windows_sandbox": "Komputer Windows ini tidak dapat mengisolasi perintah Codex: perlu Windows 11 24H2 atau yang lebih baru. Perbarui Windows, pilih Claude atau kunci API untuk agen ini, atau pindahkan ke komputer Linux.",
         "our_error": "Ada yang salah di pihak kami dan tugasnya berhenti. Minta lagi sebentar lagi.",
         "unknown": "Gagal."
       }
@@ -6166,6 +6175,7 @@
       "budget": "Anggaran",
       "owner": "Pemilik",
       "audience": "Siapa yang bisa bicara",
+      "editors": "Siapa yang bisa mengedit",
       "channels": "Kanal",
       "computer": "Komputer",
       "danger": "Arsipkan atau hapus",
@@ -6557,7 +6567,7 @@
         "done": "Saya membaca {{apps}}",
         "doneNone": "Belum ada aplikasi",
         "title": "Aplikasi kerjamu",
-        "desc": "Yang akan dipakai tim barumu muncul lebih dulu. Membaca tidak pernah mengubah apa pun, dan mengirim, menghapus, serta membayar meminta persetujuanmu.",
+        "desc": "Membaca tidak pernah mengubah apa pun. Mengirim, menghapus, dan membayar meminta persetujuanmu.",
         "connect": "Hubungkan",
         "all": "Lihat semua aplikasi",
         "todoPersonal": "Hubungkan aplikasimu.",
@@ -6874,6 +6884,7 @@
     "modelAndCost": "Model dan biaya",
     "model": "Model",
     "modelDesc": {
+      "fable": "Paling mampu, untuk pekerjaan tersulit",
       "sonnet": "Disarankan untuk sebagian besar",
       "opus": "Tugas panjang dan sulit",
       "haiku": "Cepat dan murah",
@@ -7396,7 +7407,7 @@
     },
     "arrival": {
       "title": "Selamat datang di {{org}}, {{name}}",
-      "lead": "Di sini tim dan agen bekerja bersama: tulis di #{{channel}} atau panggil agen dengan namanya.",
+      "lead": "Tulis di #{{channel}} atau panggil agen dengan namanya.",
       "alsoIn": "Kamu juga ada di {{channels}}.",
       "sayHi": "Sapa di #{{channel}}",
       "talkTo": "Bicara dengan {{name}}",
@@ -7597,7 +7608,10 @@
     "unreachableTitle": "agentes.chat tidak bisa dijangkau",
     "unreachableText": "Mungkin sedang dimulai ulang. Halaman ini terbuka sendiri begitu kembali normal.",
     "offlineTitle": "Kamu sedang offline",
-    "offlineText": "Halaman ini terbuka sendiri saat kamu kembali online."
+    "offlineText": "Halaman ini terbuka sendiri saat kamu kembali online.",
+    "unknownHostTitle": "Alamat ini belum disiapkan",
+    "unknownHostText": "Kalau baru saja dihubungkan, coba lagi dalam beberapa menit.",
+    "unknownHostTab": "Alamat belum disiapkan · agentes.chat"
   },
   "scopes": {
     "context_read": {
@@ -8794,6 +8808,7 @@
       "computer_busy": "Komputernya terus sibuk dengan tugas lain",
       "computer_failed": "Komputer mengalami masalah dan berhenti",
       "computer_timeout": "Komputer terlalu lama menjawab",
+      "disk_full": "Disk komputer penuh",
       "cli_failed": "Program AI di komputer berhenti karena kesalahan",
       "account_missing": "Akun agen sudah tidak ada di komputernya",
       "our_error": "Ada yang salah di pihak kami"
@@ -8809,13 +8824,13 @@
       "dontRunName": "Jangan jalankan {{name}} saat batasnya diatur ulang",
       "canceledToast": "Dibatalkan. Tidak akan berjalan saat batasnya diatur ulang.",
       "continuedToast": "Proses dilanjutkan.",
-      "forbidden": "Hanya pembuat rutinitas, pemilik agen, atau admin yang bisa melanjutkannya sekarang",
+      "forbidden": "Hanya pembuat rutinitas, pemilik agen, yang bisa mengedit agen, atau admin yang bisa melanjutkannya sekarang",
       "extra_off": "Jatah paket ini sudah habis dan pekerjaan panjang agen ini tidak memakai penggunaan ekstra berbayar dari paket. Dia lanjut setelah diatur ulang",
       "extra_used_up": "Jatah paket ini sudah habis dan penggunaan ekstra berbayarnya juga habis atau tidak tersedia. Dia lanjut setelah diatur ulang"
     },
     "pausedRunningToast": "Rutinitas dijeda. Proses yang sedang berjalan juga dihentikan.",
     "deleteBodyRunning": "Rutinitas ini berhenti berjalan dan hilang dari daftar, dan proses yang sedang berjalan juga dihentikan. Proses sebelumnya tetap ada di riwayat.",
-    "detailsHidden": "Hanya pembuatnya, pemilik agen, admin, dan orang di percakapan itu yang melihat ini."
+    "detailsHidden": "Hanya pembuatnya, pemilik agen, yang bisa mengedit agen, admin, dan orang di percakapan itu yang melihat ini."
   },
   "missions": {
     "chip": "Misi · {{done}} dari {{count}}",
@@ -9288,8 +9303,7 @@
       "approvals": "Secara default, merge, deploy, dan rollback meminta persetujuan",
       "start": "Mulai misi",
       "created": "Misi dibuat: {{name}} sedang menyusun rencananya.",
-      "who": "Siapa yang menulis kode",
-      "codexOld": "Codex di {{computer}} terlalu lama untuk misi: perbarui di sana."
+      "who": "Siapa yang menulis kode"
     },
     "commandApproval": {
       "label": "Otonomi",
@@ -10189,8 +10203,8 @@
     "line": {
       "invalid": "TypeSafe tidak menerima kunci ini. Buat yang baru.",
       "no_credit": "Tambahkan saldo di TypeSafe. Jev lanjut dengan sendirinya.",
-      "env": "Diatur di pengaturan server ini (TYPESAFE_API_KEY).",
-      "envInvalid": "TypeSafe tidak menerima kunci ini. Ubah di pengaturan server ini (TYPESAFE_API_KEY)."
+      "env": "Diatur di pengaturan server ini (`TYPESAFE_API_KEY`).",
+      "envInvalid": "TypeSafe tidak menerima kunci ini. Ubah di pengaturan server ini (`TYPESAFE_API_KEY`)."
     },
     "checkAgain": "Periksa lagi",
     "via": {
@@ -10216,7 +10230,7 @@
       "line": {
         "invalid": "OpenRouter tidak menerima kunci ini. Buat yang baru.",
         "no_credit": "Tambahkan saldo di OpenRouter. Jev lanjut dengan sendirinya.",
-        "envInvalid": "OpenRouter tidak menerima kunci ini. Ubah di pengaturan server ini (TYPESAFE_API_KEY)."
+        "envInvalid": "OpenRouter tidak menerima kunci ini. Ubah di pengaturan server ini (`TYPESAFE_API_KEY`)."
       }
     },
     "remove": {
@@ -10294,7 +10308,6 @@
       "needsCloud": {
         "online": "{{computer}} sedang memulai ulang atau menyambung lagi. Ini berubah sendiri begitu ia kembali.",
         "installing": "{{program}} sedang dipasang di {{computer}}. Ini berubah sendiri setelah selesai.",
-        "updating": "{{program}} sedang diperbarui di {{computer}}. Ini berubah sendiri setelah selesai.",
         "runnerOld": "Program agentes.chat di {{computer}} sudah usang dan pembaruannya sedang dalam perjalanan. Ini berubah sendiri setelah selesai.",
         "execOff": "{{computer}} belum bisa menjalankan {{program}}. Kami sedang menanganinya, dan ini berubah sendiri.",
         "toolOff": "{{program}} belum diizinkan di {{computer}}. Itu urusan kami: coba lagi nanti.",
@@ -10428,7 +10441,7 @@
     "modeText": {
       "everyone": "Siapa pun di ruang kerja bisa memanggil {{name}}.",
       "people": "Pilih orang dan peran yang bisa bicara dengan {{name}}.",
-      "owner": "Hanya {{owner}} yang bicara dengan {{name}}.",
+      "owner": "Hanya {{owner}} yang bicara dengan {{name}}. Di daftar, {{name}} hanya terlihat oleh {{owner}}, admin, dan yang boleh mengedit.",
       "noOwner": "Tetapkan pemilik untuk memakai opsi ini.",
       "everyonePersonal": "Siapa pun di sini bisa memanggil {{name}}.",
       "peoplePersonal": "Pilih orang yang bisa bicara dengan {{name}}."
@@ -10465,6 +10478,24 @@
       "only": "{{name}} hanya membalas {{names}}.",
       "some": "{{name}} hanya membalas beberapa orang.",
       "nobody": "{{name}} sedang tidak membalas siapa pun."
+    }
+  },
+  "editors": {
+    "section": "Siapa yang bisa mengedit",
+    "title": "Siapa yang bisa mengedit {{name}}",
+    "mode": {
+      "owner": "Hanya yang mengurus {{name}}",
+      "people": "Juga beberapa orang atau peran"
+    },
+    "modeText": {
+      "owner": "{{owner}} (pemilik), admin, dan siapa pun yang mengedit agen dan bisa bicara dengan {{name}}.",
+      "noOwner": "Admin dan siapa pun yang mengedit agen dan bisa bicara dengan {{name}}.",
+      "people": "Pilih siapa lagi yang bisa mengubah cara kerja {{name}}."
+    },
+    "rolesHint": "Siapa pun dengan peran ini bisa mengedit, termasuk yang mendapatkannya nanti.",
+    "note": "Mengedit berarti mengubah instruksi, peran, skill, dan rutinitas {{name}}. Aplikasi, anggaran, dan pemilik tetap di tangan yang mengedit agen.",
+    "summary": {
+      "owner": "Hanya yang mengurusnya"
     }
   },
   "composer": {
@@ -10528,7 +10559,7 @@
     "tooShort": "Terlalu singkat. Bicaralah sedikit lagi.",
     "silent": "Tidak terdengar apa pun. Tidak ada yang dikirim.",
     "notSent": "Audio tidak bisa dikirim.",
-    "limit": "Sudah banyak audio untuk hari ini. Tulis di sini dan coba lagi besok.",
+    "limit": "Batas audio hari ini sudah habis. Tulis di sini, atau coba lagi besok.",
     "micBlocked": "Mikrofon diblokir",
     "micBlockedHint": "Izinkan mikrofon di pengaturan perangkatmu untuk merekam.",
     "openSettings": "Buka pengaturan",
@@ -11149,8 +11180,8 @@
     "audienceInFolder": "Di dalam {{folder}}, yang aksesnya terbatas: di sini kamu hanya bisa mempersempitnya lagi.",
     "audienceFollows": "Dari {{folder}}",
     "audienceUseFolder": "Atur untuk folder {{folder}}",
-    "audienceFolderSaved": "Beres. Akses folder diperbarui.",
-    "audienceFolderOpened": "Beres. Folder ini sekarang tidak dibatasi.",
+    "audienceFolderSaved": "Akses folder diperbarui.",
+    "audienceFolderOpened": "Folder ini sekarang tidak dibatasi.",
     "audienceRootTitle": "Akses ke seluruh wiki",
     "audienceRootText": "Berlaku untuk setiap halaman dan folder wiki, juga yang ditambahkan nanti.",
     "audienceInRoot": "Seluruh wiki dibatasi: di sini kamu hanya bisa mempersempitnya lagi.",
@@ -11181,7 +11212,7 @@
       "failed_other": "{{count}} tidak berubah ({{titles}}): {{reason}}",
       "agentsTitle_other": "Agen yang membaca {{count}} halaman",
       "agentsText": "Siapa yang melihat tiap halaman di antara orang-orang tetap seperti semula.",
-      "agentsSaved_other": "Selesai. {{count}} halaman diperbarui."
+      "agentsSaved_other": "{{count}} halaman diperbarui."
     },
     "trash": {
       "title": "Sampah",
@@ -11212,8 +11243,8 @@
     "audienceAgentDetail": "Agen",
     "audiencePeople": "Orang",
     "audienceNoMatch": "Tidak ada yang bernama itu.",
-    "audienceSaved": "Beres. Akses diperbarui.",
-    "audienceOpened": "Beres. Semua orang bisa melihat dan mengeditnya.",
+    "audienceSaved": "Akses diperbarui.",
+    "audienceOpened": "Semua orang bisa melihat dan mengeditnya.",
     "noAccessTitle": "Kamu tidak punya akses ke halaman ini",
     "noAccessText": "Halaman ini hanya untuk orang tertentu. Kalau kamu butuh, tanyakan ke pengurus wiki.",
     "delete": "Pindahkan ke sampah",
@@ -11472,12 +11503,6 @@
       "read": "{{name}} sudah membacanya",
       "resolved": "{{name}} menutup permintaan bantuan"
     },
-    "well": {
-      "readYours": "Membaca catatanmu",
-      "readOf": "Membaca catatan {{name}}",
-      "nowYours": "Berhenti untuk membaca catatanmu",
-      "nowOf": "Berhenti untuk membaca catatan {{name}}"
-    },
     "strip": {
       "see": "Lihat",
       "toStop": "untuk menghentikan"
@@ -11571,11 +11596,6 @@
       "not_installed": "{{program}} belum terpasang di {{computer}}.",
       "cant_start": "{{program}} ada di {{computer}}, tetapi tidak mau berjalan.",
       "not_reported": "{{computer}} masih memeriksa program apa saja yang dimilikinya. Ini berubah sendiri setelah selesai.",
-      "outdated": "Versi di {{computer}} sudah lama. Perbarui Codex untuk memakainya.",
-      "outdatedCodex": "Codex CLI {{detected}} ditemukan di {{computer}}. Perbarui ke versi {{minimum}} atau yang lebih baru.",
-      "codexUpdateGuide": "Cara memperbarui Codex CLI",
-      "codexRecheckHere": "Setelah memperbarui, pilih Periksa lagi pada baris Codex di Preferensi › Alat.",
-      "codexRecheckThere": "Perbarui Codex CLI di {{computer}}. Jika komputer itu menjalankan aplikasi desktop, pilih Periksa lagi pada baris Codex di Preferensi › Alat.",
       "system": "{{program}} belum berjalan di sistem {{computer}}.",
       "no_computerCloud": "Siap begitu {{computer}} siap."
     },
@@ -11640,24 +11660,16 @@
     "see": "Lihat antrean",
     "openComputer": "Buka komputer",
     "label": "Antrean {{name}}",
-    "full": "Penuh",
-    "fullNext": "Penuh · berikutnya mulai sekitar {{n}} mnt lagi",
     "free": "Tidak ada yang mengantre",
     "workingNow": "Sedang bekerja · {{n}}",
     "inLine": "Dalam antrean · {{n}}",
     "allStarted": "semua mulai dalam ~{{n}} mnt",
     "nothingWorking": "Tidak ada yang berjalan sekarang",
     "rule": "Kerja baru mulai saat komputer punya memori kosong. Orang didahulukan. Agen yang disebut bersamaan mulai satu per satu.",
-    "cause_other": "Komputer penuh: {{count}} kerja memakai memorinya sekarang ({{fill}}).",
     "spill": {
-      "title": "Lebih banyak komputer, antrean lebih pendek",
+      "title": "Komputermu",
       "text": "Saat komputer ini penuh, balasan untukmu bisa mulai di salah satu komputermu. Kerja panjang dan file para agen tetap di sini.",
       "plan": "paket {{plan}} kamu"
-    },
-    "stopFill": {
-      "routine": "Hentikan rutinitas",
-      "work": "Hentikan kerja panjang",
-      "agent": "Hentikan {{name}}"
     },
     "youFirst": "Kamu duluan",
     "startsIn": "mulai ~{{n}} mnt lagi",
@@ -11689,13 +11701,7 @@
       "agents": "percakapan antar agen",
       "private": "percakapan pribadi"
     },
-    "live": {
-      "nextEta": "Menunggu komputer. Giliran berikutnya, sekitar {{n}} mnt lagi",
-      "next": "Menunggu komputer. Giliran berikutnya",
-      "waiting": "Menunggu komputer",
-      "behind": "Dalam antrean, ke-{{nth}}. Setelah {{names}}",
-      "position": "Dalam antrean, ke-{{nth}}"
-    },
+    "waiting": "Dalam antrean · segera dimulai",
     "nth": {
       "one": "{{n}}",
       "two": "{{n}}",
@@ -12072,7 +12078,40 @@
     "trashBy": "{{name}} · dihapus {{when}}",
     "daysLeft_other": "{{count}} hari",
     "goneIn_other": "hilang dalam {{count}} hari",
-    "fileBadge": "FILE"
+    "fileBadge": "FILE",
+    "folders": "Folder",
+    "folder": "Folder",
+    "newFolder": "Folder baru",
+    "renameFolder": "Ganti nama folder",
+    "renameFile": "Ganti nama file",
+    "rename": "Ganti nama",
+    "create": "Buat",
+    "openFolder": "Buka",
+    "folderMore": "Tindakan lain untuk {{name}}",
+    "path": "Jalur folder",
+    "up": "Naik satu tingkat",
+    "folderEmptyTitle": "Folder ini kosong",
+    "folderEmptyText": "Letakkan file di sini atau unggah. Menyeret file ke folder akan memindahkannya ke sana.",
+    "folderEmptyViewer": "File yang dimasukkan ke folder ini muncul di sini.",
+    "move": "Pindahkan",
+    "moveToMenu": "Pindahkan ke…",
+    "moveTitle_other": "Pindahkan {{count}} item",
+    "moveTo": "Folder",
+    "moveSearch": "Cari folder",
+    "moveEmpty": "Tidak ada folder bernama “{{q}}”.",
+    "moveHere": "Ada di sini",
+    "moveToName": "Pindahkan ke {{name}}",
+    "moved_other": "{{count}} item dipindahkan ke {{name}}.",
+    "deleteFolder": "Hapus folder",
+    "deleteFolderTitle": "Hapus “{{name}}”?",
+    "deleteFolderBody": "Folder di dalamnya juga ikut terhapus. File yang bisa kamu hapus masuk ke sampah selama 30 hari. File milik orang lain naik ke tempat folder ini berada.",
+    "folderDeletedEmpty": "Folder dihapus.",
+    "folderDeleted_other": "Folder dihapus. {{count}} file masuk ke sampah.",
+    "folderDeletedKept_other": "Folder dihapus. {{count}} file yang tidak bisa kamu hapus naik satu tingkat.",
+    "delete": "Hapus",
+    "deleteItemsTitle_other": "Hapus {{count}} item?",
+    "deleteItemsBody": "Folder dihapus beserta semua isinya. File yang boleh Anda hapus masuk ke sampah selama 30 hari. File milik orang lain naik satu tingkat.",
+    "itemsDeleted_other": "{{count}} item dihapus."
   },
   "storage": {
     "title": "Penyimpanan",
@@ -12328,7 +12367,7 @@
         "invalid": "Tidak valid"
       },
       "line": {
-        "env": "Diatur di pengaturan server ini (GITHUB_APP_ID).",
+        "env": "Diatur di pengaturan server ini (`GITHUB_APP_ID`).",
         "invalid": "Server ini tidak bisa membuka aplikasi yang tersimpan. Hapus lalu buat lagi.",
         "events": "Agar agen mendengar apa yang terjadi di GitHub, centang event berikut di aplikasi: {{events}}."
       },
@@ -12900,7 +12939,7 @@
     "composio": {
       "via": "Lewat Composio",
       "needsReconnect": "Perlu dihubungkan ulang",
-      "off_other": "{{names}} dan {{count}} layanan lain terhubung lewat Composio. Untuk mengaktifkannya, pengelola server ini mengatur COMPOSIO_API_KEY (lihat SELF_HOSTING.md).",
+      "off_other": "{{names}} dan {{count}} layanan lain terhubung lewat Composio. Untuk mengaktifkannya, pengelola server ini mengatur `COMPOSIO_API_KEY` (lihat `SELF_HOSTING.md`).",
       "usage": "Composio: {{calls}} dari {{limit}} panggilan di {{month}}",
       "usageNoLimit": "Composio: {{calls}} panggilan di {{month}}",
       "limitNotice": "Ruang kerja ini sudah menghabiskan panggilan Composio bulan ini",
@@ -13820,6 +13859,7 @@
       "vault_delete": "Hapus kata sandi",
       "vault_make_password": "Buat kata sandi",
       "get_my_usage": "Lihat pemakaian saya",
+      "ignore_usage_limit": "Abaikan batas penggunaan",
       "send_feedback": "Kirim masukan",
       "offer_feedback": "Tawarkan laporan masalah"
     }
@@ -14046,7 +14086,7 @@
       },
       "railway": {
         "1": "Di layanan Postgres, buka Data → Query dan jalankan perintah di bawah (ganti kata sandinya).",
-        "2": "Di Variables, salin DATABASE_PUBLIC_URL (DATABASE_URL bersifat internal dan tidak bisa dipakai dari sini).",
+        "2": "Di Variables, salin `DATABASE_PUBLIC_URL` (`DATABASE_URL` bersifat internal dan tidak bisa dipakai dari sini).",
         "3": "Ganti user dan kata sandi di dalamnya dengan agentes_leitura dan kata sandi pilihanmu, lalu tempel di sini."
       },
       "rds": {
@@ -14081,7 +14121,7 @@
     "error": {
       "auth": "User atau kata sandi tidak cocok. Periksa lalu coba lagi.",
       "unreachable": "Kami tidak bisa menjangkau server database. Periksa alamatnya dan apakah server menerima koneksi dari luar.",
-      "blocked_host": "Server ini tidak diizinkan. Pakai alamat publik database (alamat internal, seperti DATABASE_URL di Railway, tidak bisa dipakai dari sini).",
+      "blocked_host": "Server ini tidak diizinkan. Pakai alamat publik database (alamat internal, seperti `DATABASE_URL` di Railway, tidak bisa dipakai dari sini).",
       "tls": "Database tidak menerima koneksi aman. Aktifkan SSL di database, atau pilih Tanpa enkripsi di bagian Lanjutan (hanya untuk database uji coba).",
       "unknown": "Tidak bisa terhubung sekarang. Coba lagi sebentar lagi.",
       "no_databases": "Pengguna ini tidak bisa membuka database apa pun di server ini. Periksa izinnya atau awalan namanya."
@@ -14832,7 +14872,7 @@
       "continueExtraOff": "Jatah periode paket ini sudah habis dan pekerjaan panjang agen ini tidak memakai pemakaian tambahan berbayar dari paket. Agen melanjutkan setelah reset.",
       "continueExtraUsedUp": "Jatah periode paket ini sudah habis dan pemakaian tambahan berbayarnya juga habis atau tidak tersedia. Agen melanjutkan setelah reset.",
       "actionsNeedApprover": "Hanya pemilik agen atau orang yang menyetujui tindakannya yang bisa membiarkan rutinitas bertindak sendiri.",
-      "editorOnly": "Hanya pembuat rutinitas, pemilik agen, atau Admin yang bisa mengubahnya.",
+      "editorOnly": "Hanya pembuat rutinitas, pemilik agen, yang bisa mengedit agen, atau Admin yang bisa mengubahnya.",
       "widgetFixed": "Rutinitas ini menjaga widget tetap terbaru. Ubah dari widget-nya."
     },
     "run": {
@@ -14860,6 +14900,9 @@
       "sharingEmpty": "Pilih siapa yang melihat.",
       "sharingTooMany": "Pilih paling banyak {{max}} orang dan {{max}} peran.",
       "notInDrive": "Ini hanya ada di percakapannya, jadi tidak bisa dibagikan."
+    },
+    "drive": {
+      "folderIntoItself": "Folder tidak bisa dimasukkan ke dirinya sendiri atau ke folder di dalamnya."
     },
     "live": {
       "readOnly": "File ini sekarang hanya bisa dibaca, jadi tidak bisa diubah.",
@@ -14905,6 +14948,7 @@
       "askSelf": "Ini komputermu: nyalakan dengan tombolnya.",
       "adminAskSelf": "Kamu bisa melakukannya sendiri di sini.",
       "accountMethodUnsupported": "Komputer ini belum bisa menghubungkan Claude dengan cara ini. Perbarui program agentes.chat di komputer ini, atau pakai kunci API.",
+      "brainUnavailable": "AI ini belum disiapkan di {{computer}}. Siapkan di sana, atau pilih yang lain.",
       "offline": "{{name}} sedang offline. Coba lagi setelah ia kembali.",
       "paused": "{{name}} dijeda: tidak ada yang baru dimulai di sana sampai dilanjutkan.",
       "timeout": "Komputer tidak menjawab tepat waktu. Coba lagi."
@@ -14949,7 +14993,7 @@
       "ownerOrAdmin": "Hanya pemilik agen atau Admin yang bisa melakukan ini.",
       "detailsHidden": "Hanya orang yang berbicara dengan {{agentName}} yang bisa melihat cara kerjanya.",
       "undoForbidden": "Hanya orang yang dibantu agen, pemiliknya, atau Admin yang bisa membatalkan ini.",
-      "undoSkillsAdmins": "Hanya Admin yang bisa membatalkan atau mengulang perubahan pada skill agen."
+      "undoSkillsAdmins": "Hanya yang bisa mengedit agen yang bisa membatalkan atau mengulang perubahan pada skill-nya."
     },
     "account": {
       "notRestorable": "Akun ini sudah tidak bisa dipulihkan.",
@@ -14970,7 +15014,7 @@
       "titleRequired": "Beri nama.",
       "tooLong": "Terlalu panjang. Batasnya {{max}}.",
       "notHttps": "Gunakan alamat yang diawali https://",
-      "keyNameInvalid": "Gunakan huruf kapital, angka, dan _ pada nama, misalnya ACME_API_KEY.",
+      "keyNameInvalid": "Gunakan huruf kapital, angka, dan _ pada nama, misalnya `ACME_API_KEY`.",
       "keyNameReserved": "Nama ini dicadangkan. Pilih nama lain.",
       "keyNameTaken": "Sudah ada kunci tersimpan dengan nama ini di sini.",
       "contactEmpty": "Isi setidaknya satu kolom.",
@@ -15365,14 +15409,20 @@
       "since": "sejak {{time}}",
       "until": "sampai {{time}}",
       "withHost": "bersama {{host}}",
-      "lastSeen": "terakhir terlihat {{time}}"
+      "lastSeen": "terakhir terlihat {{time}}",
+      "offlineUnresponsive": "berhenti merespons pukul {{time}}",
+      "offlineStopped": "runner berhenti pukul {{time}}",
+      "offlineDropped": "koneksi terputus pukul {{time}}"
     },
     "line": {
       "ready": "Agen bisa memakainya sekarang.",
       "busy_other": "{{count}} dari {{max}} tugas berjalan",
       "offline": "Agen menunggu sampai perangkat ini kembali.",
       "offlineSeen": "Terakhir terlihat {{time}}. Agen menunggu sampai perangkat ini kembali.",
-      "offlineWithHost": "{{host}} sedang offline. Agen menunggu sampai komputer itu kembali."
+      "offlineWithHost": "{{host}} sedang offline. Agen menunggu sampai komputer itu kembali.",
+      "offlineUnresponsive": "Berhenti merespons pukul {{time}}, mungkin tanpa jaringan atau kelebihan beban. Jalankan `{{command}}` di sana.",
+      "offlineStopped": "Runner berhenti pukul {{time}}. Jalankan lagi, atau jalankan `{{command}}` di sana untuk melihat sebabnya.",
+      "offlineDropped": "Koneksi terputus pukul {{time}}. Ia tersambung lagi sendiri. Jika tidak, jalankan `{{command}}` di sana."
     },
     "reason": {
       "locked": "Ponselnya terkunci",
@@ -15732,7 +15782,12 @@
       "iosBehind": "iPhone ini menjalankan iOS {{ios}} dan Xcode di Mac ini untuk iOS {{sdk}}. Perbarui iPhone: Pengaturan › Umum › Pembaruan Perangkat Lunak.",
       "xcodeOld": "{{name}} memakai iOS {{version}}, sedangkan Xcode di {{mac}} paling tinggi mengenal iOS {{sdk}}. Instal Xcode {{major}}, lalu jalankan ini di Terminal.",
       "xcodeOldAny": "{{name}} memakai iOS {{version}}, lebih baru dari yang dikenal Xcode di {{mac}}. Instal Xcode {{major}}, lalu jalankan ini di Terminal.",
-      "uiRefusedText": "iPhone menolak ketukan helper pengujian. Buka kuncinya dan masukkan kode sandinya jika diminta. Jika terus terjadi, matikan lalu nyalakan lagi Pengaturan › Pengembang › Aktifkan Otomatisasi UI.",
+      "uiRefusedText": "Agen bisa melihat layar iPhone, tetapi iOS menolak ketukan mereka.",
+      "uiTurnOn": "Di iPhone, nyalakan keduanya:",
+      "uiPasscode": "Masukkan kode sandinya saat diminta, dan biarkan tetap tidak terkunci.",
+      "uiCheck": "Periksa lagi",
+      "repair": "Perbaiki helper pengujian",
+      "repairHint": "Gunakan saat ketukan masih gagal meski keduanya sudah nyala. Mac menghentikan helper pengujian dan membuatnya lagi dengan Xcode-nya, dalam beberapa menit.",
       "tooOld": "{{name}} memakai iOS {{version}}, dan agen butuh iOS 17 atau lebih baru. Perbarui jika bisa, atau colokkan iPhone yang lebih baru.",
       "tooOldVersion": "16 atau lebih lama",
       "pluggedIn": "Sudah tercolok",
@@ -16261,6 +16316,11 @@
       "sentence": "{{who}} menjawab lewat email",
       "request": "permintaan dukungan dari {{name}}"
     },
+    "operatorReview": {
+      "sentence": "{{who}} meninjau konten demi keamanan",
+      "items_other": "{{value}} item",
+      "period": "{{from}} sampai {{to}}"
+    },
     "change": {
       "mergedWithoutAsking": "Merge di {{repo}} tanpa bertanya",
       "accentChanged": "Mengubah warna aksen ruang kerja",
@@ -16642,7 +16702,7 @@
       "envOffHere": "Dimatikan di aplikasi agentes.chat di komputer ini.",
       "see": "Lihat apa yang dikirim",
       "dialogTitle": "Apa yang dikirim",
-      "dialogText": "Sekali sehari. Ini laporan berikutnya, persis apa adanya."
+      "dialogText": "Dikirim sekali sehari. Ini persis laporan berikutnya."
     },
     "tileState": {
       "members_other": "{{count}} anggota"
@@ -16772,8 +16832,8 @@
         },
         "line": {
           "invalid": "Server ini tidak bisa membaca kunci ini. Tempel lagi.",
-          "env": "Diatur di pengaturan server ini (GIPHY_API_KEY).",
-          "envInvalid": "Kunci ini tidak bisa dipakai. Ubah di pengaturan server ini (GIPHY_API_KEY)."
+          "env": "Diatur di pengaturan server ini (`GIPHY_API_KEY`).",
+          "envInvalid": "Kunci ini tidak bisa dipakai. Ubah di pengaturan server ini (`GIPHY_API_KEY`)."
         },
         "invalid": "GIPHY tidak menerima kunci ini. Salin lagi dari GIPHY Developers.",
         "remove": {
@@ -16973,7 +17033,7 @@
       "routines": "Rutinitas"
     },
     "hint": {
-      "handoffs": "Sebagian besar penggunaan minggu ini berasal dari agen yang saling menyerahkan pekerjaan. Untuk pekerjaan panjang, minta langsung ke agennya.",
+      "handoffs": "Sebagian besar berasal dari serah terima antaragen.",
       "message": "Kirim pesan ke {{name}}"
     }
   },
@@ -17141,7 +17201,7 @@
     "autoUpdateNow": "Sekarang: {{now}}.",
     "statusReply": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca di langkah berikutnya.",
     "statusReplyTurn": "Saya sedang di tengah tugas ({{duration}}) dan belum bisa menjawab. Pesan Anda sudah antre dan saya baca setelah putaran kerja ini selesai.",
-    "statusReplyQueued": "Menunggu komputer ({{duration}}). Saya baca pesan Anda saat tiba giliran saya.",
+    "statusReplyQueued": "Dalam antrean ({{duration}}). Saya baca pesan Anda saat tiba giliran saya.",
     "statusReplyAway": "Menunggu komputer saya kembali. Saya baca pesan Anda begitu komputer kembali.",
     "statusReplyPlan": "Menunggu paket saya kembali ({{when}}). Saya baca pesan Anda saat paket kembali.",
     "statusReplyPlanUnknown": "Menunggu paket saya kembali. Saya baca pesan Anda begitu paket kembali.",
@@ -17350,6 +17410,11 @@
         "shell": "Menjalankan perintah lain di dalamnya",
         "inline": "Menjalankan kode yang ditulis langsung",
         "global": "Memasang untuk seluruh komputer",
+        "privilege": "Meminta hak lebih",
+        "reverseShell": "Menyerahkan shell komputer ini ke mesin lain",
+        "destroy": "Akan menghapus komputer atau seluruh folder home",
+        "network": "Mengubah atau melewati proxy dan firewall",
+        "otherUser": "Menjangkau file pengguna lain",
         "rules": "Di luar yang boleh dilakukan agen sendiri",
         "noAccess": "Agen tidak punya akses ke ini",
         "policy": "Tidak diizinkan dalam jenis pekerjaan ini",
@@ -17677,8 +17742,7 @@
       "provider_wait_ours": "Ada masalah di pihak kami yang menghambat AI-ku, bukan akunmu. Aku akan menjawab begitu selesai.",
       "provider_back": "AI-ku sudah kembali.",
       "confidential_removed": "Dihapus: teks rahasia disimpan selama {{days}} hari.",
-      "brain_busy": "Komputerku sedang sibuk dengan tugas lain. Aku akan menjawab begitu ia luang.",
-      "brain_queued": "Aku masih di antrean komputer. Aku jawab begitu ada memori kosong.",
+      "brain_queued": "Masih dalam antrean. Saya akan menjawab begitu giliran saya tiba.",
       "brain_interrupted": "{{brain}} berhenti sebelum selesai. Sudah dikerjakan, tidak diulang: {{tools}}.",
       "plan_limit_cut": "Aku berhenti di batas paket {{plan}}. Aku akan melanjutkan dari titik terakhir {{when}}, saat batasnya direset.",
       "plan_limit_cut_unknown": "Aku berhenti di batas paket {{plan}}. Aku akan melanjutkan dari titik terakhir begitu batasnya direset.",
@@ -18573,6 +18637,21 @@
     "writeAfter": ".",
     "ask": "Butuh bantuan? Tanyakan ke pengelola server ini."
   },
+  "resetOrg": {
+    "cardTitle": "Atur ulang atau hapus",
+    "row": {
+      "title": "Atur ulang ruang kerja",
+      "text": "Menghapus semua yang dibuat di dalamnya dan mulai lagi, dengan orang-orang yang sama."
+    },
+    "goes": "Agen, percakapan, DM, file, tugas, rutinitas, dan memori",
+    "stays": "Orang, peran, undangan, akun AI, komputer, dan konektor",
+    "fresh": "Setelah itu ruang kerja terbuka seperti baru, dengan penyiapan awal",
+    "plan": "Paketnya tetap sama, tanpa tagihan baru",
+    "now": "Terjadi seketika dan tidak bisa dibatalkan.",
+    "title": "Atur ulang {{name}}?",
+    "submit": "Atur ulang ruang kerja",
+    "resetting": "Mengatur ulang {{name}}…"
+  },
   "deleteOrg": {
     "card": {
       "title": "Hapus ruang kerja",
@@ -18644,8 +18723,7 @@
     "menu": "Hapus akun",
     "card": {
       "text": "Menghapus akunmu dalam 7 hari, di semua ruang kerja.",
-      "button": "Hapus akun…",
-      "title": "Hapus"
+      "button": "Hapus akun…"
     },
     "title": "Hapus seluruh akunmu?",
     "intro": "Ini menghapus seluruh akunmu, bukan hanya satu ruang kerja.",
@@ -19142,8 +19220,6 @@
       "working": "Bekerja",
       "ok": "Menunggumu",
       "answer": "Menunggu jawaban",
-      "computerBusy": "Menunggu tempat di komputer",
-      "inLine": "Antre · ke-{{position}}",
       "computerOffline": "Menunggu komputer",
       "plan": "Menunggu kuota paket",
       "budget": "Menunggu anggaran",
@@ -19168,7 +19244,6 @@
       "computerWait": "Menunggu komputer",
       "computerWaitNext": "Lanjut saat komputer siap",
       "computerOfflineNext": "Lanjut saat komputer menyala",
-      "computerBusyNext": "Mulai saat ada memori kosong",
       "okNext": "Lanjut saat ada yang menyetujui",
       "answerNext": "Lanjut saat ada yang menjawab",
       "back": "Lanjut {{when}}",
@@ -19253,7 +19328,7 @@
     "failed": "Tidak bisa menghentikannya. Coba lagi.",
     "queue": {
       "see": "Lihat antrean",
-      "full_other": "Penuh · {{count}} antre",
+      "inLine_other": "{{count}} dalam antrean",
       "room": "Ada tempat",
       "computers": "Komputer"
     },
@@ -19829,14 +19904,14 @@
       "failed": "Tim tidak dibuat. Alasannya ada di kartu percakapan.",
       "none": "Tidak ada yang cocok",
       "noneSub": "Ceritakan apa yang kamu kerjakan dan {{name}} menyusunnya",
-      "tailor": "Nanti, cukup minta saya menyesuaikannya dengan bisnismu.",
+      "tailor": "Nanti, minta saya menyesuaikannya dengan bisnismu.",
       "titlePersonal": "Agenmu",
       "leadPersonal": "Agen siap pakai untuk bantuan yang kamu butuhkan. Lalu {{name}} menyesuaikannya untukmu.",
       "heldLeadPersonal": "Pilih yang paling mendekati kebutuhanmu. Semuanya bisa diubah nanti.",
       "createPersonal": "Buat agenku",
       "failedPersonal": "Agenmu tidak dibuat. Alasannya ada di kartu percakapan.",
       "noneSubPersonal": "Ceritakan apa yang kamu butuhkan dan {{name}} menyiapkannya",
-      "tailorPersonal": "Nanti, cukup minta saya menyesuaikannya dengan rutinitasmu."
+      "tailorPersonal": "Nanti, minta saya menyesuaikannya dengan rutinitasmu."
     },
     "weekly": {
       "name": "Minggu tim",
@@ -20262,6 +20337,38 @@
       "alwaysOn": "Mulai sekarang, laporan seperti ini dikirim tanpa bertanya.",
       "askFirst": "Tanya dulu sebelum mengirim"
     }
+  },
+  "problemReport": {
+    "button": "Kirim laporan",
+    "title": "Kirim laporan ke agentes.chat",
+    "lead": "Tim agentes.chat menerima: versi, pengaturan mana yang diisi (tanpa nilainya), apa yang gagal, dan baris terakhir log. Tanpa pesan, halaman, nama, atau kunci.",
+    "noteLabel": "Apa yang terjadi? (opsional)",
+    "notePlaceholder": "Apa yang sedang kamu lakukan saat berhenti",
+    "emailLabel": "Email untuk balasan (opsional)",
+    "emailHelp": "Hanya jika kamu ingin dijawab.",
+    "showAll": "Lihat semua yang dikirim",
+    "copy": "Salin laporan",
+    "copied": "Tersalin",
+    "send": "Kirim",
+    "sending": "Mengirim…",
+    "cancel": "Batal",
+    "loading": "Mengumpulkan detail…",
+    "sentTitle": "Laporan {{id}} terkirim",
+    "sentText": "Jika kamu menghubungi kami, sebutkan kode ini.",
+    "sentTextReply": "Kami akan menjawab ke {{email}}. Sebutkan kode ini jika kamu menghubungi kami.",
+    "copyCode": "Salin kode",
+    "done": "Selesai",
+    "noLogComputer": "{{computer}} tidak menjawab, jadi lognya tidak disertakan.",
+    "oldRunner": "Aplikasi agentes.chat di {{computer}} terlalu lama untuk menyertakan lognya. Perbarui di sana agar lognya ikut.",
+    "noServerLines": "Baris log server hanya disertakan jika pemilik instalasi yang mengirim laporan.",
+    "off": "Pengiriman dimatikan di server ini (`PROBLEM_REPORT_URL=off`). Salin laporan untuk membagikannya.",
+    "errorRate": "Terlalu banyak laporan dalam waktu singkat. Coba lagi dalam {{minutes}} menit, atau salin laporannya.",
+    "errorUnreachable": "agentes.chat tidak menjawab. Coba lagi, atau salin laporannya.",
+    "errorRefused": "agentes.chat tidak menerima laporan ini (mungkin dari versi lama). Salin laporannya saja.",
+    "errorPreview": "Tidak bisa mengumpulkan detail: {{reason}}",
+    "emailInvalid": "Email itu sepertinya tidak benar. Perbaiki atau biarkan kosong.",
+    "settingsTitle": "Ada yang tidak berfungsi?",
+    "settingsText": "Kirim detail teknis ke tim agentes.chat."
   },
   "live": {
     "slides": {

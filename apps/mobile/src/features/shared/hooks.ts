@@ -4,7 +4,7 @@ import {
   type FormerAgent,
   type Member,
   type RealtimeConnection,
-  useAgents,
+  useAllAgents,
   useAuthConfig,
   useComputerSetup,
   useFormerAgents,
@@ -21,15 +21,13 @@ import { NavigationContext } from "expo-router/react-navigation";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, type AppStateStatus } from "react-native";
-import { useOrg } from "@/providers/org";
+import { useOrgId } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
 import { haptics, rememberAgentLooks, useTheme, useToast } from "@/ui";
 import { agentLook, daysAgo, type PacedClock, pacedClock, whenKind } from "./logic";
 
-/** The current organization's id. */
-export function useOrgId(): string {
-  return useOrg().orgId;
-}
+/** The current organization's id, from its own context: a change of `me` doesn't draw its readers again. */
+export { useOrgId };
 
 /**
  * Which words the computers get here: the Cloud's or self-host's (`computerEdition`). The server's
@@ -90,8 +88,10 @@ interface KeptDirectory {
  */
 const directories = new WeakMap<Agent[], WeakMap<FormerAgent[], WeakMap<Member[], KeptDirectory>>>();
 
-function directoryMaps(agents: Agent[], former: FormerAgent[], members: Member[]): DirectoryMaps {
-  const agentById = new Map(agents.map((a) => [a.id, a]));
+/** `agents` is what lists and pickers offer (`listed`); the lookups also resolve an agent unlisted to me. */
+function directoryMaps(all: Agent[], former: FormerAgent[], members: Member[]): DirectoryMaps {
+  const agents = all.filter((a) => a.listed !== false);
+  const agentById = new Map(all.map((a) => [a.id, a]));
   const gone = formerById(former);
   const anyAgent = (id: string) => agentById.get(id) ?? gone.get(id);
   const memberById = new Map(members.map((m) => [m.userId, m]));
@@ -136,7 +136,7 @@ function directoryOf(agents: Agent[], former: FormerAgent[], members: Member[], 
 /** Agents and people of the organization, by id: one object for every caller while the lists stay the same. */
 export function useDirectory(): Directory {
   const orgId = useOrgId();
-  const agents = useAgents(orgId);
+  const agents = useAllAgents(orgId);
   const former = useFormerAgents(orgId);
   const members = useMembers(orgId);
   return directoryOf(
@@ -149,7 +149,7 @@ export function useDirectory(): Directory {
 
 /** Toasts and other places that only know an agent's id draw it from these looks (once, at the app's root). */
 export function useRememberAgentLooks() {
-  const agents = useAgents(useOrgId());
+  const agents = useAllAgents(useOrgId());
   useEffect(() => {
     if (agents.data) rememberAgentLooks(agents.data.map((a) => ({ id: a.id, ...agentLook(a) })));
   }, [agents.data]);

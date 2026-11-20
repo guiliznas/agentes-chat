@@ -11,14 +11,15 @@ afterEach(forgetKeptSizes);
 describe("a row comes back as the person left it", () => {
   test("its fades play for what changes while it shows, never again on a scroll back", () => {
     const row = src("features/chat/MessageRow.tsx");
+    // Mounted again when "See more" opens its message, the same way: what it holds just shows.
     expect(row).toMatch(
-      /export const MessageRow = memo\(function MessageRow\(props: RowProps\) \{\s*return \(\s*<LayoutAnimationConfig skipEntering>\s*<RowBody \{\.\.\.props\} \/>/,
+      /export const MessageRow = memo\(function MessageRow\(props: RowProps\) \{[\s\S]*?return \(\s*<LayoutAnimationConfig key=\{opened \? "opened" : "row"\} skipEntering>\s*<RowBody \{\.\.\.props\} \/>/,
     );
   });
 
   test("a reply shows the work it showed the first time, however late it comes back", () => {
     const items = [{ kind: "say" as const, key: "s1", text: "Vou olhar" }];
-    rememberTurn("run-k1", { items, quotes: {}, at: 1000 });
+    rememberTurn("run-k1", { items, at: 1000 });
     expect(keptTurn("msg-k1", "run-k1", 2000)?.items).toEqual(items);
     // A minute later, the same reply still finds it; another reply of an old run doesn't.
     expect(keptTurn("msg-k1", "run-k1", 61_000)?.items).toEqual(items);
@@ -26,7 +27,6 @@ describe("a row comes back as the person left it", () => {
     // What it showed stays even if its run's work moved on.
     rememberTurn("run-k1", {
       items: [...items, { kind: "say" as const, key: "s2", text: "Pronto" }],
-      quotes: {},
       at: 70_000,
     });
     expect(keptTurn("msg-k1", "run-k1", 71_000)?.items).toEqual(items);

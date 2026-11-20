@@ -1,5 +1,6 @@
 import type { Dirent } from "node:fs";
 import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { ASK_AGAIN, inBrowserProfile } from "@agenteschat/adapters/command-policy";
 import {
@@ -85,8 +86,45 @@ export const LOCKED_TURNS_PAST_COUNT = 2;
 export const PERSON_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.4e9;
 /** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
 export const TURN_SETTLE_MS = 30_000;
+/**
+ * Past this share of the computer's memory in use, idle CLIs close one at a time (`closeIdleUnderPressure`). Below it
+ * they stay open: on a computer that sleeps, a sleeping CLI holds no host memory.
+ */
+export const BRAIN_PRESSURE_USED = 0.65;
+export const PRESSURE_POLL_MS = 30_000;
+
+/**
+ * Where memory is read (Linux): while more than `BRAIN_PRESSURE_USED` of it is in use, `close` closes one idle CLI
+ * (the least recently used) every `PRESSURE_POLL_MS`. The interval, for the caller to clear.
+ */
+export function closeIdleUnderPressure(
+  close: () => Promise<boolean>,
+  o: { memAvailable?: () => number | null; totalBytes?: number; everyMs?: number } = {},
+) {
+  let closing = false;
+  const timer = setInterval(() => {
+    const free = (o.memAvailable ?? hostMemAvailable)();
+    if (closing || free === null || free >= (1 - BRAIN_PRESSURE_USED) * (o.totalBytes ?? os.totalmem())) return;
+    closing = true;
+    void close()
+      .catch(() => false)
+      .finally(() => {
+        closing = false;
+      });
+  }, o.everyMs ?? PRESSURE_POLL_MS);
+  timer.unref?.();
+  return timer;
+}
+
 /** How long a turn without room may wait while idle warm CLIs close for it, before `no_slot`. */
 export const RECLAIM_MS = 5_000;
+/**
+ * After a `no_slot`, how often the memory is read again: once the agents' floor holds, `room.freed` tells the server's
+ * line at once instead of at its next retry. Only while the last refusal is younger than `ROOM_WATCH_MS` (the line asks
+ * again well within it while it still waits).
+ */
+export const ROOM_POLL_MS = 1_000;
+export const ROOM_WATCH_MS = 60_000;
 /**
  * Never refused for room nor at the ceiling: a brain turn holds its request for the whole turn, so a computer
  * full of agents' work would otherwise keep people from watching or taking control, or a person in control from
@@ -112,6 +150,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "task.start",
   "brain.turn",
   "brain.route",
+  "brain.warm",
   "git.sync",
   "browser.act",
   "browser.batch",
@@ -159,6 +198,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "brain.steer": "agent",
   // As the agent's own user: the account folder is lent to it, as for a turn.
   "brain.route": "agent",
+  "brain.warm": "agent",
   "git.sync": "agent",
   "mission.worktree": "agent",
   "access.request": "machine",
@@ -217,11 +257,15 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   // The person's own session: macOS's password window opens on their screen (a system-mode runner answers unsupported).
   "xcode.fix": "machine",
   "xcode.open": "machine",
+  // The process that sees the phones runs their helpers.
+  "phone.repair": "machine",
   // Looking for the coding CLIs only reads the computer's PATH, so root answers it in system mode too.
   "clis.check": "machine",
   // Installed as the runner's own user. Root answers unsupported: the agents' users get their CLIs from the
   // computer's setup, never from an install run as root.
   "cli.install": "machine",
+  // Reads the runner's own log and state: root's.
+  "report.collect": "machine",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -348,6 +392,8 @@ export interface HandlerContext {
   cliInstall?: (req: Extract<MachineRequest, { op: "cli.install" }>) => MachineReplies["cli.install"];
   /** `IPHONE_DEV_MODE_PROTOCOL`: opening Xcode on this Mac; without it the op answers `opened: false`. */
   xcodeOpen?: () => Promise<MachineReplies["xcode.open"]>;
+  /** `PROBLEM_REPORT_PROTOCOL`: what a problem report adds from this computer. */
+  reportParts?: () => MachineReplies["report.collect"];
 }
 
 export interface RequestScope {
@@ -658,6 +704,8 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     }
     if (hosted?.onSharedLogin(req) && req.agent) {
       const { agent } = req;
+      // Root starts such a sign-in's CLI only for its turn.
+      if (req.op === "brain.warm") return { open: false, started: false } satisfies MachineReplies["brain.warm"];
       if (req.op === "brain.route") {
         requireTool(ctx, "claude");
         return hosted.route(req, agent, scope);
@@ -721,6 +769,10 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
   if (req.op === "phone.look")
     return { looking: (await ctx.phones?.look()) ?? false } satisfies MachineReplies["phone.look"];
   if (req.op === "xcode.open") return (await ctx.xcodeOpen?.()) ?? { opened: false };
+  if (req.op === "phone.repair") {
+    if (!ctx.phones) throw new RunnerError("phone_missing", "This computer doesn't reach phones.");
+    return ctx.phones.repair(req);
+  }
   if (req.op === "phone.wifi")
     return ctx.phones ? ctx.phones.wifi(req) : ({ available: [] } satisfies MachineReplies["phone.wifi"]);
   if (req.op === "xcode.fix") {
@@ -729,6 +781,10 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
         fix: { kind: req.kind === "update" ? "update" : "select", state: "unsupported", step: 0 },
       }
     );
+  }
+  if (req.op === "report.collect") {
+    if (!ctx.reportParts) throw new RunnerError("bad_request", "This runner doesn't add to problem reports");
+    return ctx.reportParts();
   }
   if (req.op === "clis.check") {
     if (!ctx.clisCheck) throw new RunnerError("bad_request", "This runner doesn't look up its programs on request");
@@ -773,6 +829,19 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
   switch (req.op) {
     case "brain.turn":
       return doBrainTurn(ctx, req, scope, secrets);
+    case "brain.warm": {
+      if (req.kind !== "claude_code" || !ctx.brains || !req.agent) return { open: false, started: false };
+      requireTool(ctx, "claude");
+      const chat = req.permissions?.mode === "chat";
+      return ctx.brains.prewarm(req, {
+        agent: req.agent,
+        folder: ctx.workspaceReal,
+        secrets: secrets && !chat ? { env: secrets.env, redact: secrets.redact, hold: secrets.hold } : null,
+        emit: () => {},
+        ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
+        ...(ctx.grant ? { grant: ctx.grant } : {}),
+      });
+    }
     case "brain.route":
       // Never the agent's secrets: the route reads other people's messages.
       requireTool(ctx, req.kind === "codex" ? "codex" : "claude");
@@ -1567,6 +1636,8 @@ function describeOp(req: MachineRequest): string {
       return `task.output ${String(req.taskId ?? "")}`;
     case "brain.turn":
       return `brain.turn ${String(req.runId ?? "")} (${String(req.kind ?? "")}${req.model ? `, ${String(req.model)}` : ""})`;
+    case "brain.warm":
+      return `brain.warm ${String(req.session?.id ?? "").slice(0, 8)} (${String(req.kind ?? "")}${req.model ? `, ${String(req.model)}` : ""})`;
     case "brain.steer":
       // Never the text: how many messages, for which run.
       return `brain.steer ${String(req.runId ?? "")} (${Array.isArray(req.messages) ? req.messages.length : 0} messages)`;
@@ -1654,6 +1725,8 @@ export interface Admission {
   now?: () => number;
   /** Tests: `RECLAIM_MS`. */
   reclaimMs?: number;
+  /** Tests: `ROOM_POLL_MS`. */
+  roomPollMs?: number;
 }
 
 /**
@@ -1673,6 +1746,9 @@ export class RequestRunner {
   private lastPersonTurn = Number.NEGATIVE_INFINITY;
   /** The request in the slot held for a person's turn (`reserve`). */
   private reserved: string | null = null;
+  /** When a turn was last refused for room, until `room.freed` was sent. */
+  private refusedAt: number | null = null;
+  private roomWatch: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly ctx: HandlerContext,
@@ -1724,9 +1800,10 @@ export class RequestRunner {
     return true;
   }
 
-  private floorHolds(locked: boolean) {
+  /** A turn on its session's open CLI starts no process: it goes down to the person's floor (lower still when locked). */
+  private warmFloorHolds(locked: boolean) {
     const free = this.memAvailable();
-    return free !== null && free >= (locked ? LOCKED_TURN_MIN_FREE_BYTES : MIN_FREE_BYTES);
+    return free !== null && free >= (locked ? LOCKED_TURN_MIN_FREE_BYTES : PERSON_TURN_MIN_FREE_BYTES);
   }
 
   private memAvailable() {
@@ -1767,6 +1844,28 @@ export class RequestRunner {
       return Promise.resolve();
     }
     const controller = new AbortController();
+    // A warm start takes a CLI's memory like a turn, but never closes anything for it: no room, no start.
+    if (req.op === "brain.warm" && !this.ctx.paused?.()) {
+      this.inflight.set(id, controller);
+      const key = brainKey(req.agent?.id ?? "", String((req as { session?: { id?: unknown } }).session?.id ?? ""));
+      const open = this.ctx.warmBrain ? this.ctx.warmBrain(key).catch(() => false) : Promise.resolve(false);
+      return open.then((warm) => {
+        this.inflight.delete(id);
+        if (this.closed) return;
+        if (warm) return this.run(id, req, controller);
+        if (!this.admit(false, false)) {
+          this.reply(id, { ok: true, data: { open: false, started: false } satisfies MachineReplies["brain.warm"] });
+          return;
+        }
+        const at = this.admitted.at(-1);
+        // Declined (nothing to start it with, the agent's cap): no CLI of its grows, so other turns' room comes back.
+        return this.run(id, req, controller, (outcome) => {
+          if (outcome.ok && (outcome.data as MachineReplies["brain.warm"] | undefined)?.started) return;
+          const i = at === undefined ? -1 : this.admitted.lastIndexOf(at);
+          if (i >= 0) this.admitted.splice(i, 1);
+        });
+      });
+    }
     const locked = req.op === "brain.turn" && req.permissions?.mode === "chat";
     const person = req.op === "brain.turn" && req.personWaiting === true;
     // A paused computer says so (the handler refuses new work), never that it is full.
@@ -1781,12 +1880,13 @@ export class RequestRunner {
       this.inflight.set(id, controller);
       const session = (req as { session?: { id?: unknown } }).session?.id;
       const spare = brainKey(req.agent?.id ?? "", String(session ?? ""));
-      // A turn on its session's open CLI starts no process: the turns still settling don't count against it, the floor does.
+      // The turns still settling don't count against a turn on its session's open CLI, its floor does.
       const warm = this.ctx.warmBrain ? this.ctx.warmBrain(spare).catch(() => false) : Promise.resolve(false);
       return warm
         .then(
           (open) =>
-            (open && this.floorHolds(locked)) || this.reclaim(() => close(spare), controller.signal, locked, person),
+            (open && this.warmFloorHolds(locked)) ||
+            this.reclaim(() => close(spare), controller.signal, locked, person),
         )
         .then((room) => {
           if (!this.closed && (room || (!controller.signal.aborted && this.reserve(id, person))))
@@ -1803,9 +1903,41 @@ export class RequestRunner {
   private full(id: string) {
     const message = "This computer is short of memory for more work right now";
     this.reply(id, { ok: false, error: { code: "no_slot", message } });
+    this.refusedAt = (this.admission.now ?? Date.now)();
+    if (this.roomWatch || this.memAvailable() === null) return;
+    this.roomWatch = setInterval(() => {
+      const now = (this.admission.now ?? Date.now)();
+      if (this.closed || this.refusedAt === null || now - this.refusedAt > ROOM_WATCH_MS) return this.stopRoomWatch();
+      const free = this.memAvailable();
+      const settling = this.admitted.filter((at) => now - at < TURN_SETTLE_MS).length;
+      if (free !== null && free - settling * TURN_BYTES >= MIN_FREE_BYTES) this.roomFreed();
+    }, this.admission.roomPollMs ?? ROOM_POLL_MS);
+    this.roomWatch.unref?.();
   }
 
-  private run(id: string, req: MachineRequest, controller: AbortController): Promise<void> {
+  private stopRoomWatch() {
+    if (this.roomWatch) clearInterval(this.roomWatch);
+    this.roomWatch = null;
+  }
+
+  /** `ROOM_FREED_PROTOCOL`: the line waiting on this computer asks again now. An older server drops the frame. */
+  private roomFreed() {
+    this.refusedAt = null;
+    this.stopRoomWatch();
+    if (this.closed) return;
+    try {
+      this.send({ type: "room.freed" });
+    } catch {
+      // socket gone
+    }
+  }
+
+  private run(
+    id: string,
+    req: MachineRequest,
+    controller: AbortController,
+    settled?: (outcome: RequestOutcome) => void,
+  ): Promise<void> {
     const turn = req.op === "brain.turn";
     if (turn) this.turns++;
     this.inflight.set(id, controller);
@@ -1864,6 +1996,7 @@ export class RequestRunner {
           const note = notes.length > 0 ? ` (${notes.join(", ")})` : "";
           this.log(`${describeRequest(req)} ${Date.now() - startedAt}ms${note}`);
         }
+        settled?.(outcome);
         this.observe(() => this.observer?.finished(id, req, outcome));
         this.reply(id, outcome);
       })
@@ -1871,6 +2004,8 @@ export class RequestRunner {
         this.inflight.delete(id);
         if (turn) this.turns--;
         if (this.reserved === id) this.reserved = null;
+        // Its CLI is idle now, so a refused turn's ask can close it for room.
+        if (turn && this.refusedAt !== null) this.roomFreed();
       });
   }
 
@@ -1889,6 +2024,7 @@ export class RequestRunner {
   /** The connection ended: stop everything, send nothing more. */
   close() {
     this.closed = true;
+    this.stopRoomWatch();
     for (const c of this.inflight.values()) c.abort();
   }
 

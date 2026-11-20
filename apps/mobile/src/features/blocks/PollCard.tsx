@@ -9,23 +9,37 @@ import { serverUrl } from "@/lib/server";
 import { Icon, PressScale, Sky, Text, textLineOf, useToast } from "@/ui";
 import { useFontScale } from "@/ui/text-scale";
 import { leadBox } from "@/ui/type-scale";
+import { useMessageCardCorners } from "../chat/look";
+import { useRowDirectory, useRowMeId } from "../chat/row-data";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { faceOverlap } from "./logic";
 
 const FACES = 4;
+
+/** The closing time's format, made once per language (building one reads the language's data). */
+const closeFormats = new Map<string, Intl.DateTimeFormat>();
+function closeFormat(locale: string): Intl.DateTimeFormat {
+  let format = closeFormats.get(locale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" });
+    closeFormats.set(locale, format);
+  }
+  return format;
+}
 
 /**
  * A vote in the conversation (ADR 0113), drawn by the app and never by a page: a vote is an act of the person's.
  * Everyone sees the marks arrive (`poll.updated`).
  */
 export function PollCard({ id, version }: { id: string; version?: number }) {
+  const cardCorners = useMessageCardCorners();
   const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const toast = useToast();
   const artifact = useArtifact(orgId, id, version);
   const query = usePoll(orgId, id);
@@ -37,7 +51,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   const poll = query.data;
   if (a?.content.kind !== "poll" || !poll) {
     return (
-      <View style={[styles.card, styles.loading, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+      <View style={[styles.card, styles.loading, { backgroundColor: c.raised, borderColor: c.line2 }, cardCorners]}>
         <ActivityIndicator color={c.faint} />
         <Text variant="footnote" tone="muted">
           {t("mobile.blocks.building")}
@@ -57,11 +71,9 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   };
   // An option's label wraps: its box, mark and faces sit on its first line, not centred on the whole option.
   const line = textLineOf("body", fontScale);
-  const closes = new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "short" }).format(
-    new Date(poll.closesAt),
-  );
+  const closes = closeFormat(i18n.language).format(new Date(poll.closesAt));
   return (
-    <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+    <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }, cardCorners]}>
       <Sky
         color={agentLook(dir.agentById.get(a.createdBy.id)).color}
         surface="raised"
