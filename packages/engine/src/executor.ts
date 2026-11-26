@@ -48,7 +48,7 @@ import { announceAgentStatus, askRunStatus, soleStatusPick, startRunStatus, stat
 import { TECHNICAL_STYLE_LINE } from "./agent-style";
 import { type Agent, getAgentCached } from "./agents";
 import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
-import { planKeyFallbackOn } from "./ai-accounts/fallback";
+import { planCrossProviderOn, planKeyFallbackOn } from "./ai-accounts/fallback";
 import { runAsker } from "./ai-accounts/reply";
 import { type AgentAi, agentAiState, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { heldBehind, markNotRun, notRunAfter, notRunText, wakeLine } from "./approval-order";
@@ -3523,6 +3523,8 @@ async function executeRunInner(
             moved.to,
             isRightHand(agent) ? await rightHandPerson(db, agent, run) : null,
             isRightHand(agent) ? null : await runAsker(db, agent, run),
+            // Moved to another CLI by the order across CLIs: it goes on there, on the model chosen for it.
+            moved.kinds ? { kind: moved.kinds.to, ...(moved.model ? { model: moved.model } : {}) } : undefined,
           )
         : null;
     const cut = transcript.interruptedTurn;
@@ -4068,16 +4070,30 @@ async function executeRunInner(
     triedThisClaim.add(home.id);
     const tried = [...triedThisClaim];
     const person = isRightHand(agent) ? await rightHandPerson(db, agent, run) : null;
+    // The order across CLIs (ADR 0041 §6, amended 2026-11-26): only at a plan's limit, never for room, and never with a
+    // confidential thread's words in the transcript (one provider reads such a thread, ADR 0190).
+    const cross = cause !== "busy" && !ctx.confidential && (await planCrossProviderOn(db, run.orgId));
     const next = await nextAccountPlan(deps, await planAgent(), plan, tried, {
       ...(room ? { room } : {}),
       forPerson: person,
       asker: isRightHand(agent) ? null : await runAsker(db, agent, run),
       own,
+      cross,
     });
     const to = next.plan?.account;
     if (!next.plan || !to || !next.plan.session) return next;
     await db.update(agentRuns).set({ brainSessionId: next.plan.session.id }).where(eq(agentRuns.id, run.id));
+    const fromKind = prev?.kinds?.from ?? plan.kind;
+    const crossed = next.plan.kind !== plan.kind;
     plan = next.plan;
+    // Another CLI thinks from here on: its brain, the run's recorded brain and what thinks for it (ADR 0053 §10).
+    if (crossed && plan.kind !== "model") {
+      brain = createBrain(deps, thinker, run, plan.kind, turnToken, () => transcript as Transcript);
+      await recordRunBrain(db, run.id, plan.kind, plan.session?.machineId);
+      run = { ...run, brain: plan.kind };
+      thinksAs(plan.kind);
+      if (plan.kind !== "claude_code") onDemandForOtherBrain(t);
+    }
     triedThisClaim.add(to.id);
     // Back on the agent's own account (it reset while the run waited on another): the run is no longer moved.
     if (to.id === own) delete t.accountMove;
@@ -4087,6 +4103,8 @@ async function executeRunInner(
         to: to.id,
         ...(next.lentBy ? { lentBy: next.lentBy } : {}),
         tried: [...tried, to.id],
+        ...(plan.kind !== fromKind && plan.kind !== "model" ? { kinds: { from: fromKind, to: plan.kind } } : {}),
+        ...(plan.kind !== fromKind && plan.model ? { model: plan.model } : {}),
       };
     t.freshSession = next.plan.session.id;
     await noteMoved();
@@ -5380,7 +5398,9 @@ async function executeRunInner(
         if (back?.plan) continue;
         const machineId = plan.session?.machineId ?? agent.machineId;
         const own = machineId
-          ? await storedPlanUsage(db, run.orgId, machineId, plan.kind, moved.from).catch(() => null)
+          ? await storedPlanUsage(db, run.orgId, machineId, moved.kinds?.from ?? plan.kind, moved.from).catch(
+              () => null,
+            )
           : null;
         ownReset = bindingReset(own, Date.now());
         await leaveMovedAccount();

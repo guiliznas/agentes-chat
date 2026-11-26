@@ -1,11 +1,25 @@
 import type { PlanUsage } from "@agenteschat/adapters";
-import { and, type Executor, eq, isNull, ne, schema, sql } from "@agenteschat/db";
+import { and, type Executor, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
-import { autoPlanModel, claudeCodeModel, NEXT_ACCOUNT_KINDS, planOf } from "@agenteschat/providers/plans";
+import {
+  autoPlanModel,
+  CROSS_PROVIDER_KINDS,
+  claudeCodeModel,
+  crossMayMoveTo,
+  NEXT_ACCOUNT_KINDS,
+  planOf,
+} from "@agenteschat/providers/plans";
 import type { Agent } from "./agents";
 import { accountOrderSql, chainWhereSql } from "./ai-accounts/chain";
-import { type BrainPlan, computerBrainUnavailable, NO_AI_CODES, planIsOwners, storedPlanUsage } from "./brains/select";
-import type { BrainAccount, BrainSession } from "./brains/types";
+import {
+  type BrainPlan,
+  computerBrainUnavailable,
+  NO_AI_CODES,
+  planIsOwners,
+  sessionUsed,
+  storedPlanUsage,
+} from "./brains/select";
+import type { BrainAccount, BrainKind, BrainSession } from "./brains/types";
 import { machineRule, mayUseDevice } from "./devices";
 import type { MachineStatus } from "./machine-hub";
 import { isRightHand } from "./right-hand";
@@ -108,6 +122,12 @@ export interface AccountMove {
   lentBy?: string;
   /** Every account the run thought with or was refused on, `from` and `to` included: each at most once per run. */
   tried: string[];
+  /**
+   * The order across CLIs brought it to another CLI than its agent's own (ADR 0041 §6, amended 2026-11-26): `from`'s and
+   * `to`'s, and the model chosen for `to` there (none: its CLI's default).
+   */
+  kinds?: { from: BrainKind; to: BrainKind };
+  model?: string;
 }
 
 /** `Transcript.accountSwitch`: each account by id and the name the run's details show it by. */
@@ -121,16 +141,31 @@ export interface AccountSwitch {
   cause: "limit" | "line" | "extra" | "busy";
 }
 
-/** Where `nextAccountPlan` landed: the plan on the next account, else how many accounts are all limited and the first reset. */
+/**
+ * Where `nextAccountPlan` landed: the plan on the next account (of another CLI only through the order across CLIs),
+ * else how many accounts are all limited and the first reset.
+ */
 export type NextAccount =
   | { plan: BrainPlan; lentBy: string | null; lenderName?: string }
   | { plan: null; chain: number; resetsAt?: string };
 
-type SeatRow = { id: string; email: string | null; providerOrgId: string | null };
-/** Two logins of one seat share its limits (`sameAccountWhere`): one email, in the same Claude organization when both know it. */
+type SeatRow = { id: string; kind: string; email: string | null; providerOrgId: string | null };
+
+/** The kinds a run on `kind` may go on with in the order across CLIs, its own already looked at (`nextAccountPlan`). */
+const otherKinds = (kind: string, triedKinds: readonly string[]) =>
+  CROSS_PROVIDER_KINDS.filter(
+    // Never from one Gemini account to another: Google forbids automating account rotation (ADR 0143).
+    (k) => k !== kind && !(k === "antigravity" && (kind === "antigravity" || triedKinds.includes("antigravity"))),
+  );
+/**
+ * Two logins of one seat share its limits (`sameAccountWhere`): one CLI and one email, in the same Claude organization
+ * when both know it.
+ */
 const sameSeat = (a: SeatRow, b: SeatRow) =>
   a.id === b.id ||
-  (!!a.email &&
+  // One email signs in to several providers: a seat is of one CLI.
+  (a.kind === b.kind &&
+    !!a.email &&
     a.email.toLowerCase() === b.email?.toLowerCase() &&
     (!a.providerOrgId || !b.providerOrgId || a.providerOrgId === b.providerOrgId));
 
@@ -149,11 +184,12 @@ function chainWhere(
   forPerson: string | null,
   keep: string[],
   asker: string | null = null,
+  kinds?: readonly string[],
 ) {
   const owner = agent.ownerUserId ?? null;
   if (isRightHand(agent))
     return chainWhereSql(agent.orgId, machineId, kind, forPerson === owner ? owner : null, keep, true);
-  return chainWhereSql(agent.orgId, machineId, kind, owner, keep, false, asker);
+  return chainWhereSql(agent.orgId, machineId, kind, owner, keep, false, asker, kinds);
 }
 
 /** Its owner still in the workspace (`planIsOwners`). */
@@ -168,7 +204,9 @@ const ownerIsMember = and(
  * `tried` or one of their seats, nor one limited by what is stored: unknown usage is worth a try (a setup token can't
  * read its usage without a turn). `own`: the agent's own account, which takes the run back when it has room. `room`:
  * what long work also needs of an account's stored usage. Null plan: no such account, with how many accounts are limited (the
- * tried ones counted) and the earliest reset.
+ * tried ones counted) and the earliest reset. `cross`: the workspace's order across CLIs is on (ADR 0041 §6, amended
+ * 2026-11-26): with none of its own CLI left, the next account of another CLI there by the same rules, each on the model
+ * chosen for it in the order; never the right hand's, which thinks only on its person's plans.
  */
 export async function nextAccountPlan(
   deps: SpillDeps,
@@ -181,46 +219,81 @@ export async function nextAccountPlan(
     /** Someone besides the agent's owner the run answers (`runAsker`). */
     asker?: string | null;
     own?: string;
+    cross?: boolean;
   } = {},
 ): Promise<NextAccount> {
   const machineId = plan.session?.machineId;
   const owner = agent.ownerUserId;
   const none = { plan: null, chain: 0 } as const;
-  if (!machineId || !owner || !plan.account || plan.missionId || !NEXT_ACCOUNT_KINDS.includes(plan.kind)) return none;
-  if (agent.brainAccountPinned || plan.account.provider) return none;
+  if (!machineId || !owner || !plan.account || plan.missionId || agent.brainAccountPinned) return none;
+  const sameKind = NEXT_ACCOUNT_KINDS.includes(plan.kind) && !plan.account.provider;
+  const cross = options.cross === true && !isRightHand(agent) && CROSS_PROVIDER_KINDS.includes(plan.kind);
+  if (!sameKind && !cross) return none;
   const keep = [plan.account.id, ...(options.own ? [options.own] : [])];
-  const [status, rows] = await Promise.all([
-    deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
+  const accounts = (kinds?: readonly string[]) =>
     deps.db
       .select({
         id: machineAccounts.id,
+        kind: machineAccounts.kind,
         label: machineAccounts.label,
         email: machineAccounts.email,
         providerOrgId: machineAccounts.providerOrgId,
         createdBy: machineAccounts.createdBy,
         ownerName: schema.users.name,
         usage: machineAccounts.usage,
+        provider: machineAccounts.provider,
+        authMethod: machineAccounts.authMethod,
+        orderModel: machineAccounts.orderModel,
+        shared: machineAccounts.shared,
+        status: machineAccounts.status,
       })
       .from(machineAccounts)
       .innerJoin(schema.organizationMembers, ownerIsMember)
       .leftJoin(schema.users, eq(schema.users.id, machineAccounts.createdBy))
       .where(
         and(
-          chainWhere(agent, plan.kind, machineId, options.forPerson ?? null, keep, options.asker ?? null),
+          chainWhere(agent, plan.kind, machineId, options.forPerson ?? null, keep, options.asker ?? null, kinds),
           eq(machineAccounts.status, "active"),
         ),
       )
-      .orderBy(...accountOrderSql(owner)),
+      .orderBy(...accountOrderSql(owner));
+  const [status, own] = await Promise.all([
+    deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
+    sameKind ? accounts() : [],
   ]);
+  // Across CLIs, after its own CLI's: the kinds of the accounts it tried tell whether a Gemini account was one.
+  const triedKinds = cross
+    ? (
+        await deps.db
+          .select({ kind: machineAccounts.kind })
+          .from(machineAccounts)
+          .where(and(eq(machineAccounts.orgId, agent.orgId), inArray(machineAccounts.id, [...tried, plan.account.id])))
+      ).map((r) => r.kind)
+    : [];
+  const kinds = cross ? otherKinds(plan.kind, triedKinds) : [];
+  const others = kinds.length > 0 ? (await accounts(kinds)).filter((r) => crossMayMoveTo(r)) : [];
+  const rows = [...own, ...others];
   const triedRows = rows.filter((r) => tried.includes(r.id));
   const now = Date.now();
   const chain: SeatRow[] = [];
   let earliest: number | null = null;
   for (const r of rows) {
-    const account: BrainAccount = { id: r.id, label: r.label, status: "active" };
+    const kind = r.kind as BrainKind;
+    const crossed = kind !== plan.kind;
+    const account: BrainAccount = {
+      id: r.id,
+      label: r.label,
+      status: "active",
+      ...(crossed && r.provider ? { provider: r.provider } : {}),
+    };
     const usage = (r.usage as PlanUsage | null) ?? null;
-    const model = isAutoModel(plan.model) ? autoPlanModel(undefined, plan.model, usage) : plan.model;
-    const why = computerBrainUnavailable(plan.kind, machineId, status, now, account, true, usage, model);
+    // Across CLIs the model chosen for the account there, else its CLI's own; within its CLI the run's, unless the
+    // order across CLIs chose one for that account.
+    const chosen = cross ? (r.orderModel ?? undefined) : undefined;
+    const model = crossed
+      ? chosen
+      : (chosen ?? (isAutoModel(plan.model) ? autoPlanModel(undefined, plan.model, usage) : plan.model));
+    const why = computerBrainUnavailable(kind, machineId, status, now, account, true, usage, model);
     const limited = why?.code === "plan_limit";
     if (limited || tried.includes(r.id)) {
       if (!chain.some((c) => sameSeat(c, r))) chain.push(r);
@@ -229,12 +302,16 @@ export async function nextAccountPlan(
     }
     if (why || tried.includes(r.id) || triedRows.some((t) => sameSeat(t, r))) continue;
     if (options.room && !options.room(usage, r.id)) continue;
-    const { unavailable: _, usage: _usage, ...rest } = plan;
+    // Another CLI thinks with its own effort levels: the agent's is its own CLI's.
+    const { unavailable: _, usage: _usage, model: _model, effort, ...rest } = plan;
+    const next = crossed ? chosen : (chosen ?? plan.model);
     return {
       plan: {
         ...rest,
+        kind,
         account,
-        ...(plan.model ? { model: plan.model } : {}),
+        ...(next ? { model: next } : {}),
+        ...(effort && !crossed ? { effort } : {}),
         ...(usage ? { usage } : {}),
         session: { ...(plan.session as BrainSession), id: Bun.randomUUIDv7(), resume: false },
       },
@@ -261,33 +338,69 @@ export async function movedAccountPlan(
   accountId: string,
   forPerson: string | null = null,
   asker: string | null = null,
+  /** The move took it to another CLI (`AccountMove.kinds`), on this model there. */
+  crossed?: { kind: BrainKind; model?: string },
 ): Promise<BrainPlan | null> {
   const machineId = plan.session?.machineId;
   if (!machineId || plan.kind === "model") return null;
+  const kind = crossed?.kind ?? plan.kind;
   const [row] = await deps.db
-    .select({ id: machineAccounts.id, label: machineAccounts.label, status: machineAccounts.status })
+    .select({
+      id: machineAccounts.id,
+      label: machineAccounts.label,
+      status: machineAccounts.status,
+      provider: machineAccounts.provider,
+    })
     .from(machineAccounts)
     .innerJoin(schema.organizationMembers, ownerIsMember)
-    .where(and(eq(machineAccounts.id, accountId), chainWhere(agent, plan.kind, machineId, forPerson, [], asker)));
+    .where(
+      and(
+        eq(machineAccounts.id, accountId),
+        chainWhere(agent, plan.kind, machineId, forPerson, [], asker, crossed ? [crossed.kind] : undefined),
+      ),
+    );
   if (!row) return null;
   const account: BrainAccount = {
     id: row.id,
     label: row.label,
     status: row.status === "active" ? "active" : "signed_out",
+    ...(crossed && row.provider ? { provider: row.provider } : {}),
   };
   const [status, usage] = await Promise.all([
     deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
-    storedPlanUsage(deps.db, agent.orgId, machineId, plan.kind, row.id).catch(() => null),
+    storedPlanUsage(deps.db, agent.orgId, machineId, kind, row.id).catch(() => null),
   ]);
-  const model = isAutoModel(plan.model) ? autoPlanModel(undefined, plan.model, usage) : plan.model;
+  const model = crossed
+    ? crossed.model
+    : isAutoModel(plan.model)
+      ? autoPlanModel(undefined, plan.model, usage)
+      : plan.model;
   // Of its own account's refusal only what holds for the run on any account (the right hand's, say): its limit,
   // its sign-in or its owner's sharing belong to that account.
   const own = plan.unavailable;
   const carried =
     own && own.code !== "plan_limit" && own.code !== "plan_not_owner" && !NO_AI_CODES.has(own.code) ? own : null;
-  const why =
-    computerBrainUnavailable(plan.kind, machineId, status, Date.now(), account, true, usage, model) ?? carried;
+  const why = computerBrainUnavailable(kind, machineId, status, Date.now(), account, true, usage, model) ?? carried;
   const { unavailable: _, usage: _usage, ...rest } = plan;
+  if (crossed) {
+    const { model: _model, effort: _effort, ...other } = rest;
+    // Its session there ran as that CLI: resumed when that CLI's turn used it.
+    const session = other.session
+      ? {
+          ...other.session,
+          resume: await sessionUsed(deps.db, { orgId: agent.orgId, agentId: agent.id }, kind, other.session.id),
+        }
+      : undefined;
+    return {
+      ...other,
+      ...(session ? { session } : {}),
+      kind,
+      account,
+      ...(model ? { model } : {}),
+      ...(usage ? { usage } : {}),
+      ...(why ? { unavailable: why } : {}),
+    };
+  }
   return { ...rest, account, ...(usage ? { usage } : {}), ...(why ? { unavailable: why } : {}) };
 }
 

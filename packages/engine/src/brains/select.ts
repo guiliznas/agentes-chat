@@ -669,7 +669,12 @@ export const SESSION_IDLE_MS = 60 * 60_000;
 export const SESSION_MAX_INPUT_TOKENS = 150_000;
 
 /** Whether a session already ran on the machine (plan usage recorded for one of its runs): resume it. A hint: the runner checks its own disk. */
-async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, sessionId: string) {
+export async function sessionUsed(
+  db: Executor,
+  run: Pick<AgentRun, "orgId" | "agentId">,
+  kind: BrainKind,
+  sessionId: string,
+) {
   const { agentRuns, usageRecords } = schema;
   const [row] = await db
     .select({ id: usageRecords.id })

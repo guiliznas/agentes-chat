@@ -25,6 +25,7 @@ import {
   STAND_IN_LINE,
   setAccountServes,
   setAgentBrain,
+  setPlanCrossProvider,
   setPlanKeyFallback,
   thinkingAgent,
   usageQueue,
@@ -145,7 +146,14 @@ const notes = async (fx: Fixture, code: string) =>
 const runs = (fx: Fixture) => fx.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
 
 type Moved = {
-  accountMove?: { from: string; to: string; lentBy?: string; tried: string[] };
+  accountMove?: {
+    from: string;
+    to: string;
+    lentBy?: string;
+    tried: string[];
+    kinds?: { from: string; to: string };
+    model?: string;
+  };
   accountSwitch?: AccountSwitch;
 };
 const moveOf = (run: { transcript: unknown } | undefined) => (run?.transcript as Moved | undefined)?.accountMove;
@@ -1630,4 +1638,272 @@ test("the next account never answered a turn and its CLI fails there: the run en
   // Nothing answered for its plan, and it never waits for its own account's reset.
   expect(fx.provider.calls).toHaveLength(0);
   expect((run?.transcript as { waitingForBrain?: unknown } | undefined)?.waitingForBrain).toBeUndefined();
+});
+
+/** ADR 0041 §6, amended 2026-11-26: the order across CLIs, one per computer, each account on the model chosen there. */
+const GEMINI = "0193eeee-0000-4000-8000-00000000c001";
+const GEMINI2 = "0193eeee-0000-4000-8000-00000000c002";
+const OPENCODE = "0193eeee-0000-4000-8000-00000000c003";
+const WALTER_GEMINI = "0193eeee-0000-4000-8000-00000000c004";
+
+/** A computer with Claude Code, Antigravity and OpenCode on it. */
+const statusAll = (id: string): MachineStatus => {
+  const s = statusOf(id);
+  return {
+    ...s,
+    executors: {
+      ...s.executors,
+      antigravity: { version: "agy 1.4.12" },
+      opencode: { version: "1.19.5" },
+    } as MachineStatus["executors"],
+  };
+};
+
+/** One brain per CLI, each answering by `script` and keeping what it was asked. */
+function brainsOf(script: (kind: string, n: number) => BrainEvent[]) {
+  const seen: { kind: string; account?: string; model?: string; resume?: boolean }[] = [];
+  const of = (kind: "claude_code" | "antigravity" | "opencode"): Brain => ({
+    kind,
+    async *run(turn) {
+      const n = seen.filter((x) => x.kind === kind).length;
+      seen.push({
+        kind,
+        ...(turn.account?.id ? { account: turn.account.id } : {}),
+        ...(turn.model ? { model: turn.model } : {}),
+        ...(turn.session ? { resume: turn.session.resume } : {}),
+      });
+      yield* script(kind, n);
+    },
+  });
+  const handlers = (fx: Fixture) =>
+    createJobHandlers({
+      ...fx.jobDeps,
+      brains: {
+        claude_code: () => of("claude_code"),
+        antigravity: () => of("antigravity"),
+        opencode: () => of("opencode"),
+      },
+      machines: { status: async (id) => statusAll(id) },
+      planLimitGraceMs: 50,
+    });
+  return { seen, handlers };
+}
+
+const limitRefusal: BrainEvent[] = [
+  { type: "error", code: "plan_limit", message: "You've hit your limit", worked: false },
+];
+
+/** The agent on Claude Code (OWN1, at its limit), a Gemini account and an OpenCode key of its owner on its computer. */
+async function crossWorld(over: Partial<typeof schema.agents.$inferInsert> = {}) {
+  const w = await world(over);
+  await w.account(GEMINI, w.fx.owner.id, { kind: "antigravity", label: "Gemini", useOrder: 1 });
+  await w.account(OPENCODE, w.fx.owner.id, {
+    kind: "opencode",
+    label: "OpenCode",
+    provider: "zen",
+    authMethod: "api_key",
+    orderModel: "opencode/big-pickle",
+    useOrder: 2,
+  });
+  await w.fx.db.update(schema.machineAccounts).set({ useOrder: 0 }).where(eq(schema.machineAccounts.id, OWN1));
+  await w.usage(OWN1, 100);
+  return w;
+}
+
+test("across providers off: the run waits for its Claude plan, though a Gemini account on its computer has room", async () => {
+  const { fx } = await crossWorld();
+  const { seen, handlers } = brainsOf(() => answers);
+  await ask(fx);
+  await drainOutbox(fx.db, handlers(fx));
+  expect(seen).toHaveLength(0);
+  const [run] = await runs(fx);
+  expect(run).toMatchObject({ status: "waiting_input", brain: "claude_code" });
+  expect(await notes(fx, "plan_limit_wait")).toHaveLength(1);
+});
+
+test("across providers on: Claude at its limit goes on with Gemini, then with OpenCode on its free model, then is done", async () => {
+  const { fx } = await crossWorld({ brainEffort: "high" });
+  await setPlanCrossProvider(fx.db, fx.owner.id, fx.org.id, true);
+  await fx.db
+    .update(schema.machineAccounts)
+    .set({ orderModel: "gemini-3.1-pro" })
+    .where(eq(schema.machineAccounts.id, GEMINI));
+  const { seen, handlers } = brainsOf((kind) => (kind === "antigravity" ? limitRefusal : answers));
+  await ask(fx);
+  await drainOutbox(fx.db, handlers(fx));
+  // Each on the model chosen for it in the order, in a fresh session there.
+  expect(seen).toEqual([
+    { kind: "antigravity", account: GEMINI, model: "gemini-3.1-pro", resume: false },
+    { kind: "opencode", account: OPENCODE, model: "opencode/big-pickle", resume: false },
+  ]);
+  const [run] = await runs(fx);
+  // The run's brain is the CLI that answered; the agent's stays Claude Code on its own account.
+  expect(run).toMatchObject({ status: "done", brain: "opencode" });
+  expect(moveOf(run)).toEqual({
+    from: OWN1,
+    to: OPENCODE,
+    tried: [OWN1, GEMINI, OPENCODE],
+    kinds: { from: "claude_code", to: "opencode" },
+    model: "opencode/big-pickle",
+  });
+  expect(switchOf(run)).toMatchObject({ from: { id: OWN1 }, to: { id: OPENCODE }, cause: "limit" });
+  expect(await agentRow(fx)).toMatchObject({ brain: "claude_code", brainAccountId: OWN1 });
+  // The next run starts on its own Claude account again.
+  await usageOf(fx, OWN1, 10);
+  clearPlanLimits();
+  await ask(fx, "@dev e agora?");
+  await drainOutbox(fx.db, handlers(fx));
+  expect(seen.at(-1)).toMatchObject({ kind: "claude_code", account: OWN1 });
+  expect((await runs(fx))[1]).toMatchObject({ status: "done", brain: "claude_code" });
+});
+
+const usageOf = (fx: Fixture, id: string, used: number) =>
+  fx.db
+    .update(schema.machineAccounts)
+    .set({ usage: reading(used) as never })
+    .where(eq(schema.machineAccounts.id, id));
+
+test("across providers: a Claude account with room comes before any other CLI, and an OpenCode key with no free model never", async () => {
+  const { fx, account } = await crossWorld();
+  await account(OWN2, fx.owner.id, { useOrder: 3 });
+  await fx.db.update(schema.machineAccounts).set({ orderModel: null }).where(eq(schema.machineAccounts.id, OPENCODE));
+  await setPlanCrossProvider(fx.db, fx.owner.id, fx.org.id, true);
+  const deps = { db: fx.db, machines: { status: async (id: string) => statusAll(id) } };
+  const [agent] = await fx.db.select().from(schema.agents).where(eq(schema.agents.id, fx.agent.id));
+  if (!agent) throw new Error("no agent");
+  const plan: BrainPlan = {
+    kind: "claude_code",
+    model: "sonnet",
+    session: { id: "s1", resume: true, machineId: agent.machineId ?? "", cwd: "" },
+    account: { id: OWN1, label: "a001", status: "active" },
+  };
+  const a = agent as never;
+  expect((await nextAccountPlan(deps, a, plan, [OWN1], { cross: true })).plan).toMatchObject({
+    kind: "claude_code",
+    account: { id: OWN2 },
+    model: "sonnet",
+  });
+  expect((await nextAccountPlan(deps, a, plan, [OWN1, OWN2], { cross: true })).plan).toMatchObject({
+    kind: "antigravity",
+    account: { id: GEMINI },
+  });
+  // OpenCode without a free model chosen thinks on its paid default: no place.
+  expect(await nextAccountPlan(deps, a, plan, [OWN1, OWN2, GEMINI], { cross: true })).toMatchObject({ plan: null });
+  // Off, it never leaves its CLI.
+  expect(await nextAccountPlan(deps, a, plan, [OWN1, OWN2])).toMatchObject({ plan: null });
+});
+
+test("across providers: never from one Gemini account to another, and each account once per claim", async () => {
+  const { fx, account } = await crossWorld();
+  await account(GEMINI2, fx.owner.id, { kind: "antigravity", label: "Gemini 2", useOrder: 3 });
+  const deps = { db: fx.db, machines: { status: async (id: string) => statusAll(id) } };
+  const [agent] = await fx.db.select().from(schema.agents).where(eq(schema.agents.id, fx.agent.id));
+  const onGemini: BrainPlan = {
+    kind: "antigravity",
+    session: { id: "s1", resume: true, machineId: agent?.machineId ?? "", cwd: "" },
+    account: { id: GEMINI, label: "Gemini", status: "active" },
+  };
+  // On Gemini at its limit: OpenCode next, never the other Gemini account.
+  const next = await nextAccountPlan(deps, agent as never, onGemini, [OWN1, GEMINI], { cross: true });
+  expect(next.plan).toMatchObject({ kind: "opencode", account: { id: OPENCODE, provider: "zen" } });
+  expect(
+    await nextAccountPlan(deps, agent as never, onGemini, [OWN1, GEMINI, OPENCODE], { cross: true }),
+  ).toMatchObject({ plan: null });
+});
+
+test("across providers: an agent pinned to its account waits for it; a mission never moves", async () => {
+  const { fx } = await crossWorld({ brainAccountPinned: true });
+  await setPlanCrossProvider(fx.db, fx.owner.id, fx.org.id, true);
+  const { seen, handlers } = brainsOf(() => answers);
+  await ask(fx);
+  await drainOutbox(fx.db, handlers(fx));
+  expect(seen).toHaveLength(0);
+  expect((await runs(fx))[0]?.status).toBe("waiting_input");
+  const deps = { db: fx.db, machines: { status: async (id: string) => statusAll(id) } };
+  const [agent] = await fx.db.select().from(schema.agents).where(eq(schema.agents.id, fx.agent.id));
+  const mission: BrainPlan = {
+    kind: "claude_code",
+    missionId: "0193eeee-0000-4000-8000-0000000000ff",
+    session: { id: "s1", resume: true, machineId: agent?.machineId ?? "", cwd: "" },
+    account: { id: OWN1, label: "a001", status: "active" },
+  };
+  expect(
+    await nextAccountPlan(
+      deps,
+      { ...(agent as typeof schema.agents.$inferSelect), brainAccountPinned: false },
+      mission,
+      [OWN1],
+      {
+        cross: true,
+      },
+    ),
+  ).toMatchObject({ plan: null });
+});
+
+test("across providers: another person's Gemini that serves only its owner is skipped; at the end the workspace's key answers", async () => {
+  const { fx, walter, account } = await crossWorld();
+  await account(WALTER_GEMINI, walter.id, { kind: "antigravity", serves: "owner", useMode: "owner", useOrder: 0 });
+  await fx.db
+    .update(schema.machineAccounts)
+    .set({ usage: reading(100) as never })
+    .where(eq(schema.machineAccounts.id, OPENCODE));
+  await setPlanCrossProvider(fx.db, fx.owner.id, fx.org.id, true);
+  await setPlanKeyFallback(fx.db, fx.owner.id, fx.org.id, true);
+  const { seen, handlers } = brainsOf((kind) => (kind === "antigravity" ? limitRefusal : answers));
+  await ask(fx);
+  await drainOutbox(fx.db, handlers(fx));
+  // Walter's Gemini serves only Walter: never this agent's. Its owner's Gemini refuses, OpenCode is at its limit.
+  expect(seen.map((x) => x.account)).toEqual([GEMINI]);
+  const [run] = await runs(fx);
+  expect(run).toMatchObject({ status: "done", brain: "model" });
+  expect(await notes(fx, "plan_limit_all_wait")).toHaveLength(0);
+});
+
+test("across providers: a run moved to Gemini whose turn the plan cut resumes there, on its model, in its session", async () => {
+  const { fx } = await crossWorld();
+  await setPlanCrossProvider(fx.db, fx.owner.id, fx.org.id, true);
+  await fx.db
+    .update(schema.machineAccounts)
+    .set({ orderModel: "gemini-3.1-pro", usage: null })
+    .where(eq(schema.machineAccounts.id, GEMINI));
+  const seen: { kind: string; account?: string; model?: string; session?: { id: string; resume: boolean } }[] = [];
+  const gemini: Brain = {
+    kind: "antigravity",
+    async *run(turn) {
+      seen.push({
+        kind: "antigravity",
+        ...(turn.account?.id ? { account: turn.account.id } : {}),
+        ...(turn.model ? { model: turn.model } : {}),
+        ...(turn.session ? { session: { id: turn.session.id, resume: turn.session.resume } } : {}),
+      });
+      if (seen.length > 1) {
+        yield* answers;
+        return;
+      }
+      yield { type: "usage", input: 100, output: 10, source: "plan", model: "gemini-3.1-pro" };
+      yield { type: "tool_call", id: "c1", name: "Bash", input: { command: "ls" }, executed: { content: "ok" } };
+      yield { type: "limit", resetsAt: iso(3600_000) };
+      yield { type: "error", code: "plan_limit", message: "You've hit your limit", worked: true };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => scripted(() => answers).brain, antigravity: () => gemini },
+    machines: { status: async (id) => statusAll(id) },
+    planLimitGraceMs: 50,
+  });
+  await ask(fx);
+  await drainOutbox(fx.db, handlers);
+  const [parked] = await runs(fx);
+  expect(parked).toMatchObject({ status: "waiting_input", brain: "antigravity" });
+  expect(moveOf(parked)).toMatchObject({ to: GEMINI, kinds: { from: "claude_code", to: "antigravity" } });
+
+  clearPlanLimits();
+  await drainOutbox(fx.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  expect(seen.map((x) => [x.kind, x.account, x.model])).toEqual([
+    ["antigravity", GEMINI, "gemini-3.1-pro"],
+    ["antigravity", GEMINI, "gemini-3.1-pro"],
+  ]);
+  expect(seen[1]?.session).toEqual({ id: seen[0]?.session?.id ?? "", resume: true });
+  expect((await runs(fx))[0]).toMatchObject({ status: "done", brain: "antigravity" });
 });
