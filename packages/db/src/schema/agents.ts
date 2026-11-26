@@ -396,6 +396,11 @@ export const organizationSettings = pgTable("organization_settings", {
   autoModels: jsonb().$type<Partial<Record<string, Partial<Record<string, string>>>>>().notNull().default({}),
   /** With every plan account of a run's order at its limit, the run goes on with the workspace's API key (off by default). */
   planKeyFallback: boolean().notNull().default(false),
+  /**
+   * At a plan's limit with no next account of its CLI, a run goes on with the next account of another CLI on the same
+   * computer, in one order per computer (ADR 0041 §6, amended 2026-11-26). Off by default.
+   */
+  planCrossProvider: boolean().notNull().default(false),
   /** People can send GIFs in chat (ADR 0091): needs the server's `GIPHY_API_KEY` too. */
   gifs: boolean().notNull().default(true),
   /** The most a GIF may be rated: `g` (any age) or `pg` (ADR 0091). */

@@ -8,7 +8,7 @@ import {
   type MachineAccountView,
 } from "../machine-accounts";
 import { can, getMembership } from "../organizations";
-import { planKeyFallbackOn } from "./fallback";
+import { planCrossProviderOn, planKeyFallbackOn } from "./fallback";
 import { type AccountRights, accountRights } from "./permissions";
 import { type AccountPermissions, accountPermissionsOf, accountPersonOf } from "./serves";
 
@@ -36,6 +36,8 @@ export interface AiHub {
   order: AccountOrderGroup[];
   /** "Continuar com a chave de API quando todos os planos estiverem no limite" (`planKeyFallback`). */
   keyFallback: boolean;
+  /** The order across CLIs (`planCrossProvider`, ADR 0041 §6 amended 2026-11-26): `order` is one group per computer. */
+  crossProvider: boolean;
   /** The viewer adds, renames and removes keys (`manage_credentials`). */
   canManageKeys: boolean;
   /** The viewer turns the API-key switch on or off and moves anyone's account in the order (`configure`). */
@@ -46,10 +48,18 @@ export interface AiHub {
 export async function aiHubView(db: Database, userId: string, orgId: string): Promise<AiHub> {
   const membership = await getMembership(db, userId, orgId);
   if (!membership)
-    return { accounts: [], keys: [], order: [], keyFallback: false, canManageKeys: false, canConfigure: false };
+    return {
+      accounts: [],
+      keys: [],
+      order: [],
+      keyFallback: false,
+      crossProvider: false,
+      canManageKeys: false,
+      canConfigure: false,
+    };
   const viewer = accountPersonOf(userId, membership);
   const canManageKeys = can(membership, "manage_credentials");
-  const [computers, rows, members, order, keyFallback, keys] = await Promise.all([
+  const [computers, rows, members, order, keyFallback, crossProvider, keys] = await Promise.all([
     db
       .select({ id: machines.id, name: machines.name })
       .from(machines)
@@ -65,6 +75,7 @@ export async function aiHubView(db: Database, userId: string, orgId: string): Pr
       .where(eq(organizationMembers.orgId, orgId)),
     listAccountOrder({ db }, userId, orgId),
     planKeyFallbackOn(db, orgId),
+    planCrossProviderOn(db, orgId),
     canManageKeys ? listCredentials(db, userId, orgId) : liveKeys(db, orgId),
   ]);
   const inWorkspace = new Set(members.map((m) => m.userId));
@@ -98,6 +109,7 @@ export async function aiHubView(db: Database, userId: string, orgId: string): Pr
       })),
     order,
     keyFallback,
+    crossProvider,
     canManageKeys,
     canConfigure: can(membership, "configure"),
   };

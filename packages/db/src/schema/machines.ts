@@ -465,6 +465,11 @@ export const machineAccounts = pgTable(
      */
     useOrder: integer(),
     /**
+     * The model a run thinks with once the order across CLIs brings it here (ADR 0041 §6, amended 2026-11-26); null: its
+     * CLI's own default. OpenCode's only with one of its free models.
+     */
+    orderModel: text(),
+    /**
      * How it signs in (protocol 50): `cli_login`, `setup_token` or `api_key`. Set when its sign-in starts and from
      * what the runner reports, never cleared by a report that doesn't say; null: unknown.
      */

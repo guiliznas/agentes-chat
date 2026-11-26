@@ -569,6 +569,37 @@ export const accountOnlyBrain = (kind: string) => (ACCOUNT_ONLY_BRAINS as readon
  */
 export const NEXT_ACCOUNT_KINDS: readonly string[] = ["claude_code", "codex"];
 
+/**
+ * The kinds a run may go on with from one CLI to another at a plan's limit, once the workspace turned the order across
+ * CLIs on (ADR 0041 §6, amended 2026-11-26). Antigravity only as one step of that order, never from one Gemini account
+ * to another; OpenCode only on one of its free models (`orderModel`). Not Grok or Cursor.
+ */
+export const CROSS_PROVIDER_KINDS: readonly string[] = ["claude_code", "codex", "antigravity", "opencode"];
+
+/** OpenCode's own key (`OPENCODE_KEY_PROVIDER`), the one way its accounts sign in. */
+const OPENCODE_KEY = "zen";
+
+/**
+ * Whether a run may move onto an account in the order across CLIs (`crossKindSql` in the engine is its SQL twin):
+ * Claude Code's, Codex's or Antigravity's own sign-in, or an OpenCode key set to one of its free models. Shared
+ * between agents and signed in, as within one CLI.
+ */
+export const crossMayMoveTo = (row: {
+  kind: string;
+  provider: string | null;
+  authMethod?: string | null;
+  orderModel?: string | null;
+  shared: boolean;
+  status: string;
+}) =>
+  CROSS_PROVIDER_KINDS.includes(row.kind) &&
+  // OpenCode's key spends nothing on its free models; any other key is paid by the token.
+  (row.kind === "opencode"
+    ? row.provider === OPENCODE_KEY && typeof row.orderModel === "string" && isOpencodeFreeModel(row.orderModel)
+    : row.provider === null && row.authMethod !== "api_key") &&
+  row.shared &&
+  row.status === "active";
+
 /** What an account's place in the order of use is read from (`compareInOrder`). */
 export interface OrderKey {
   ownerId: string | null;

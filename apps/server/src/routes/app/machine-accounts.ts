@@ -10,14 +10,17 @@ import {
   listAccountOrder,
   listAiAccounts,
   moveAccountInOrder,
+  planCrossProviderOn,
   planKeyFallbackOn,
   publishMachineAgentsChanged,
   refreshAiAccounts,
   removeMachineAccount,
   renameMachineAccount,
   sendAccountLoginCode,
+  setAccountOrderModel,
   setAccountPermissions,
   setAccountServes,
+  setPlanCrossProvider,
   setPlanKeyFallback,
   takeBackPlan,
   ValidationError,
@@ -97,14 +100,22 @@ const AccountOrderGroup = z
   .object({
     machineId: z.uuid(),
     computer: z.string(),
-    kind: AccountKind,
+    kind: AccountKind.openapi({
+      description: "The group's kind; across CLIs (`kinds`), its first account's.",
+    }),
+    kinds: z.array(AccountKind).optional().openapi({
+      description:
+        "The order across CLIs is on (ADR 0041 §6, amended 2026-11-26): the group is all of the computer's accounts of these kinds in one order.",
+    }),
     accounts: z.array(
       MachineAccount.extend({
         canMove: z.boolean().openapi({ description: "The caller may move it in the order: its owner or an admin." }),
       }),
     ),
   })
-  .openapi("AccountOrderGroup", { description: "One computer's accounts of one kind, first to last." });
+  .openapi("AccountOrderGroup", {
+    description: "One computer's accounts of one kind, first to last; with the order across CLIs on, of every kind.",
+  });
 
 const AiHub = z
   .object({
@@ -125,6 +136,10 @@ const AiHub = z
     keyFallback: z.boolean().openapi({
       description:
         "With every plan account of a run's order at its limit, the run goes on with the workspace's API key (off by default).",
+    }),
+    crossProvider: z.boolean().openapi({
+      description:
+        "The order across CLIs (off by default): with no next account of its CLI, a run goes on with the next of another CLI on the same computer; `order` is one group per computer.",
     }),
     canManageKeys: z.boolean().openapi({ description: "The caller adds and removes keys (`manage_credentials`)." }),
     canConfigure: z.boolean().openapi({
@@ -523,6 +538,9 @@ export function machineAccountRoutes(deps: AppDeps) {
             keyFallback: z.boolean().optional().openapi({
               description: '"Continuar com a chave de API quando todos os planos estiverem no limite", off by default.',
             }),
+            crossProvider: z.boolean().optional().openapi({
+              description: "The order across CLIs, off by default: `groups` is one per computer, of every kind.",
+            }),
             canConfigure: z
               .boolean()
               .optional()
@@ -535,12 +553,13 @@ export function machineAccountRoutes(deps: AppDeps) {
     async (c) => {
       const userId = c.get("user").id;
       const { orgId } = c.req.valid("param");
-      const [groups, keyFallback, canConfigure] = await Promise.all([
+      const [groups, keyFallback, crossProvider, canConfigure] = await Promise.all([
         listAccountOrder({ db }, userId, orgId),
         planKeyFallbackOn(db, orgId),
+        planCrossProviderOn(db, orgId),
         getMembership(db, userId, orgId).then((m) => can(m, "configure")),
       ]);
-      return c.json({ groups, keyFallback, canConfigure }, 200);
+      return c.json({ groups, keyFallback, crossProvider, canConfigure }, 200);
     },
   );
 
@@ -561,6 +580,53 @@ export function machineAccountRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const on = await setPlanKeyFallback(db, c.get("user").id, orgId, c.req.valid("json").on);
       return c.json({ on }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/ai-accounts/cross-provider",
+      tags,
+      security,
+      summary: "Turn on or off the order across AI providers at a plan's limit (admins)",
+      description:
+        "ADR 0041 §6, amended 2026-11-26. Off by default. On: with no next account of its CLI, a run goes on with the next account of another CLI (Claude Code, Codex, Antigravity, OpenCode on a free model) on the same computer, in one order per computer. Needs `configure`. Audited as `ai.cross_provider`.",
+      request: { params: OrgParams, body: body(z.object({ on: z.boolean() })) },
+      responses: { 200: json(z.object({ on: z.boolean() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const on = await setPlanCrossProvider(db, c.get("user").id, orgId, c.req.valid("json").on);
+      return c.json({ on }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/ai-accounts/{accountId}/order-model",
+      tags,
+      security,
+      summary: "Choose the model an account thinks with in the order across AI providers (its owner or an admin)",
+      description:
+        "ADR 0041 §6, amended 2026-11-26. `model` null: the CLI's own default. A model the account's CLI runs (`brain.invalid_model`); on OpenCode one of its free models (`account.order_model_paid`), without which the account has no place there. Only with the order across providers on (`account.order_cross_off`). Someone else's account: `account.order_forbidden`. Audited as `account.order_model`.",
+      request: {
+        params: PlanParams,
+        body: body(z.object({ model: z.string().max(120).nullable() })),
+      },
+      responses: { 200: json(AccountOrderGroup), ...errors },
+    }),
+    async (c) => {
+      const { orgId, accountId } = c.req.valid("param");
+      const group = await setAccountOrderModel(
+        { db, pubsub },
+        c.get("user").id,
+        orgId,
+        accountId,
+        c.req.valid("json").model,
+      );
+      return c.json(group, 200);
     },
   );
 

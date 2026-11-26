@@ -1248,7 +1248,11 @@ export const MachineAccount = z
     }),
     movable: z.boolean().openapi({
       description:
-        "A run at another account's limit may go on with it: Claude Code's or Codex's own sign-in (never a key), shared between agents and signed in (ADR 0041 §6). Only these have a place in the order of use.",
+        "A run at another account's limit may go on with it: Claude Code's or Codex's own sign-in (never a key), shared between agents and signed in (ADR 0041 §6). Only these have a place in the order of use. In the order across CLIs (`AccountOrderGroup.kinds`) also Antigravity's own sign-in and an OpenCode key on one of its free models.",
+    }),
+    orderModel: z.string().optional().openapi({
+      description:
+        "The model a run thinks with once the order across CLIs brings it to this account (ADR 0041 §6, amended 2026-11-26); absent: its CLI's own default.",
     }),
   })
   .openapi("MachineAccount", {

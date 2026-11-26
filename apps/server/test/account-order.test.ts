@@ -244,3 +244,107 @@ test("Contas de IA as one view: every account with each viewer's rights, the ord
   const res = await asAda("/ai-accounts/order");
   expect(await res.json()).toMatchObject({ keyFallback: true, canConfigure: true });
 });
+
+const OWNER_OPENCODE = "0193ffff-0000-4000-8000-00000000a006";
+
+test("the order across AI providers: off by default; on, one order per computer of every kind, each account on its model", async () => {
+  const { api, asAda, asJoao, mac, orgId } = await workspace();
+  const [owners] = await t.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, OWNER_A));
+  await t.db.insert(schema.machineAccounts).values({
+    id: OWNER_OPENCODE,
+    orgId,
+    machineId: mac.machineId,
+    kind: "opencode",
+    label: "OpenCode",
+    status: "active",
+    createdBy: owners?.createdBy ?? null,
+    shared: true,
+    provider: "zen",
+    authMethod: "api_key",
+    createdAt: new Date(Date.UTC(2026, 10, 1, 13)),
+  });
+  // Off: as before, by kind, never Gemini nor OpenCode.
+  const before = (await (await api("/ai-accounts/order")).json()) as { groups: Group[]; crossProvider: boolean };
+  expect(before.crossProvider).toBe(false);
+  expect(before.groups.map((g) => g.kind)).toEqual(["claude_code", "codex"]);
+  // The model in the order is chosen only with the order across providers on.
+  const early = await api(`/ai-accounts/${OWNER_GEMINI}/order-model`, { method: "PUT", json: { model: null } });
+  expect(early.status).toBe(409);
+  expect(await code(early)).toBe("account.order_cross_off");
+
+  // Admins only turn it on, audited.
+  expect((await asJoao("/ai-accounts/cross-provider", { method: "PUT", json: { on: true } })).status).toBe(403);
+  const on = await asAda("/ai-accounts/cross-provider", { method: "PUT", json: { on: true } });
+  expect(on.status).toBe(200);
+  expect(await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "ai.cross_provider"))).toHaveLength(
+    1,
+  );
+  const read = (await (await api("/ai-accounts/order")).json()) as {
+    groups: (Group & { kinds?: string[] })[];
+    crossProvider: boolean;
+  };
+  expect(read.crossProvider).toBe(true);
+  // One group for the computer, of every kind: Gemini placed, the OpenCode key listed with no place until its model
+  // is a free one; a coding plan's key never.
+  expect(read.groups).toHaveLength(1);
+  const [all] = read.groups;
+  expect(all?.kinds).toEqual(["claude_code", "codex", "antigravity", "opencode"]);
+  expect(ids(all)).toEqual([OWNER_A, JOAO_A, OWNER_B, JOAO_ONLY, OWNER_CODEX, OWNER_GEMINI, OWNER_OPENCODE]);
+  expect(all?.accounts.find((a) => a.id === OWNER_GEMINI)?.movable).toBe(true);
+  expect(all?.accounts.find((a) => a.id === OWNER_OPENCODE)?.movable).toBe(false);
+  expect((await move(api, OWNER_OPENCODE, 0)).status).toBe(404);
+
+  // A model the account's CLI runs; on OpenCode only a free one.
+  const setModel = (call: Call, id: string, model: string | null) =>
+    call(`/ai-accounts/${id}/order-model`, { method: "PUT", json: { model } });
+  const wrong = await setModel(api, OWNER_GEMINI, "gpt-5.4");
+  expect(wrong.status).toBe(400);
+  expect(await code(wrong)).toBe("brain.invalid_model");
+  const paid = await setModel(api, OWNER_OPENCODE, "anthropic/claude-sonnet-4-6");
+  expect(paid.status).toBe(400);
+  expect(await code(paid)).toBe("account.order_model_paid");
+  const free = await setModel(api, OWNER_OPENCODE, "opencode/big-pickle");
+  expect(free.status).toBe(200);
+  const group = (await free.json()) as Group & { accounts: { id: string; orderModel?: string; movable: boolean }[] };
+  expect(group.accounts.find((a) => a.id === OWNER_OPENCODE)).toMatchObject({
+    orderModel: "opencode/big-pickle",
+    movable: true,
+  });
+  expect((await setModel(api, OWNER_GEMINI, "gemini-3.1-pro")).status).toBe(200);
+  // Someone else's account: refused in words.
+  const theirs = await setModel(asJoao, OWNER_GEMINI, null);
+  expect(theirs.status).toBe(403);
+  expect(await code(theirs)).toBe("account.order_forbidden");
+  expect(
+    await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "account.order_model")),
+  ).toHaveLength(2);
+
+  // Moving counts every kind of the computer: Gemini first, the rest keep their order.
+  const moved = await move(api, OWNER_GEMINI, 0);
+  expect(moved.status).toBe(200);
+  expect(ids((await moved.json()) as Group)).toEqual([
+    OWNER_GEMINI,
+    OWNER_A,
+    JOAO_A,
+    OWNER_B,
+    JOAO_ONLY,
+    OWNER_CODEX,
+    OWNER_OPENCODE,
+  ]);
+  const places = await t.db
+    .select({ id: schema.machineAccounts.id, useOrder: schema.machineAccounts.useOrder })
+    .from(schema.machineAccounts);
+  expect(Object.fromEntries(places.map((r) => [r.id, r.useOrder]))).toMatchObject({
+    [OWNER_GEMINI]: 0,
+    [OWNER_A]: 1,
+    [OWNER_CODEX]: 5,
+    [OWNER_OPENCODE]: 6,
+  });
+
+  // The hub says it too; turned off, the order is by kind again.
+  const hub = (await (await api("/ai-accounts")).json()) as { hub: { crossProvider: boolean } };
+  expect(hub.hub.crossProvider).toBe(true);
+  await asAda("/ai-accounts/cross-provider", { method: "PUT", json: { on: false } });
+  expect((await order(api)).map((g) => g.kind)).toEqual(["claude_code", "codex"]);
+  expect(ids((await order(api))[0])).toEqual([OWNER_A, JOAO_A, OWNER_B, JOAO_ONLY]);
+});

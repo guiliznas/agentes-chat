@@ -56,12 +56,16 @@ import {
   isNull,
   ne,
   or,
+  type SQL,
   schema,
   sql,
 } from "@agenteschat/db";
 import {
   ACCOUNT_ONLY_BRAINS,
+  CROSS_PROVIDER_KINDS,
+  crossMayMoveTo,
   GEMINI_ENTERPRISE_PROVIDER,
+  isOpencodeFreeModel,
   isPlanId,
   loginPerAgent,
   NEXT_ACCOUNT_KINDS,
@@ -81,8 +85,11 @@ import {
   windowReadAt,
   windowStale,
 } from "@agenteschat/ui/plan-state";
+import { crossKindSql } from "./ai-accounts/chain";
+import { planCrossProviderOn } from "./ai-accounts/fallback";
 import { accountPersonOf, loginPermissions, managesAccount } from "./ai-accounts/serves";
 import { recordAudit } from "./audit";
+import { normalizeBrainModel } from "./brain-settings";
 import { liveModelLimits } from "./brains/select";
 import { BRAIN_NAMES, BRAIN_PLAN_NAMES, brainRunsOn } from "./brains/types";
 import { caches } from "./cache";
@@ -193,6 +200,11 @@ export interface MachineAccountView {
    * a key), shared between agents and signed in. Only these have a place in the order of use.
    */
   movable: boolean;
+  /**
+   * The model a run thinks with once the order across CLIs brings it to this account (ADR 0041 §6, amended
+   * 2026-11-26); absent: its CLI's own default.
+   */
+  orderModel?: string;
 }
 
 /** Who a plan thinks for (`machine_accounts.serves`, ADR 0059 §3). */
@@ -312,6 +324,7 @@ function accountView(
     useOrder: row.useOrder,
     sameAs,
     movable: runMayMoveTo(row),
+    ...(row.orderModel ? { orderModel: row.orderModel } : {}),
   };
 }
 
@@ -391,23 +404,36 @@ export async function listMachineAccounts(
   });
 }
 
-/** One computer's accounts of one kind in their order of use (ADR 0041 §6). */
+/**
+ * One computer's accounts of one kind in their order of use (ADR 0041 §6), or with the order across CLIs on (amended
+ * 2026-11-26) all of its accounts of every kind in that order (`kinds`).
+ */
 export interface AccountOrderGroup {
   machineId: string;
   computer: string;
+  /** The kind of a group of one kind; in a group across CLIs, its first account's (older apps read one kind). */
   kind: AccountKind;
+  /** The order across CLIs: the kinds this one group holds, first to last as they first come. */
+  kinds?: AccountKind[];
   /** First to last: by `useOrder`, the unplaced after, oldest first. `canMove`: the viewer owns it or is an admin. */
   accounts: (MachineAccountView & { canMove: boolean })[];
 }
 
-/** Accounts a run may go on with at its plan's limit (`nextAccountPlan`): the CLI's own sign-in, never a key. */
-const inOrder = (orgId: string) =>
+/**
+ * Accounts a run may go on with at its plan's limit (`nextAccountPlan`): the CLI's own sign-in, never a key. `cross`:
+ * the order across CLIs, which also lists an OpenCode key (its place only once its model is a free one).
+ */
+const inOrder = (orgId: string, cross = false) =>
   and(
     eq(machineAccounts.orgId, orgId),
-    inArray(machineAccounts.kind, [...NEXT_ACCOUNT_KINDS]),
     inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
-    isNull(machineAccounts.provider),
-    sql`${machineAccounts.authMethod} is distinct from 'api_key'`,
+    cross
+      ? or(crossKindSql, and(eq(machineAccounts.kind, "opencode"), eq(machineAccounts.provider, OPENCODE_KEY_PROVIDER)))
+      : and(
+          inArray(machineAccounts.kind, [...NEXT_ACCOUNT_KINDS]),
+          isNull(machineAccounts.provider),
+          sql`${machineAccounts.authMethod} is distinct from 'api_key'`,
+        ),
   );
 
 const orderOfUse = [
@@ -428,12 +454,24 @@ export async function listAccountOrder(
 ): Promise<AccountOrderGroup[]> {
   const membership = await requirePermission(deps.db, userId, orgId, "read");
   const admin = can(membership, "configure");
+  const cross = await planCrossProviderOn(deps.db, orgId);
   const rows = await deps.db
-    .select({ id: machineAccounts.id, machineId: machineAccounts.machineId, computer: machines.name })
+    .select({
+      id: machineAccounts.id,
+      machineId: machineAccounts.machineId,
+      computer: machines.name,
+      row: machineAccounts,
+    })
     .from(machineAccounts)
     .innerJoin(machines, and(eq(machines.id, machineAccounts.machineId), isNull(machines.deletedAt)))
-    .where(inOrder(orgId))
-    .orderBy(machines.createdAt, machines.id, machineAccounts.kind, sql`${movableRow} desc`, ...orderOfUse);
+    .where(inOrder(orgId, cross))
+    .orderBy(
+      machines.createdAt,
+      machines.id,
+      ...(cross ? [] : [machineAccounts.kind]),
+      sql`${cross ? crossPlaced : movableRow} desc`,
+      ...orderOfUse,
+    );
   const views = new Map<string, MachineAccountView>();
   for (const machineId of new Set(rows.map((r) => r.machineId))) {
     for (const v of await listMachineAccounts(deps, orgId, machineId, userId)) views.set(v.id, v);
@@ -442,15 +480,19 @@ export async function listAccountOrder(
   for (const r of rows) {
     const view = views.get(r.id);
     if (!view) continue;
-    let group = groups.find((g) => g.machineId === r.machineId && g.kind === view.kind);
+    let group = groups.find((g) => g.machineId === r.machineId && (cross || g.kind === view.kind));
     if (!group) {
       group = { machineId: r.machineId, computer: r.computer, kind: view.kind, accounts: [] };
       groups.push(group);
     }
-    group.accounts.push({ ...view, canMove: view.mine || admin });
+    if (cross && !group.kinds?.includes(view.kind)) group.kinds = [...(group.kinds ?? []), view.kind];
+    group.accounts.push({ ...view, ...(cross ? { movable: crossMayMoveTo(r.row) } : {}), canMove: view.mine || admin });
   }
   return groups;
 }
+
+/** In the order across CLIs, the accounts that have a place (`crossMayMoveTo`, short of an OpenCode model's list). */
+const crossPlaced = and(movableRow, crossKindSql) as SQL;
 
 /**
  * `PUT …/ai-accounts/{id}/order`: the account takes place `index` (0 first) among its computer's accounts of its kind
@@ -469,10 +511,12 @@ export async function moveAccountInOrder(
     throw new ValidationError("The place is a whole number from 0", "account.invalid_order");
   }
   const membership = await requirePermission(deps.db, userId, orgId, "read");
+  const cross = await planCrossProviderOn(deps.db, orgId);
+  const placed = cross ? crossPlaced : movableRow;
   const [row] = await deps.db
     .select()
     .from(machineAccounts)
-    .where(and(inOrder(orgId), movableRow, eq(machineAccounts.id, accountId)));
+    .where(and(inOrder(orgId, cross), placed, eq(machineAccounts.id, accountId)));
   if (!row) throw new NotFoundError("Account not found", "account.not_found");
   if (row.createdBy !== userId && !can(membership, "configure")) {
     throw new ForbiddenError(
@@ -486,10 +530,11 @@ export async function moveAccountInOrder(
       .from(machineAccounts)
       .where(
         and(
-          inOrder(orgId),
-          movableRow,
+          inOrder(orgId, cross),
+          placed,
           eq(machineAccounts.machineId, row.machineId),
-          eq(machineAccounts.kind, row.kind),
+          // Across CLIs one order per computer: the places count every kind of it.
+          cross ? undefined : eq(machineAccounts.kind, row.kind),
         ),
       )
       .orderBy(...orderOfUse)
@@ -516,10 +561,90 @@ export async function moveAccountInOrder(
     details: { machineId: row.machineId, kind: row.kind, index },
   });
   await publishAccountsChanged(deps.pubsub, orgId, row.machineId);
+  return orderGroupOf(deps, userId, orgId, row);
+}
+
+/** The order group `row` is in now, as the viewer reads it. */
+async function orderGroupOf(
+  deps: Pick<MachineAccountDeps, "db">,
+  userId: string,
+  orgId: string,
+  row: Pick<MachineAccountRow, "machineId" | "kind" | "id">,
+): Promise<AccountOrderGroup> {
   const groups = await listAccountOrder(deps, userId, orgId);
-  const found = groups.find((g) => g.machineId === row.machineId && g.kind === row.kind);
+  const found = groups.find((g) => g.machineId === row.machineId && g.accounts.some((a) => a.id === row.id));
   if (!found) throw new NotFoundError("Account not found", "account.not_found");
   return found;
+}
+
+/**
+ * `PUT …/ai-accounts/{id}/order-model`: the model a run thinks with once the order across CLIs brings it to this
+ * account (ADR 0041 §6, amended 2026-11-26), for every login of it; null: its CLI's own default. One its CLI runs
+ * (`normalizeBrainModel`, the brains' own check); on OpenCode one of its free models, without which the account has no
+ * place there. Only with that order on (`account.order_cross_off`). Its owner or an admin (`account.order_forbidden`).
+ * Audited as `account.order_model`.
+ */
+export async function setAccountOrderModel(
+  deps: MachineAccountDeps,
+  userId: string,
+  orgId: string,
+  accountId: string,
+  model: unknown,
+): Promise<AccountOrderGroup> {
+  const membership = await requirePermission(deps.db, userId, orgId, "read");
+  const [row] = await deps.db
+    .select()
+    .from(machineAccounts)
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        eq(machineAccounts.id, accountId),
+        inArray(machineAccounts.status, LISTED_ACCOUNT_STATUSES),
+        inArray(machineAccounts.kind, [...CROSS_PROVIDER_KINDS]),
+      ),
+    );
+  if (!row) throw new NotFoundError("Account not found", "account.not_found");
+  if (!(await planCrossProviderOn(deps.db, orgId))) {
+    throw new ConflictError("The order across AI providers is off in this workspace", "account.order_cross_off");
+  }
+  if (row.createdBy !== userId && !can(membership, "configure")) {
+    throw new ForbiddenError(
+      "Only the person who connected this account or an admin can choose its model in the order",
+      "account.order_forbidden",
+    );
+  }
+  const kind = kindOf(row);
+  const value = normalizeBrainModel(kind, model);
+  if (kind === "opencode" && value !== null && !isOpencodeFreeModel(value)) {
+    throw new ValidationError(
+      "In the order OpenCode thinks only on one of its free models",
+      "account.order_model_paid",
+      {
+        model: value,
+      },
+    );
+  }
+  if (value !== row.orderModel) {
+    // Every login of the account thinks on the same model there.
+    const logins = await deps.db
+      .select()
+      .from(machineAccounts)
+      .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.machineId, row.machineId)));
+    const ids = logins.filter((l) => sameAccountRow(l, row)).map((l) => l.id);
+    await deps.db
+      .update(machineAccounts)
+      .set({ orderModel: value, updatedAt: new Date() })
+      .where(and(eq(machineAccounts.orgId, orgId), inArray(machineAccounts.id, ids.length > 0 ? ids : [row.id])));
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "account.order_model",
+      target: { type: "machine_account", id: row.id },
+      details: { machineId: row.machineId, kind, model: value },
+    });
+    await publishAccountsChanged(deps.pubsub, orgId, row.machineId);
+  }
+  return orderGroupOf(deps, userId, orgId, row);
 }
 
 async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow, viewerId: string) {
