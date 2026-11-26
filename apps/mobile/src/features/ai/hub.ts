@@ -226,3 +226,44 @@ export function hubAccounts(hub: Pick<AiHub, "accounts">, viewerId: string): AiH
     .map((logins) => logins[0] as AiHubAccount)
     .sort((x, y) => kindRank(x.kind) - kindRank(y.kind) || inOrder(x, y));
 }
+
+/** An order's heading: its AI and computer, or across AI providers (`kinds`, ADR 0041 §6) the computer's whole order. */
+export const orderGroupTitle = (t: TFunction, g: Pick<AccountOrderGroup, "kind" | "kinds" | "computer">) =>
+  g.kinds
+    ? t("aiHub.order.crossGroup", { computer: g.computer })
+    : t("mobile.aiHub.orderGroup", { plan: t(`aiAccounts.connect.${g.kind}`), computer: g.computer });
+
+/** The model sheet's "its AI's default": a word no model is called. */
+export const ORDER_MODEL_DEFAULT = "default";
+
+/**
+ * The model sheet of an account in the order across AI providers: its AI's default (never on OpenCode, which takes a
+ * place only on a free model), then what its computer lists (`orderModelChoices`), and one chosen before it stopped
+ * listing it. `value`: the one in use.
+ */
+export function orderModelSheet(
+  t: TFunction,
+  a: Pick<OrderLogin, "kind" | "orderModel">,
+  listed: readonly { value: string; label: string }[],
+): { options: { key: string; label: string }[]; value: string | null } {
+  const free = a.kind === "opencode";
+  const chosen = a.orderModel ?? null;
+  return {
+    options: [
+      ...(free ? [] : [{ key: ORDER_MODEL_DEFAULT, label: t("aiHub.order.modelDefault") }]),
+      ...listed.map((m) => ({ key: m.value, label: m.label })),
+      ...(chosen && !listed.some((m) => m.value === chosen) ? [{ key: chosen, label: chosen }] : []),
+    ],
+    value: chosen ?? (free ? null : ORDER_MODEL_DEFAULT),
+  };
+}
+
+/** The model an account thinks on there, in words: its label, its AI's default, or OpenCode still waiting for one. */
+export function orderModelText(
+  t: TFunction,
+  a: Pick<OrderLogin, "kind" | "orderModel">,
+  listed: readonly { value: string; label: string }[],
+): string {
+  if (!a.orderModel) return t(a.kind === "opencode" ? "aiHub.order.modelPickFree" : "aiHub.order.modelDefault");
+  return listed.find((m) => m.value === a.orderModel)?.label ?? a.orderModel;
+}

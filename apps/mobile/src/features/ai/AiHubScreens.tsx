@@ -2,13 +2,16 @@ import type { AccountAudienceMode, AccountOrderGroup, AiHub, AiHubAccount } from
 import {
   useAccountOrder,
   useAiAccounts,
+  useBrainMachines,
   useMembers,
   useMoveAccountInOrder,
   useRoles,
+  useSetAccountOrderModel,
   useSetAccountPermissions,
+  useSetCrossProvider,
   useSetKeyFallback,
 } from "@agenteschat/client";
-import { orderDrop, orderStep } from "@agenteschat/client/lib/ai-accounts";
+import { orderDrop, orderModelChoices, orderStep } from "@agenteschat/client/lib/ai-accounts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
 import { planOf } from "@agenteschat/client/lib/plans";
@@ -49,14 +52,19 @@ import {
   hubState,
   hubTitle,
   mayChange,
+  ORDER_MODEL_DEFAULT,
   type OrderRow,
   orderDropOf,
+  orderGroupTitle,
+  orderModelSheet,
+  orderModelText,
   orderRows,
   PERMISSIONS,
   type Permission,
   type StateTone,
 } from "./hub";
 import { openConnectAi } from "./NoAiCard";
+import { Note } from "./parts";
 
 /*
  * "Contas de IA" on the phone (the web's IA e uso › Contas de IA): every plan account of the workspace in one calm list
@@ -384,7 +392,9 @@ export function AccountAudienceScreen({
 /**
  * Ordem de uso: the accounts of each AI on each computer, numbered, in the order agents go through them at a limit;
  * each held by its handle and dragged, or moved up and down from its menu (and VoiceOver's actions). A signed-out
- * account is at the end, skipped. Under them, admins' switch to go on with the API key after the last plan.
+ * account is at the end, skipped. Under them, admins' switches: to go on with other AI providers (then one order per
+ * computer, every AI in it, each account with its model: ADR 0041 §6, amended 2026-11-26) and with the API key after
+ * the last plan.
  */
 export function AccountOrderScreen() {
   const { t, i18n } = useTranslation();
@@ -393,6 +403,10 @@ export function AccountOrderScreen() {
   const order = useAccountOrder(orgId);
   const move = useMoveAccountInOrder(orgId);
   const fallback = useSetKeyFallback(orgId);
+  const crossing = useSetCrossProvider(orgId);
+  const setModel = useSetAccountOrderModel(orgId);
+  const cross = order.data?.crossProvider === true;
+  const machines = useBrainMachines(orgId).data;
   // A drop shows at once, before the server answers: the group's rows as the person left them.
   const [draft, setDraft] = useState<{ group: string; rows: OrderRow[] } | null>(null);
   const failed = (e: unknown) => {
@@ -412,6 +426,16 @@ export function AccountOrderScreen() {
     );
   };
   const groups = order.data?.groups ?? [];
+  /** The model sheet of an account across AI providers: what it picks is saved at once. */
+  const chooseModel = async (g: AccountOrderGroup, a: AccountOrderGroup["accounts"][number]) => {
+    const sheet = orderModelSheet(t, a, orderModelChoices(machines, g.machineId, a.kind));
+    const picked = await pickOne({ title: t("aiHub.order.model", { name: hubTitle(t, a) }), ...sheet });
+    if (picked === null || picked === sheet.value) return;
+    setModel.mutate(
+      { accountId: a.id, model: picked === ORDER_MODEL_DEFAULT ? null : picked },
+      { onSuccess: () => successHaptic(), onError: failed },
+    );
+  };
   return (
     <SettingsPage title={t("mobile.aiHub.order")} onRefresh={() => order.refetch()}>
       <GroupedFooter>{t("mobile.aiHub.orderSub")}</GroupedFooter>
@@ -421,19 +445,24 @@ export function AccountOrderScreen() {
       {groups.map((g) => {
         const rows = draft?.group === groupKey(g) ? draft.rows : orderRows(g);
         const placed = rows.filter((r) => r.place !== null).length;
-        const plan = t(`aiAccounts.connect.${g.kind}`);
+        const plan = g.kinds ? t("aiHub.order.crossGroupOne") : t(`aiAccounts.connect.${g.kind}`);
+        const listed = (kind: OrderRow["account"]["kind"]) => orderModelChoices(machines, g.machineId, kind);
         return (
           <View key={groupKey(g)}>
             <GroupedHeader
-              hint={{
-                name: t("common.about", { label: t("usageViews.order.termsLabel", { plan }) }),
-                text: t("common.joinSentences", {
-                  a: t("usageViews.order.hint"),
-                  b: t("usageViews.order.termsHint", { plan }),
-                }),
-              }}
+              hint={
+                g.kinds
+                  ? { name: t("common.about", { label: plan }), text: t("aiHub.order.crossHint") }
+                  : {
+                      name: t("common.about", { label: t("usageViews.order.termsLabel", { plan }) }),
+                      text: t("common.joinSentences", {
+                        a: t("usageViews.order.hint"),
+                        b: t("usageViews.order.termsHint", { plan }),
+                      }),
+                    }
+              }
             >
-              {t("mobile.aiHub.orderGroup", { plan, computer: g.computer })}
+              {orderGroupTitle(t, g)}
             </GroupedHeader>
             <GroupedList>
               <ReorderList
@@ -460,9 +489,10 @@ export function AccountOrderScreen() {
                   <OrderAccountRow
                     row={r}
                     locale={i18n.language}
-                    disabled={move.isPending}
-                    steps={
-                      r.account.canMove && r.place !== null
+                    disabled={move.isPending || setModel.isPending}
+                    {...(g.kinds ? { model: orderModelText(t, r.account, listed(r.account.kind)) } : {})}
+                    steps={[
+                      ...(r.account.canMove && r.place !== null
                         ? ([-1, 1] as const).flatMap((step) => {
                             const to = orderStep(g.accounts, r.account.id, step);
                             return to === null
@@ -474,8 +504,17 @@ export function AccountOrderScreen() {
                                   },
                                 ];
                           })
-                        : []
-                    }
+                        : []),
+                      // Across AI providers, whoever may move it chooses its model there too.
+                      ...(g.kinds && r.account.canMove
+                        ? [
+                            {
+                              label: t("aiHub.order.model", { name: hubTitle(t, r.account) }),
+                              onPress: () => void chooseModel(g, r.account),
+                            },
+                          ]
+                        : []),
+                    ]}
                   />
                 )}
               />
@@ -486,6 +525,30 @@ export function AccountOrderScreen() {
       {order.data && order.data.keyFallback !== undefined ? (
         <>
           <GroupedHeader> </GroupedHeader>
+          {order.data.crossProvider !== undefined ? (
+            <>
+              <GroupedList>
+                <GroupedRow
+                  label={t("aiHub.order.cross")}
+                  labelLines={2}
+                  hint={{
+                    name: t("common.about", { label: t("aiHub.order.cross") }),
+                    text: t("aiHub.order.crossHint"),
+                  }}
+                  toggle={cross}
+                  disabled={!order.data.canConfigure || crossing.isPending}
+                  onPress={() => crossing.mutate(!cross, { onError: failed })}
+                />
+              </GroupedList>
+              {/* Gemini comes into the order with it: Google's own rule for personal plans, said plainly. */}
+              {cross ? (
+                <Note icon="info" inset>
+                  {t("connectAi.plan.gemini.warning")}
+                </Note>
+              ) : null}
+              <GroupedHeader> </GroupedHeader>
+            </>
+          ) : null}
           <GroupedList>
             <GroupedRow
               label={t("mobile.aiHub.keyFallback")}
@@ -506,19 +569,26 @@ export function AccountOrderScreen() {
   );
 }
 
-const groupKey = (g: Pick<AccountOrderGroup, "machineId" | "kind">) => `${g.machineId}:${g.kind}`;
+/** A group's key: one AI on one computer, or across AI providers (`kinds`) the computer's whole order. */
+const groupKey = (g: Pick<AccountOrderGroup, "machineId" | "kind" | "kinds">) =>
+  g.kinds ? g.machineId : `${g.machineId}:${g.kind}`;
 
-/** One account of an order: its number, name, plan and owner, its state; its menu moves it up or down. */
+/**
+ * One account of an order: its number, name, plan and owner, its state; its menu moves it up or down. Across AI
+ * providers (`model`) its maker's mark by its number and the model it thinks on there in its line.
+ */
 function OrderAccountRow({
   row,
   locale,
   steps,
   disabled,
+  model,
 }: {
   row: OrderRow;
   locale: string;
   steps: { label: string; onPress: () => void }[];
   disabled: boolean;
+  model?: string;
 }) {
   const { t } = useTranslation();
   const a = row.account;
@@ -530,14 +600,17 @@ function OrderAccountRow({
   return (
     <GroupedRow
       leading={
-        <Text variant="callout" tone="muted" style={styles.place}>
-          {row.place ?? ""}
-        </Text>
+        <View style={styles.leading}>
+          <Text variant="callout" tone="muted" style={styles.place}>
+            {row.place ?? ""}
+          </Text>
+          {model !== undefined ? <ProviderLogo id={a.provider === "zen" ? "zen" : a.kind} size="sm" /> : null}
+        </View>
       }
       leadingSaid={row.place?.toString()}
       label={hubTitle(t, a)}
       faint={skipped}
-      sub={hubLine(t, a)}
+      sub={model !== undefined ? [hubLine(t, a), model].filter(Boolean).join(" · ") : hubLine(t, a)}
       {...(stateText ? { below: <StateLine text={stateText} tone={state?.tone ?? "amber"} /> } : {})}
       disabled={disabled || steps.length === 0}
       {...(steps.length > 0 ? { onPress: () => void pickSteps(hubTitle(t, a), steps) } : {})}
@@ -553,4 +626,5 @@ const pickSteps = async (title: string, steps: { label: string; onPress: () => v
 const styles = StyleSheet.create({
   meter: { paddingHorizontal: 16, paddingVertical: 12 },
   place: { minWidth: 24, textAlign: "center", fontVariant: ["tabular-nums"], fontWeight: "600" },
+  leading: { flexDirection: "row", alignItems: "center", gap: 6 },
 });

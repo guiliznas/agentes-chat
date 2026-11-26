@@ -216,3 +216,41 @@ describe("the one choice", () => {
     ]);
   });
 });
+
+describe("the order across AI providers (ADR 0041 §6, amended 2026-11-26)", () => {
+  const listed = [{ value: "opencode/big-pickle", label: "Big Pickle" }];
+  test("one heading for the computer's whole order; one AI's order keeps its own", async () => {
+    const { orderGroupTitle } = await import("../../src/features/ai/hub");
+    const t = await translator("pt-BR");
+    expect(
+      orderGroupTitle(t, { kind: "claude_code", kinds: ["claude_code", "antigravity"], computer: "MacBook" }),
+    ).toBe("Todas as IAs · MacBook");
+    expect(orderGroupTitle(t, { kind: "claude_code", computer: "MacBook" })).toBe("Claude · MacBook");
+  });
+
+  test("a model per account: its AI's default or what its computer lists; OpenCode only on a free one", async () => {
+    const { orderModelSheet, orderModelText } = await import("../../src/features/ai/hub");
+    const t = await translator("pt-BR");
+    expect(orderModelSheet(t, { kind: "antigravity" }, [{ value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" }])).toEqual(
+      {
+        options: [
+          { key: "default", label: "Padrão da IA" },
+          { key: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+        ],
+        value: "default",
+      },
+    );
+    expect(orderModelSheet(t, { kind: "opencode" }, listed)).toEqual({
+      options: [{ key: "opencode/big-pickle", label: "Big Pickle" }],
+      value: null,
+    });
+    // Chosen before its computer stopped listing it: still there, checked.
+    expect(orderModelSheet(t, { kind: "opencode", orderModel: "opencode/beam-free" }, listed).options.at(-1)).toEqual({
+      key: "opencode/beam-free",
+      label: "opencode/beam-free",
+    });
+    expect(orderModelText(t, { kind: "opencode" }, listed)).toBe("Escolha um modelo gratuito");
+    expect(orderModelText(t, { kind: "opencode", orderModel: "opencode/big-pickle" }, listed)).toBe("Big Pickle");
+    expect(orderModelText(t, { kind: "claude_code" }, listed)).toBe("Padrão da IA");
+  });
+});
