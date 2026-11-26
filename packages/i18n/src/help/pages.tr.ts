@@ -443,6 +443,44 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
+        id: "tool-levels",
+        heading: "Bağlı bir uygulamanın her aracı",
+        blocks: [
+          "Adresiyle bağlanan bir uygulamanın her aracının kendi seviyesi vardır. Bunu **Ayarlar\u00a0›\u00a0Bağlayıcılar** içinde, o bağlantının araçlarında seçersiniz. Ajanın sayfasında **Araçlar ve erişim**, hangi uygulamaları ve araçları kullanabileceğini gösterir.",
+          {
+            list: [
+              "**Yalnızca bakar**: okur ve hiçbir şeyi değiştirmez. Hiç sormaz.",
+              "**Bir şeyleri değiştirir**: sormadan oluşturur ve düzenler. **Her zaman sor** seviyesindeki bir ajan yine de sorar.",
+              "**Onayınızı ister**: her kullanımdan önce konuşmada sorar.",
+              "**Kapalı**: ajanlar onu almaz.",
+            ],
+          },
+          "Ajanın sayfasındaki **Hiç sorma** bunların hepsinden önce gelir: bu seviyedeki bir ajan, **Onayınızı ister** seviyesindeki bir araçta bile hiçbir şey sormaz. İstekler beklerken bir seviye değişirse, artık sormayacak olanlar iptal edilir ve ajan bunları kart olmadan yeniden yapar.",
+        ],
+      },
+      {
+        id: "sensitive",
+        heading: "Hassas araçlar",
+        blocks: [
+          "Uygulamanın sunucusunun silen, gönderen ya da ödeme yapan olarak işaretlediği bir araç yalnızca **Onayınızı ister** ya da **Kapalı** olabilir.",
+        ],
+      },
+      {
+        id: "order",
+        heading: "Onaylanan eylemler hangi sırayla çalışır",
+        blocks: [
+          "Bir ajan, tek bir turda eylemlerini, onları hangi sırayla onaylarsanız onaylayın, istediği sırayla yapar. Ajan beklerken gönderilen bir mesaj yeni bir tur başlatır ve o turun eylemleri, ajanın zaten beklediğini bildiği isteklerden sonra çalışır. Farklı konuşmalardaki istekler birbirini hiç beklemez.",
+          "Bir kişiyi 30 dakikadan uzun süredir bekleyen bir istek hiçbir şeyi durdurmaz. Bekleyen onaylı bir eylem neyi beklediğini söyler, o istek için **Onayla** ve **Reddet** ile onsuz devam etmek için **Bunu şimdi çalıştır** düğmeleriyle.",
+        ],
+      },
+      {
+        id: "many",
+        heading: "Birkaçı birden",
+        blocks: [
+          "İsteklerin sizi beklediği yerde, web'de ve telefonda, **Tümünü onayla** ve **Tümünü reddet** bir ajanın tüm isteklerine tek seferde karar verir.",
+        ],
+      },
+      {
         id: "who",
         heading: "Kim onaylar",
         blocks: [
@@ -494,7 +532,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "Çalışma alanınızı agentes.chat barındırıyorsa Jev dahildir. Kendi çalıştırdığınız bir sunucuda sahibin TypeSafe anahtarını kullanır, mesaj başına yaklaşık US$ 0,0001: [Jev'i kurun](/help/jev#setup).",
+          "Çalışma alanınızı agentes.chat barındırıyorsa Jev dahildir. Kendi çalıştırdığınız bir sunucuda sahibin TypeSafe ya da OpenRouter anahtarını kullanır, mesaj başına yaklaşık US$ 0,0001: [Jev'i kurun](/help/jev#setup).",
         ],
       },
       {
@@ -556,6 +594,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
               "agentes.chat'te **Ayarlar › Yapay zeka ve kullanım** bölümünü açın ve anahtarı **Jev** altına yapıştırın. Onu yalnızca bu sunucuyu kuran kişi görür.",
             ],
           },
+          "Zaten OpenRouter mı kullanıyorsunuz? **Jev** altında **OpenRouter**'ı seçip https://openrouter.ai/keys adresinden bir anahtar yapıştırın ya da çalışma alanının OpenRouter anahtarıyla Jev'i tek tıkla açın. Aynı Jev, aynı fiyatla OpenRouter üzerinden faturalanır.",
           "Docker ile çalıştırdığınız bir sunucuda anahtarı bunun yerine `.env` dosyasına `TYPESAFE_API_KEY` olarak koyabilirsiniz. Bu anahtar, Ayarlar'dakinin önüne geçer.",
         ],
       },
@@ -590,6 +629,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           "TypeSafe, Jev'i Amerika Birleşik Devletleri'nde çalıştırır ve modellerini gönderdiklerinizle eğitmez. Verileri hizmeti sürdürmek için gerektiği kadar saklar. Kurumsal planlarında sıfır saklama seçeneği vardır.",
           "TypeSafe'in gizlilik politikası: https://typesafe.ai/legal/privacy-policy. Veri işleme sözleşmesi: https://typesafe.ai/legal/data-processing.",
+          "OpenRouter anahtarıyla aynı istekler TypeSafe'e giderken OpenRouter'dan geçer; OpenRouter'ın koşulları ve oradaki gizlilik ayarlarınız geçerli olur: https://openrouter.ai/privacy.",
         ],
       },
       {
@@ -844,7 +884,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "data",
         heading: "Ne gönderir",
         blocks: [
-          "Sunucu günde bir kez agentes.chat'e anonim kullanım istatistikleri gönderir: kişi, ajan sayısı, makine boyutları, kullanılan yapay zekâ token'ları ve ajanların tarayıcılarının ne kadar veri gönderip aldığı gibi sayılar. Asla mesajlar, dosyalar, adlar ya da siteler. `docker compose run --rm agentes telemetry` tam olarak ne gönderileceğini gösterir. Sahip bunu **Ayarlar\u00a0›\u00a0Genel** içinden ya da `.env` içinde `TELEMETRY=off` ile kapatır.",
+          "Sunucu günde bir kez agentes.chat'e anonim kullanım istatistikleri gönderir: kişi, ajan sayısı, makine boyutları, kullanılan yapay zekâ token'ları, ajanların tarayıcılarının ne kadar veri gönderip aldığı ve uygulamaların ne kadar hızlı açılıp çalıştığı gibi sayılar. Asla mesajlar, dosyalar, adlar ya da siteler. `docker compose run --rm agentes telemetry` tam olarak ne gönderileceğini gösterir. Sahip bunu **Ayarlar\u00a0›\u00a0Genel** içinden ya da `.env` içinde `TELEMETRY=off` ile kapatır.",
           "Hata raporları, `SENTRY_DSN` ile kendi seçtiğiniz Sentry uyumlu bir sunucu ayarlamadıkça hiçbir yere gitmez. Bir rapor hatayı ve nerede olduğunu içerir, asla mesajları, e-postaları, IP adreslerini, çerezleri ya da token'ları içermez.",
         ],
       },
@@ -853,6 +893,57 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Tam kılavuz",
         blocks: [
           "Tüm ayarlar, nginx gibi kendi proxy'niz, Docker olmadan çalıştırma, kendi kendine kuran yapay zekâ ajanları için bir adım listesi ve bir şey ters gittiğinde ne yapılacağı, agentes.chat deposundaki `SELF_HOSTING.md` dosyasında.",
+        ],
+      },
+    ],
+  },
+  "integration-apps": {
+    title: "Entegrasyon uygulamaları",
+    summary:
+      "Kanallarınızda bir kişi olarak değil, kendisi olarak paylaşan bir destek botu, form veya izleme aracı bağlayın.",
+    sections: [
+      {
+        id: "what",
+        heading: "Nasıl çalışır",
+        blocks: [
+          "Bir entegrasyon uygulamasının kendi tokeni vardır. Ona verdiğiniz kanallarda kendi adıyla ve **Uygulama** etiketiyle paylaşır, dışarıdaki kişinin adını da iletebilir. Ajanlar ona bir kişiye yanıt verir gibi yanıt verir: onlardan bahsettiğinde veya yönlendirici onları seçtiğinde.",
+          "Dışarıdaki konuşmaları bu şekilde getirin, asla bir kişinin kişisel tokeniyle değil: bu mesajlar o kişinin mesajı gibi görünürdü.",
+        ],
+      },
+      {
+        id: "connect",
+        heading: "Destek botu bağlama",
+        blocks: [
+          {
+            list: [
+              "**Ayarlar › Bağlayıcılar › Entegrasyonlar** bölümünde **Uygulama bağla**'ya tıklayın, bir ad verin ve kanallarını seçin.",
+              "İsterseniz bir webhook adresi ekleyin: kanallarındaki her ajan yanıtı [Standard Webhooks](https://www.standardwebhooks.com) ile imzalanarak oraya gönderilir.",
+              "Tokeni ve webhook sırrını kopyalayın. Yalnızca bir kez gösterilirler.",
+              "Dışarıdaki her konuşmanın ilk mesajını `thread_id` olmadan, gerisini onun `id` değerini `thread_id` yaparak paylaşın. O ileti dizisindeki yanıtları kişiye geri gönderin.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "api",
+        heading: "API",
+        blocks: [
+          "Tokeni `Authorization: Bearer agi_…` olarak gönderin.",
+          {
+            list: [
+              "`GET /api/v1/channels`: uygulamanın kanalları.",
+              "`POST /api/v1/messages`: `channel_id`, `text` ve isteğe bağlı olarak `thread_id`, `sender` ve `idempotency_key`.",
+              "`GET /api/v1/messages?after=<id>`: o zamandan beri yazılanlar, her ajan yanıtında `in_reply_to` ile.",
+            ],
+          },
+          "Aynı çağrılar `/mcp` adresinde MCP araçlarıdır. Tam başvuru `/api/openapi.json` adresindedir.",
+        ],
+      },
+      {
+        id: "safety",
+        heading: "Bir uygulamanın yapamadıkları",
+        blocks: [
+          "Bir uygulama hiçbir zaman üye ya da kişi değildir. Ajanlar paylaştıklarına yanıt verir, ama ondan hiçbir kural, bellek, talimat değişikliği, rutin, onay veya izin almaz. Tokenini iptal etmek onu hemen durdurur. Bir uygulamaya yanıt verirken ajan kendiliğinden yalnızca o konuşmayı ve web'i okur: çalışma alanınızdaki diğer her şey bir kişinin onayını bekler.",
         ],
       },
     ],

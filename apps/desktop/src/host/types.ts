@@ -16,6 +16,7 @@ import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
+import type { ReportFacts } from "../report/report";
 
 /** The app's windows (Tauri labels). */
 export type WindowName = "popover" | "welcome" | "prefs" | "notch";
@@ -50,8 +51,17 @@ export interface AppInfo {
   arch: string;
   /** The system's own version where the app reads it (macOS: `15.1`). */
   system?: string | null;
-  /** Linux: how it draws the app, one line to copy ("Ubuntu 26.04 LTS · wayland (GNOME) · WebKitGTK 2.50.4 · …"). */
-  graphics?: string | null;
+  /** The line to copy: versions, and on Linux how it draws ("agentes.chat 0.8.9 · Linux · Ubuntu 26.04 LTS · …"). */
+  details: string;
+}
+
+/** Linux's Compatibility mode (graphics.rs): drawing without the graphics card at the next opening. */
+export interface CompatMode {
+  on: boolean;
+  /** This opening fell back: the last one, with the graphics card, never painted. True for the first ask only. */
+  fellBack: boolean;
+  /** WEBKIT_DISABLE_DMABUF_RENDERER was set when the app started: it decides (`on` says what it does), not the switch. */
+  own: boolean;
 }
 
 /** A server's answer to `siteFetch`: its status and body as text. */
@@ -144,7 +154,19 @@ export interface Host {
   showWindow(name: WindowName): Promise<void>;
   hideWindow(name: WindowName): Promise<void>;
   quit(): Promise<void>;
+  /**
+   * Asks with the system's own dialog whether to quit, and quits on yes (`quit_ask`): a window of its own, which stays
+   * up while another window takes focus. True when the person chose to quit.
+   */
+  askQuit(words: { title: string; body: string; quit: string; cancel: string }): Promise<boolean>;
   appInfo(): Promise<AppInfo>;
+  /** This computer's system, size and web view's memory, and this opening, for a problem report (vitals.rs). */
+  reportFacts(): Promise<ReportFacts>;
+  /** Linux: Compatibility mode as the next opening will have it. */
+  compatMode(): Promise<CompatMode>;
+  setCompatMode(on: boolean): Promise<void>;
+  /** Quits and opens the app again, for a setting read only when it starts. */
+  reopen(): Promise<void>;
   autostart(): Promise<boolean>;
   setAutostart(on: boolean): Promise<void>;
   notify(title: string, body: string): Promise<void>;

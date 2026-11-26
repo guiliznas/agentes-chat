@@ -43,7 +43,8 @@ import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 import { acmeSeed, FAKE_LINKS, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
 import { createFakeSite, type FakeSite } from "../dev/fake-site";
-import type { AppInfo, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
+import type { ReportFacts } from "../report/report";
+import type { AppInfo, CompatMode, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
 
 export type Scenario = "first" | "windows" | "linux" | "cloud" | "selfhost" | "link" | "here";
 export const SCENARIOS: readonly Scenario[] = ["first", "windows", "linux", "cloud", "selfhost", "link", "here"];
@@ -76,6 +77,8 @@ const LOCAL_SERVER_VERSION = "0.1.1";
 
 export interface FakeHost extends Host {
   window: WindowName;
+  /** Linux's Compatibility mode as `compatMode` answers it (`fellBack` once). */
+  compat: CompatMode;
   readonly runners: Map<string, FakeRunner>;
   readonly tray: TrayState;
   readonly list: ServerList;
@@ -287,6 +290,7 @@ export function createFakeHost(
 
   const host: FakeHost = {
     window: initial,
+    compat: { on: true, fellBack: false, own: false },
     fake: true,
     platform,
     runners,
@@ -432,16 +436,38 @@ export function createFakeHost(
     quit: async () => {
       console.info("[fake] quit");
     },
+    askQuit: async (words) => {
+      console.info("[fake] ask to quit", words.title);
+      return false;
+    },
     appInfo: async (): Promise<AppInfo> => ({
       version,
       os: platform === "mac" ? "macos" : platform,
       arch: platform === "mac" ? "aarch64" : "x86_64",
       system: platform === "mac" ? "15.5" : null,
-      graphics:
+      details:
         platform === "linux"
-          ? "Ubuntu 26.04 LTS · wayland (GNOME) · WebKitGTK 2.50.4 · Intel (i915) · CPU · AppImage"
-          : null,
+          ? `agentes.chat ${version} · Linux · Ubuntu 26.04 LTS · wayland (GNOME) · WebKitGTK 2.50.4 · Intel (i915) · CPU (chosen) · AppImage`
+          : `agentes.chat ${version} · ${platform === "mac" ? "macOS 15.5" : "Windows"}`,
     }),
+    reportFacts: async (): Promise<ReportFacts> => ({
+      osVersion: platform === "mac" ? "15.5" : platform === "windows" ? "10.0.19045" : "6.8.0-45-generic",
+      cpus: 8,
+      memoryBytes: 16 * 2 ** 30,
+      webviewBytes: 240_000_000,
+      openingMs: 2300,
+    }),
+    compatMode: async () => {
+      const now = { ...host.compat };
+      host.compat.fellBack = false;
+      return now;
+    },
+    setCompatMode: async (on) => {
+      host.compat.on = on;
+    },
+    reopen: async () => {
+      console.info("[fake] reopen");
+    },
     autostart: async () => autostart,
     setAutostart: async (on) => {
       autostart = on;

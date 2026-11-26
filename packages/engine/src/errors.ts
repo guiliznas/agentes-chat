@@ -1,3 +1,5 @@
+import { wholeIn } from "./format";
+
 /**
  * Domain errors. The HTTP layer maps them to status codes (`apps/server/src/http/errors.ts`).
  * Each may carry a stable `code` and `params` the app translates (`t(code, params)`);
@@ -126,6 +128,13 @@ export class MissingCredentialError extends Error {
   }
 }
 
+/**
+ * A saved provider key this server can't open (`SealedValueError`): almost always one saved under another
+ * AGENTES_SECRET. Stored as the run's error and matched by `runErrorDetail`.
+ */
+export const UNREADABLE_KEY =
+  "This server can't open the saved API key, usually because AGENTES_SECRET changed after the key was saved. Paste the key again in the workspace's AI keys.";
+
 /** Unique-violation detection that works with postgres.js and PGlite. */
 export function isUniqueViolation(error: unknown): boolean {
   let e: unknown = error;
@@ -202,3 +211,10 @@ export function isUnexpectedError(error: unknown): boolean {
   if (!(error instanceof Error)) return true;
   return error.constructor !== Error && !DOMAIN_ERRORS.has(error.name);
 }
+
+/**
+ * The whole number a thrown error carries under `name` (an HTTP status, a JSON-RPC error's code), when it is within
+ * `min` to `max`, else null: a number says how something failed without any of its words.
+ */
+export const errorNumber = (error: unknown, name: "status" | "code", min: number, max: number) =>
+  wholeIn((error as Record<string, unknown> | null)?.[name], min, max);

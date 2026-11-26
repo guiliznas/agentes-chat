@@ -38,6 +38,7 @@ import {
 } from "./browser-bind-check";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import { browserPortsForUid } from "./browser-ports";
+import { scriptCheck } from "./command-gate";
 import { computerNow } from "./computer-now";
 import {
   accessToStore,
@@ -45,10 +46,12 @@ import {
   DEFAULT_AGENT_UID_RANGE,
   effectiveAccess,
   expandHome,
+  hostOrgHomes,
   normalizeServerUrl,
   pairedConfig,
   parseService,
   parseUidRange,
+  type RunnerConfig,
   readConfig,
   readStoredConfig,
   runnerHome,
@@ -61,7 +64,13 @@ import { runControl } from "./control";
 import { configFromGrant, deviceInfo, prepareWorkspace, previousMachineFor, RunnerDaemon } from "./daemon";
 import { DesktopManager } from "./desktop";
 import { runDesktopBrowser } from "./desktop-browser";
-import { DesktopSessions, type DesktopSessionsOptions, runnerUser, systemDesktopUser } from "./desktop-session";
+import {
+  DesktopSessions,
+  type DesktopSessionsOptions,
+  runnerUser,
+  systemDesktopUser,
+  taskRoomNow,
+} from "./desktop-session";
 import { localSources, runDoctor } from "./doctor";
 import { RUNNER_VERSION } from "./errors";
 import { defaultHostState, HostComputer, readTokenFile, runnerChild } from "./host";
@@ -69,9 +78,10 @@ import { writeJson } from "./json-file";
 import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
-import { adoptLoginPath } from "./login-path";
+import { addUsualDirs, adoptLoginPath } from "./login-path";
 import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpRelay, runMcpServer } from "./mcp";
+import { runMigrate } from "./migrate";
 import {
   type DeviceGrant,
   devicePair,
@@ -131,6 +141,9 @@ Usage:
       --rotate   asks for a new token for that organization's connection (the server refused its own)
   agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]
       Runs host as this computer's service: the root unit from boot on Linux, at login on macOS.
+  agentes-runner migrate [--from <app>] [--out <folder>] [--json] [--no-files]
+      Reads the agents another app keeps on this computer (openbot, openmausbot, hermes, openclaw,
+      paperclip) and writes one .zip to drop on the import screen. It only reads, and sends nothing.
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner standby [--minutes <n>]
@@ -152,9 +165,9 @@ Usage:
   agentes-runner computer
       What this computer has, what is free now, and which agents use the most of it (they share it).
       Agents run it before something heavy.
-  agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...]
+  agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...] [--org <id | name>]
       Folders agents may use besides their own (an agent's handle, as on the site).
-  agentes-runner tools [list | enable <tool> | disable <tool>]
+  agentes-runner tools [list | enable <tool> | disable <tool>] [--org <id | name>]
       Turns claude (Claude Code), codex (Codex), commands, browser, desktop or terminal on or off on
       this computer.
   agentes-runner services [list | allow <tcp|udp>/<port> | remove <tcp|udp>/<port>]
@@ -176,9 +189,12 @@ Usage:
   agentes-runner --help | --version
 
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
-Config: <home>/config.json, mode 600. For background tasks, optional "maxConcurrentTasks" (default 3)
-and "taskMaxSeconds" (default 14400). For agents thinking with Claude Code, optional "brainIdleMinutes"
-(default 20 on Linux, 3 elsewhere) and "brainMaxProcesses" (default 2 on Linux, 1 elsewhere). Changes apply while it runs.
+On the server's own computer each organization has its own connection in <home>/orgs: folders and tools
+take --org <id | name> to pick one when it serves several.
+Config: <home>/config.json, mode 600. For background tasks, optional "maxConcurrentTasks" (default: one
+per 1.5 GiB of memory past 4 GiB, at least 3, at most 20; also in the app's computer page) and "taskMaxSeconds"
+(default 14400). For agents thinking with Claude Code, optional "brainIdleMinutes" (default 60 on Linux,
+30 elsewhere) and "brainMaxProcesses" (default 8 on Linux, 1 elsewhere). Changes apply while it runs.
 Background tasks keep running when the runner restarts. Their logs are in tasks/.
 Commands run as the user that runs the runner. Consider a dedicated OS user.`;
 
@@ -194,6 +210,10 @@ interface Parsed {
 
 const VALUE_FLAGS = new Set([
   "server",
+  "from",
+  "out",
+  "data",
+  "company",
   "dir",
   "name",
   "task",
@@ -209,6 +229,7 @@ const VALUE_FLAGS = new Set([
   "rotate",
   "link",
   "minutes",
+  "org",
 ]);
 const LIST_FLAGS = new Set(["agent", "rotate"]);
 
@@ -249,6 +270,13 @@ const DESKTOP_MANAGED =
 const HOST_MANAGED =
   "This connection is one organization's on this server's own computer: agentes-runner host keeps it (and its service). Turn it off for the organization on the site, in Settings > Computers.";
 
+/**
+ * What the server's own computer says when no organization's connection is in this home yet: `pair` refuses there (the
+ * server brings one connection per organization, `host.ts`), and each organization's switches live on the site.
+ */
+const HOST_COMPUTER_NOTE =
+  "This computer is the server's computer: each organization's connection is switched on and off on the site, in Settings > Devices > Tools.";
+
 /** Why a command can't change this home: something else keeps it. Null when nothing does. */
 const managedMessage = (stored: StoredConfig | null) =>
   stored?.managedBy === "desktop" ? DESKTOP_MANAGED : stored?.managedBy === "host" ? HOST_MANAGED : null;
@@ -260,6 +288,13 @@ function storedOrNull(home = runnerHome()): StoredConfig | null {
     return null;
   }
 }
+
+/**
+ * Whether this home is the server's own computer (`agentes-runner host`): its top-level config is the machine's
+ * (`mode: "system"`), never a connection's, so it has no token — the connections are the organizations', one per home
+ * (`hostOrgHomes`). A runner of someone's own is a system-mode home too, and always paired: its token is here.
+ */
+const isHostComputer = (stored: StoredConfig | null) => stored?.mode === "system" && !stored.token;
 
 /**
  * The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site.
@@ -438,7 +473,16 @@ async function start(): Promise<number> {
     console.error(lockedMessage(home, lock.holder));
     return serviceSafe(4);
   }
-  const daemon = new RunnerDaemon({ home, mode: "start", log, print: (line) => console.log(line) });
+  // Before anything starts a CLI: a service's PATH is the installing shell's (the daemon adds them again per look).
+  if (process.platform !== "win32" && config.mode !== "system") addUsualDirs();
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log,
+    print: (line) => console.log(line),
+    cliCopies: true,
+    taskRoom: taskRoomNow,
+  });
   const stop = () => void daemon.stop();
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
@@ -515,7 +559,7 @@ async function app(): Promise<number> {
       input: process.stdin,
       output: process.stdout,
       locked: lock.ok ? null : lock.holder,
-      daemon: { log: write, logFile, refreshPath: () => adoptLoginPath() },
+      daemon: { log: write, logFile, refreshPath: () => adoptLoginPath(), taskRoom: taskRoomNow },
       signal: ac.signal,
     });
   } finally {
@@ -886,6 +930,8 @@ function status(): number {
   const home = runnerHome();
   const stored = storedOrNull(home);
   const config = readConfig(home);
+  // The server's own computer has no connection of its own: one per organization, each in its own home.
+  const orgs = !config && isHostComputer(stored) ? hostOrgHomes(home) : [];
   const bun = (process.versions as { bun?: string }).bun;
   // The version worth reporting is the one of the runner serving this home, which keeps in the lock what it puts
   // in its `hello`. This command may be another install's shim: its own constant is only the answer when no runner
@@ -908,14 +954,29 @@ function status(): number {
       `Connected${stored?.orgName ? ` to ${stored.orgName}` : ""} as "${config.name}"`,
       `${config.server} · workspace ${config.workspace}`,
     );
-  } else term.fail("Not connected.");
+  } else if (orgs.length) {
+    for (const orgHome of orgs) printOrgConnection(term, orgHome);
+  } else term.fail("Not connected.", isHostComputer(stored) ? HOST_COMPUTER_NOTE : undefined);
   if (running) term.step(`Running: pid ${running.pid}${running.mode ? ` (${running.mode})` : ""}`);
   else term.warn("Running: no");
   const service = serviceStatus(undefined, stored?.mode === "system");
   // systemd says how the unit is ("(active)", "(inactive)", "(failed)"); launchd and Windows only that it's there.
   if (service && (service.endsWith("(active)") || !service.endsWith(")"))) term.step(`Service: ${service}`);
   else term.warn(service ? `Service: ${service}` : "Service: not installed");
-  printDesktopAndTerminal(term, home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
+  // Each organization's agents' desktops and terminal run in its home: their switches are that home's, not this one's.
+  if (orgs.length) {
+    for (const orgHome of orgs) {
+      const org = storedOrNull(orgHome);
+      printDesktopAndTerminal(term, orgHome, org ? effectiveAccess(org).tools : undefined, org?.mode === "system");
+    }
+  } else
+    printDesktopAndTerminal(term, home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
+  if (!hasBunTerminal() && !runningCompiled() && process.platform !== "win32") {
+    term.text(
+      "The install command from Settings > Computers, run again, puts the runner on Bun 1.3.5 or newer (this computer stays connected).",
+      true,
+    );
+  }
   term.gap();
   term.text(`Config: ${configPath(home)}`, true);
   if (stored) {
@@ -924,6 +985,21 @@ function status(): number {
   }
   term.end();
   return 0;
+}
+
+/**
+ * `status` on the server's own computer: one organization's connection, as its own config has it (the name the server
+ * sees, the address, and that home's tools).
+ */
+function printOrgConnection(term: Term, home: string) {
+  const stored = storedOrNull(home) ?? {};
+  const tools = effectiveAccess(stored).tools;
+  term.step(
+    `Connected${stored.orgName ? ` to ${stored.orgName}` : ""} as "${stored.name ?? os.hostname()}"`,
+    `${stored.server}${stored.workspace ? ` · workspace ${stored.workspace}` : ""}`,
+    `tools ${TOOL_NAMES.map((t) => `${t} ${tools[t] ? "on" : "off"}`).join(", ")}`,
+    `Config: ${configPath(home)}`,
+  );
 }
 
 /**
@@ -945,23 +1021,48 @@ function printDesktopAndTerminal(term: Term, home: string, tools: RunnerTools | 
     else if (tools?.[tool]) term.step(`${label}: on`);
     else term.warn(`${label}: off (agentes-runner tools enable ${tool})`);
   }
-  if (!hasBunTerminal() && !runningCompiled() && process.platform !== "win32") {
-    term.text(
-      "The install command from Settings > Computers, run again, puts the runner on Bun 1.3.5 or newer (this computer stays connected).",
-      true,
-    );
-  }
 }
 
-/** For `folders` and `tools`: the paired config, or a message. */
-function pairedOrExit(home: string) {
+/**
+ * For `folders` and `tools`: the connection to change, its home, or a message. On the server's own computer the
+ * connection is the organization's, not this home's (`isHostComputer`): the only one is used as it is, and several take
+ * `--org <id or name>` (the same homes `status` lists). Nothing there: `pair` refuses, so the message says where the
+ * switches are.
+ */
+function pairedOrExit(p: Parsed, home: string): { stored: StoredConfig; config: RunnerConfig; home: string } | null {
   const stored = storedOrNull(home);
   const config = stored ? pairedConfig(stored, configPath(home)) : null;
-  if (!config || !stored) {
+  if (config && stored) return { stored, config, home };
+  if (!isHostComputer(stored)) {
     console.error("This computer isn't connected yet. Run: agentes-runner pair --server <url>");
     return null;
   }
-  return { stored, config };
+  const orgs = hostOrgHomes(home).map((orgHome) => ({ home: orgHome, stored: storedOrNull(orgHome) ?? {} }));
+  const wanted = flagString(p, "org");
+  const name = (o: (typeof orgs)[number]) => o.stored.orgName ?? "";
+  const org =
+    orgs.length === 1
+      ? orgs[0]
+      : orgs.find(
+          (o) => wanted !== undefined && (o.stored.orgId === wanted || name(o).toLowerCase() === wanted.toLowerCase()),
+        );
+  if (!org) {
+    console.error("This computer isn't connected yet. Run: agentes-runner pair --server <url>");
+    if (orgs.length === 0) console.error(HOST_COMPUTER_NOTE);
+    else
+      console.error(
+        `Use --org <id or name>. Organizations here: ${orgs
+          .map((o) => `${name(o) || "no name"} (${o.stored.orgId})`)
+          .join(", ")}`,
+      );
+    return null;
+  }
+  const orgConfig = pairedConfig(org.stored, configPath(org.home));
+  if (!orgConfig) {
+    console.error(`${org.home} isn't connected yet (no token). Start the server's computer again: agentes-runner host`);
+    return null;
+  }
+  return { stored: org.stored, config: orgConfig, home: org.home };
 }
 
 function saveAccess(home: string, access: ReturnType<typeof effectiveAccess>) {
@@ -974,12 +1075,11 @@ const unknownAgent = (given: string, agents: ReturnType<typeof readAgents>) =>
 
 /** `agentes-runner folders …`: the same config the app edits (a running runner applies it at once). */
 function folders(p: Parsed): number {
-  const home = runnerHome();
-  const paired = pairedOrExit(home);
+  const paired = pairedOrExit(p, runnerHome());
   if (!paired) return 1;
   const [, sub = "list", target] = p.positional;
   const access = effectiveAccess(paired.stored);
-  const agents = readAgents(home);
+  const agents = readAgents(paired.home);
   const nameOf = (id: string) => {
     const a = agents.find((x) => x.id === id);
     return a ? `${a.name} (@${a.handle})` : id;
@@ -1008,8 +1108,8 @@ function folders(p: Parsed): number {
           console.error("Usage: agentes-runner folders allow <path> [--agent <handle>]...");
           return 1;
         }
-        const real = checkFolder(target, { runnerHome: home, workspace: paired.config.workspace });
-        saveAccess(home, addFolder(access, real, ids));
+        const real = checkFolder(target, { runnerHome: paired.home, workspace: paired.config.workspace });
+        saveAccess(paired.home, addFolder(access, real, ids));
         console.log(
           ids.length
             ? `Allowed ${real} for ${ids.map(nameOf).join(", ")}.`
@@ -1031,7 +1131,7 @@ function folders(p: Parsed): number {
         let next = access;
         if (ids.length) for (const id of ids) next = removeFolder(next, found.path, id);
         else next = removeFolder(next, found.path);
-        saveAccess(home, next);
+        saveAccess(paired.home, next);
         console.log(ids.length ? `Removed ${found.path} for ${ids.map(nameOf).join(", ")}.` : `Removed ${found.path}.`);
         return 0;
       }
@@ -1060,8 +1160,7 @@ function safeReal(p: string) {
 
 /** `agentes-runner tools …`. */
 function tools(p: Parsed): number {
-  const home = runnerHome();
-  const paired = pairedOrExit(home);
+  const paired = pairedOrExit(p, runnerHome());
   if (!paired) return 1;
   const [, sub = "list", tool] = p.positional;
   const access = effectiveAccess(paired.stored);
@@ -1071,7 +1170,7 @@ function tools(p: Parsed): number {
   }
   if ((sub === "enable" || sub === "disable") && tool && (TOOL_NAMES as readonly string[]).includes(tool)) {
     const t = tool as keyof RunnerTools;
-    saveAccess(home, setTool(access, t, sub === "enable"));
+    saveAccess(paired.home, setTool(access, t, sub === "enable"));
     console.log(`${TOOL_LABELS[t]} ${sub === "enable" ? "on" : "off"}.`);
     return 0;
   }
@@ -1475,6 +1574,19 @@ async function main(argv: string[]): Promise<number> {
       runTaskWrapper(path.resolve(sub));
       return new Promise<number>(() => {});
     }
+    case "script-check":
+      // A long script's check, for the runner that started it (command-gate.ts).
+      return scriptCheck(process.stdin, process.stdout);
+    case "migrate":
+      // Reads another app's agents on this computer into a file for the import page; it needs no connection.
+      return runMigrate({
+        from: flagString(p, "from"),
+        out: flagString(p, "out"),
+        data: flagString(p, "data"),
+        company: flagString(p, "company"),
+        json: p.flags.has("json"),
+        noFiles: p.flags.has("no-files"),
+      });
     case "update":
       return update();
     case "standby":

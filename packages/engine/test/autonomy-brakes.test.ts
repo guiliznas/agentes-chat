@@ -9,6 +9,7 @@ import {
   costlyGate,
   costlyKind,
   createAgent,
+  createRole,
   DIGEST_AFTER_MS,
   decideCostlyProposal,
   endsAsking,
@@ -25,6 +26,8 @@ import {
   postAutonomyDigests,
   postPersonMessage,
   type RunAuthority,
+  runPermissionPrompt,
+  setMemberRoles,
   signatureOf,
   speakerFor,
   type ToolDefinition,
@@ -444,6 +447,55 @@ describe("costly work an agent starts on its own, set to ask first, needs a go (
     expect(answer).toMatchObject({ behavior: "deny", code: "autonomy" });
     expect(await signalsOf("proposal")).toHaveLength(1);
   });
+
+  test("a command the computer already refused is only recorded: no proposal, its steps say why", async () => {
+    const prompt: ToolDefinition = {
+      name: PERMISSION_TOOL,
+      description: "Permission prompt",
+      scope: "",
+      inputSchema: { type: "object" },
+      execute: async (input) => ({ content: runPermissionPrompt(input, { canRun: true }) }),
+    };
+    f = await setup({ toolSources: [{ name: "prompt", tools: async () => [prompt] }] });
+    await askFirst();
+    const trigger = await alert(f.agent.id, "Sentry: erro de build");
+    const run = await working(f.agent.id, trigger.id);
+    const tools = f.tools;
+    if (!tools) throw new Error("no tools");
+    const message = "This turn may only read.";
+    const out = await tools.invoke(
+      {
+        db: f.db,
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        runId: run.id,
+        channelId: f.general.id,
+        threadRootId: trigger.id,
+        triggerMessageId: trigger.id,
+        bridge: { machineId: crypto.randomUUID() },
+      },
+      {
+        toolUseId: "t1",
+        name: PERMISSION_TOOL,
+        input: {
+          tool_name: "Bash",
+          input: { command: "gh pr create --fill" },
+          refused: { code: "policy", message },
+        },
+      },
+    );
+    if (out.type !== "result") throw new Error(`expected a result, got ${out.type}`);
+    const answer = { behavior: "deny", message, code: "policy", refusal: "policy" };
+    expect(JSON.parse(out.output.content)).toEqual(answer);
+    expect(await signalsOf("proposal")).toHaveLength(0);
+    const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, run.id));
+    const result = steps.find((s) => s.kind === "tool_result");
+    expect(steps.find((s) => s.kind === "tool_call")?.data).toMatchObject({
+      name: PERMISSION_TOOL,
+      input: { refused: { code: "policy" } },
+    });
+    expect(JSON.parse(String((result?.data as { content?: unknown })?.content))).toEqual(answer);
+  });
 });
 
 describe("one item is worked once, noise waits for a digest, repeats stop (§4–6)", () => {
@@ -638,7 +690,7 @@ describe("who an agent may call (§8)", () => {
       .set({ autonomyBrakes: { callAgents: "some", callAgentIds: [kai.id], otherProjects: true } })
       .where(eq(schema.agents.id, caller.id));
     expect(await callableAgents(f.db, f.org.id, caller.id, [ada.id, kai.id])).toEqual(new Set([kai.id]));
-    const team = await f.db.select().from(schema.agents);
+    const team = (await f.db.select().from(schema.agents)).map((a) => ({ ...a, groupName: null }));
     const listed = teammatesFor(team, caller.id, f.owner.id, new Set(), await speakerFor(f.db, f.org.id, f.owner.id));
     expect(listed.map((a) => a.handle)).toEqual(["kai"]);
   });
@@ -695,5 +747,37 @@ describe("who an agent may call (§8)", () => {
       callAgents: "none",
       costly: "ask",
     });
+  });
+
+  test("brakes given at creation are stored as on an edit; only who manages agents sets them", async () => {
+    f = await setup();
+    const defaults = { model: f.agent.model };
+    const made = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      {
+        name: "Bia",
+        handle: "bia",
+        autonomyBrakes: { maxUnrequested: 99, callAgents: "some", callAgentIds: [f.agent.id] },
+      },
+      defaults,
+    );
+    expect(made.autonomyBrakes).toEqual({ maxUnrequested: 20, callAgents: "some", callAgentIds: [f.agent.id] });
+    const member = await addMember(f.db, f.org.id, "member", "Caio");
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, member.id, [makers.id]);
+    // Who may create agents may not, by that alone, choose whom they may call.
+    await expect(
+      createAgent(
+        f.db,
+        member.id,
+        f.org.id,
+        { name: "Edu", handle: "edu", autonomyBrakes: { callAgents: "none" } },
+        defaults,
+      ),
+    ).rejects.toThrow(/brakes/);
+    const edu = await createAgent(f.db, member.id, f.org.id, { name: "Edu", handle: "edu" }, defaults);
+    expect(edu.autonomyBrakes).toEqual({});
   });
 });

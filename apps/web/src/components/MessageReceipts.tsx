@@ -13,7 +13,8 @@ import {
 } from "@agenteschat/client";
 import { errorText, runFailureLine } from "@agenteschat/client/lib/errors";
 import { joinNames, sentAtLine } from "@agenteschat/client/lib/format";
-import { mayConnectAi, plansNotYoursOf } from "@agenteschat/client/lib/no-ai";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { mayConnectAi, noAiReceiptLine, plansNotYoursOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf, everyoneLineOf } from "@agenteschat/client/lib/routing";
@@ -21,11 +22,12 @@ import { AvatarStack, HintLine, Icon, type IconName, PixelSpinner, Popover } fro
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { usePlanHold } from "@/components/ai/plan-hold";
 import { useOpenBilling } from "@/components/BillingLinkButton";
-import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
-import { useConnectAi } from "@/components/ConnectAi";
+import { FanOutStrip } from "@/components/ComputerQueue";
+import { useConnectAi } from "@/components/connect-ai-context";
 import { HelpLink } from "@/components/HelpLink";
+import { ReportProblem, useProblemReports } from "@/components/ReportProblem";
 import { useDirectory } from "@/hooks/useDirectory";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
@@ -111,12 +113,12 @@ function KeptAnswer({ message, kept, children }: { message: Message; kept: boole
 
 /**
  * What became of a message sent into a task at work: the double check every read message has once it was read (who
- * read it is in the mark's description and its popover, never a face in the bubble), else the spinner while it waits
- * for the next pause, the bolt when it stopped to read, a check once handed over, the clock while an approval holds it.
+ * read it is in the mark's description and its popover, never a face in the bubble), else the bolt when it stopped to
+ * read, a check once handed over, the clock while an approval holds it. One that waits for the next pause wears no
+ * mark (`MessageReceipts`).
  */
 function SteerMark({ steer, size }: { steer: SteerState; size?: 14 }) {
   if (steer.state === "read" || steer.state === "resolved") return <Icon name="checks" size={size} />;
-  if (steer.state === "waiting") return <PixelSpinner size={size ?? 16} />;
   return <Icon name={steer.state === "now" ? "bolt" : steer.state === "delivered" ? "check" : "waiting"} size={size} />;
 }
 
@@ -148,6 +150,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   // The pills' list (live through `message.reactions`), else the message's: an agent's reaction is its answer.
   const reactions = useReactions(org.id, message.id, false).data ?? message.reactions;
   const steer = useSteerState(org.id, message.channelId, part === "check" ? message.id : "");
+  // Waiting for the agent's next pause: no mark at all. It was sent, and a spinner or a clock beside its time reads as
+  // a message that never arrived; the agent's row says when it reads it.
+  const waits = steer?.state === "waiting";
   const steerName = steer ? dir.agentById.get(steer.agentId)?.name : undefined;
   const steered =
     steer && steerName
@@ -160,6 +165,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   // reload), this line does.
   const failedAgent = status?.kind === "failed" && status.agents.length === 1 ? status.agents[0] : undefined;
   const failedRun = failedAgent ? receipt?.runOf?.[failedAgent] : undefined;
+  const reports = useProblemReports();
   const rowSaysWhy = useLive((s) => (failedRun ? s.streams.runs[failedRun]?.status === "failed" : false));
   const callAgent =
     actions && actions.channelAgents.length > 0 ? (
@@ -199,7 +205,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     </div>
   );
   // The mark stays where a line says the rest (a failure, no AI): what became of it in the task is its own news.
-  if (part === "line" ? !worded && !fanned : worded && !steered) return everyoneRow || null;
+  if (part === "line" ? !worded && !fanned : waits || (worded && !steered)) return everyoneRow || null;
   const marked = view.seen.length > 0 || view.picking === true || steered !== null;
   if (!marked && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return everyoneRow || null;
 
@@ -210,6 +216,13 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const mayConnect = mayConnectAi(only ? dir.agentById.get(only) : null, me.user.id, org);
   // Every plan here serves only someone else: the agent's card has the way out, so the line only says whose.
   const notYours = plansNotYoursOf(aiStatus, only);
+  // What is really in the way, when its run said (a plan it has that can't think now, its CLI missing…).
+  const noAiLine = only ? noAiReceiptLine(receipt?.failures?.[only]) : null;
+  const noAiText = notYours
+    ? t("noAi.notYours.receipt", notYours)
+    : noAiLine && only
+      ? t(noAiLine.key, { ...agentGrammar(name(only)), model: noAiLine.model })
+      : t("noAi.receipt");
   const mentionNeeded = status?.kind === "nobody" && status.mentionNeeded === true;
   const statusText =
     status === null
@@ -219,7 +232,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         : status.kind === "no_ai"
           ? held
             ? t("noAi.kept.receipt")
-            : t("noAi.receipt")
+            : noAiText
           : status.kind === "platform_cap"
             ? t("receipts.platformCap")
             : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
@@ -335,15 +348,11 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {check}
       {(status?.kind === "outage" ||
         status?.kind === "away" ||
+        status?.kind === "queued" ||
         status?.kind === "plan" ||
         status?.kind === "budget") && (
         <span className="ac-receipt__words">
           <span>{statusText}</span>
-        </span>
-      )}
-      {status?.kind === "queued" && (
-        <span className="ac-receipt__words">
-          <QueuedWords message={message} fallback={statusText} />
         </span>
       )}
       {status?.kind === "failed" && actions && (
@@ -369,6 +378,11 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
               </button>
             </ReceiptAction>
           )}
+          {failedRun && reports && (
+            <ReceiptAction>
+              <ReportProblem place="run" context={{ runId: failedRun }} className="ac-receipt__action" />
+            </ReceiptAction>
+          )}
         </span>
       )}
       {status?.kind === "platform_cap" && (
@@ -386,8 +400,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {status?.kind === "no_ai" && !held && (
         <KeptAnswer message={message} kept={receipt?.server?.kept === true}>
           <span className="ac-receipt__words">
-            <span>{notYours ? t("noAi.notYours.receipt", notYours) : t("noAi.receipt")}</span>
-            {connect && mayConnect && !notYours && (
+            <span>{noAiText}</span>
+            {connect && mayConnect && !notYours && (noAiLine?.connect ?? true) && (
               <ReceiptAction>
                 <button
                   type="button"

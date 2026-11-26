@@ -1,4 +1,14 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, watch, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  watch,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { SYSTEM_RUNNER_HOME } from "@agenteschat/adapters/command-policy";
@@ -28,8 +38,10 @@ export interface RunnerConfig {
   workspace: string;
   /** Commands on (kept equal to `access.tools.commands` once `access` exists). */
   exec: boolean;
-  /** Background tasks at once on this computer (default 3). */
+  /** Background tasks at once on this computer (default: sized to it, `sizedTaskLimit`). */
   maxConcurrentTasks?: number;
+  /** The owner's Push harder (`TASK_ROOM_PROTOCOL`): tasks may fill memory down to 0.5 GB free, whatever the processor. */
+  pushHarder?: boolean;
   /** A background task is stopped after this many seconds (default 4 h). */
   taskMaxSeconds?: number;
   /** Brain turns (protocol 8): a Claude Code process with no turn this long is closed (default 10). */
@@ -125,6 +137,33 @@ export function configPath(home = runnerHome()) {
   return path.join(home, "config.json");
 }
 
+/**
+ * The homes of the organizations a server's own computer serves (`agentes-runner host`, ADR 0153 §5): one connection
+ * per organization, each in its own home — `<home>/orgs/<orgId>`, or `<home>/host/orgs/<orgId>` where the app keeps
+ * its own on a Mac. Only the homes with a token and a server are connections: a folder an organization left behind
+ * keeps neither, and the machine's own top-level config (the `mode: "system"` this home runs in) never has a token.
+ * The same homes `doctor` reads (`doctor.ts`, `connections`).
+ */
+export function hostOrgHomes(home = runnerHome()): string[] {
+  const inside = (dir: string) => {
+    try {
+      return readdirSync(dir)
+        .sort()
+        .map((name) => path.join(dir, name));
+    } catch {
+      return [];
+    }
+  };
+  return [...new Set([...inside(path.join(home, "orgs")), ...inside(path.join(home, "host", "orgs"))])].filter((h) => {
+    try {
+      const stored = readStoredConfig(h);
+      return Boolean(stored?.token && stored.server);
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** Expands a leading `~` and makes the path absolute. */
 export function expandHome(p: string): string {
   if (p === "~") return os.homedir();
@@ -211,6 +250,7 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(text(raw.workspace, 4000) ? { workspace: text(raw.workspace, 4000) } : {}),
     ...(typeof raw.exec === "boolean" ? { exec: raw.exec } : {}),
     ...(positive(raw.maxConcurrentTasks) ? { maxConcurrentTasks: positive(raw.maxConcurrentTasks) } : {}),
+    ...(raw.pushHarder === true ? { pushHarder: true } : {}),
     ...(positive(raw.taskMaxSeconds) ? { taskMaxSeconds: positive(raw.taskMaxSeconds) } : {}),
     ...(positive(raw.brainIdleMinutes) ? { brainIdleMinutes: positive(raw.brainIdleMinutes) } : {}),
     ...(positive(raw.brainMaxProcesses) ? { brainMaxProcesses: positive(raw.brainMaxProcesses) } : {}),

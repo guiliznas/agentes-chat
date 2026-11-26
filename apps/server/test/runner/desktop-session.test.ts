@@ -1,8 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   statSync,
@@ -12,6 +14,7 @@ import {
   writeSync,
 } from "node:fs";
 import { createConnection } from "node:net";
+import os from "node:os";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
@@ -32,11 +35,15 @@ import {
   type DesktopSpawnOptions,
   type DesktopSystem,
   type DesktopUser,
+  desktopSocketPath,
+  LONG_SOCKET_PATH,
   memAvailableBytes,
+  ownSocketFolder,
   PARK_AFTER_MS,
   type ProcessStat,
   procStat,
   runnerUser,
+  STALE_WORK_MS,
   systemDesktopUser,
   terminalNote,
   vncPasswordFile,
@@ -326,6 +333,8 @@ test("start: Xvnc on a Unix socket only, VncAuth, never resized; the cookie and 
     "-FrameRate=30",
     "-UseBlacklist=0",
     "-AlwaysShared",
+    // No pointer drawn into the picture: the apps draw the agent's cursor, and in control the person's own shows.
+    "-nocursor",
   ]) {
     expect(xvnc.argv).toContain(flag);
   }
@@ -1600,6 +1609,61 @@ test("short of memory, a desktop whose apps the keeper can't vouch for, or whose
   t.desktops.close();
 });
 
+test("short of memory, the sweep parks the desktops nobody used for an hour, without waiting for another to start", async () => {
+  let free = 4 * GiB;
+  const t = setup({ memAvailable: () => (t.desktops.status(dev).running ? free : 4 * GiB) });
+  await keptNothing(t, dev, ops);
+  await t.desktops.ensure(dev);
+  t.clock.now += 2 * PARK_AFTER_MS;
+  await t.desktops.ensure(ops);
+  // Plenty free: an idle desktop stays as it was.
+  await t.desktops.sweep();
+  expect(t.desktops.status(dev).running).toBe(true);
+  // Short: the idle one goes, what was open on it kept; the one just used stays.
+  free = GiB;
+  await t.desktops.sweep();
+  await waitFor(() => !t.desktops.status(dev).running);
+  expect(t.desktops.status(ops).running).toBe(true);
+  expect(t.logs).toContainEqual("the desktop of dev was parked to make room: nobody used it for an hour");
+  t.desktops.close();
+});
+
+test("short of memory, a desktop nobody touched for a day is parked even with a command running in its Terminal", async () => {
+  const t = setup();
+  const { display } = await t.desktops.ensure(dev);
+  await keptNothing(t, dev);
+  t.fake.stats.push(
+    { pid: 7000, ppid: 1, name: "xfce4-terminal", start: 50, cpu: 1 },
+    { pid: 7001, ppid: 7000, name: "bash", start: 51, cpu: 0 },
+    { pid: 7002, ppid: 7001, name: "node", start: 52, cpu: 9 },
+  );
+  t.fake.envs.set(7000, { DISPLAY: `:${display}` });
+  // A dev server left running nobody came back to: kept for the day, then it ends with its desktop.
+  t.clock.now += STALE_WORK_MS - 60_000;
+  expect(await t.desktops.parkIdle()).toBe(0);
+  t.clock.now += 60_000;
+  expect(await t.desktops.parkIdle()).toBe(1);
+  expect(t.desktops.status(dev).running).toBe(false);
+  t.desktops.close();
+});
+
+test("a desktop the next runner takes back keeps the time since its last use: a restart doesn't make it fresh", async () => {
+  const t = setup();
+  const before = new DesktopSessions({ ...t.opts, system: gone(t.fake.system) });
+  await before.ensure(dev);
+  await keptNothing(t, dev);
+  t.clock.now += 30 * 60_000;
+  await before.sweep();
+  before.close();
+  t.clock.now += 40 * 60_000;
+  const next = new DesktopSessions(t.opts);
+  next.restore();
+  expect(next.status(dev).running).toBe(true);
+  // 70 minutes since its last use, the restart in between.
+  expect(await next.parkIdle()).toBe(1);
+  next.close();
+});
+
 test("the desktops of agents this computer no longer serves stop; the others go on", async () => {
   const t = setup();
   await t.desktops.ensure(dev);
@@ -1734,6 +1798,36 @@ test("limits and failures: short of memory, Xvnc that doesn't start, a computer 
   expect(await errorCode(() => bare.ensure(dev))).toBe("desktop_unavailable");
 });
 
+test("a second ensure while a start is under way gets that start's outcome, never a start of its own; each start is told", async () => {
+  const told: [string, unknown][] = [];
+  const t = setup({ onStarted: (agent, start) => told.push([agent.handle, start]) });
+  t.fake.failXvnc("(EE) Fatal server error: vncExtInit: Failed to bind socket");
+  // A viewer's retry, and another viewer, while the first open still starts it.
+  const tries = [t.desktops.ensure(dev), t.desktops.ensure(dev), t.desktops.ensure(dev)];
+  const outcomes = await Promise.all(
+    tries.map((p) =>
+      p.then(
+        () => "ok",
+        (err: RunnerError) => err.code,
+      ),
+    ),
+  );
+  expect(outcomes).toEqual(["internal", "internal", "internal"]);
+  expect(t.fake.of("Xtigervnc")).toHaveLength(1);
+  expect(told).toEqual([["dev", { ms: 0, error: "internal" }]]);
+
+  t.fake.failXvnc(null);
+  const [first, second] = await Promise.all([t.desktops.ensure(dev), t.desktops.ensure(dev)]);
+  expect(first).toEqual(second);
+  expect(first.started).toBe(true);
+  expect(t.fake.of("Xtigervnc")).toHaveLength(2);
+  expect(told[1]).toEqual(["dev", { ms: 0, steps: { room: 0, prepared: 0, screen: 0, look: 0, session: 0 } }]);
+  // Running: only marked used, with nothing to tell.
+  expect((await t.desktops.ensure(dev)).started).toBe(false);
+  expect(told).toHaveLength(2);
+  t.desktops.close();
+});
+
 test("requests: starting needs the desktop switch and an unpaused computer; stopping and asking always go", async () => {
   const t = setup();
   const ws = tempDir("desk-req-");
@@ -1759,4 +1853,40 @@ test("requests: starting needs the desktop switch and an unpaused computer; stop
   expect(await run({ op: "desktop.session.stop", agent: dev })).toEqual({ stopped: true });
   expect(await run({ op: "desktop.session.stop", agent: dev })).toEqual({ stopped: false });
   expect(await run({ op: "desktop.session.status", agent: dev })).toEqual({ running: false, streams: 0 });
+});
+
+/**
+ * A `sun_path` holds 107 bytes: a desktop whose folder is deeper than that (a runner home with a long user name, in
+ * single-user mode) would never start. Its socket moves to the temp folder, named after the path, and its other files stay.
+ */
+test.skipIf(!posix)("a desktop's socket goes to the temp folder when its own path is too long", () => {
+  const short = "/home/dev/.agentes/desktop";
+  expect(desktopSocketPath(short, "/tmp")).toBe(path.join(short, "vnc.sock"));
+
+  const long = `/home/${"u".repeat(90)}/.agentes/desktop`;
+  const socket = desktopSocketPath(long, "/tmp");
+  expect(Buffer.byteLength(socket)).toBeLessThanOrEqual(LONG_SOCKET_PATH);
+  expect(socket).toMatch(new RegExp(`^/tmp/agentes-desktop-${process.getuid?.() ?? 0}/[0-9a-f]{16}\\.vnc\\.sock$`));
+  // The same desktop always gets the same socket, so a restart reuses it instead of leaking one per start.
+  expect(desktopSocketPath(long, "/tmp")).toBe(socket);
+  // Two different desktops never share one.
+  expect(desktopSocketPath(`${long}/other`, "/tmp")).not.toBe(socket);
+});
+
+test.skipIf(!posix)("the socket's temp folder is the runner's own and 0700", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "agentes-sock-"));
+  try {
+    const mine = path.join(root, "mine");
+    ownSocketFolder(mine);
+    expect(statSync(mine).mode & 0o777).toBe(0o700);
+    const open = path.join(root, "open");
+    mkdirSync(open, { mode: 0o777 });
+    chmodSync(open, 0o777);
+    expect(() => ownSocketFolder(open)).toThrow();
+    const link = path.join(root, "link");
+    symlinkSync(mine, link);
+    expect(() => ownSocketFolder(link)).toThrow();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

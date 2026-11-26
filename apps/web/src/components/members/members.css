@@ -19,6 +19,10 @@
   flex-direction: column;
   gap: 20px;
 }
+/* Its members still loading (MembersColumn.tsx): unseen until they are in, then shown whole. */
+.members-side__groups[data-pending] {
+  visibility: hidden;
+}
 .members-side__group {
   display: flex;
   flex-direction: column;
@@ -119,7 +123,8 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   z-index: -1;
   opacity: 0.9;
 }
-.members-side__inner > .ac-avatar {
+.members-side__inner > .ac-avatar,
+.members-side__inner > .ac-orbit > .ac-avatar {
   flex: none;
   width: var(--name-face);
   height: var(--name-face);
@@ -183,10 +188,6 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   margin-top: 1px;
   font-size: 11.5px;
   line-height: 18px;
-}
-/* An agent working here: its pixel orbit beside its name (what it does is the orbit's label and the row's title). */
-.members-side__spin {
-  flex: none;
 }
 /* Everyone under Offline (people, and agents out of office, held or with no AI) is faded alike, whatever its badge. */
 .members-side__group[data-off] .members-side__inner {
