@@ -11604,6 +11604,18 @@ export const en = {
       fallback: "Continue with the API key when every plan is at its limit",
       fallbackHint:
         "Off: agents wait for the first plan to renew. On: they go on with the workspace's API key, which is paid per use. A mission never does.",
+      /** The order across AI providers (ADR 0041 §6, amended 2026-11-26). */
+      cross: "Go on with other AI providers when the plan runs out",
+      crossHint:
+        "Off: agents stay with accounts of the same AI. On: each computer has one order for Claude, ChatGPT, Gemini and OpenCode (on a free model), and agents go on with the next account in it, on the model you choose for it. A mission or an agent set to its account alone never does.",
+      /** A computer's one order across AI providers. */
+      crossGroup: "All AIs · {{computer}}",
+      crossGroupOne: "All AIs",
+      /** The model an account thinks on in the order across AI providers. */
+      model: "Model for {{name}}",
+      modelDefault: "Its AI's default",
+      modelPickFree: "Choose a free model",
+      modelSaved: "Model saved.",
     },
     detail: {
       limits: "Limits",

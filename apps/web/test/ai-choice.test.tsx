@@ -326,4 +326,73 @@ describe("Contas de IA: an account's permissions and the order's switch", () => 
     await settle(4);
     expect(state.calls.filter((c) => c.method === "machines.setKeyFallback").map((c) => c.args[1])).toEqual([true]);
   });
+
+  test("Ordem de uso across AI providers: off by default; on, one list for the computer, Google's warning, a model per account", async () => {
+    const GEMINI = account("acct_gemini", "Gemini pessoal", { kind: "antigravity", plan: "pro", useOrder: 1 });
+    const OPENCODE = account("acct_oc", "OpenCode", { kind: "opencode", provider: "zen", plan: null });
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        options: [
+          {
+            kind: "antigravity",
+            available: true,
+            defaultModel: null,
+            models: [{ value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" }],
+          },
+          {
+            kind: "opencode",
+            available: true,
+            defaultModel: null,
+            models: [
+              { value: "opencode/big-pickle", label: "Big Pickle", free: true },
+              { value: "anthropic/claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+            ],
+          },
+        ],
+      },
+    ];
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setAiAccounts({ accounts: [WORK, GEMINI, OPENCODE], computers: [MAC] });
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api });
+    await settle(6);
+    const order = await openOrder();
+    const cross = within(order).getByRole("switch", {
+      name: "Seguir com outros provedores de IA quando o plano acabar",
+    });
+    expect(cross.getAttribute("aria-checked")).toBe("false");
+    // Off: Claude's order alone, no Gemini, no model to choose.
+    expect(within(order).queryByText("Gemini pessoal")).toBeNull();
+    expect(within(order).queryByRole("combobox", { name: "Modelo de Gemini pessoal" })).toBeNull();
+
+    await click(cross);
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "machines.setCrossProvider").map((c) => c.args[1])).toEqual([true]);
+    const on = screen().getByRole("dialog", { name: "Ordem de uso" });
+    expect(within(on).getByText("Todas as IAs")).toBeTruthy();
+    expect(within(on).getByText("Gemini pessoal")).toBeTruthy();
+    expect(
+      within(on).getByText(
+        "O Google diz que usar um plano pessoal do Gemini dentro de outros apps pode suspender a conta. Para não correr esse risco, use uma chave de API do Gemini ou o Gemini Enterprise.",
+      ),
+    ).toBeTruthy();
+    // Gemini: its AI's default or a model its computer lists.
+    const gemini = within(on).getByRole("combobox", { name: "Modelo de Gemini pessoal" });
+    const listed = await options(gemini);
+    expect(listed.map((o) => o.textContent)).toEqual(["Padrão da IA", "Gemini 3.1 Pro"]);
+    await click(listed[1] as Element);
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "machines.setAccountOrderModel").map((c) => c.args.slice(1))).toEqual(
+      [["acct_gemini", "gemini-3.1-pro"]],
+    );
+    // OpenCode: only its free models, and no default to fall back to.
+    const opencode = within(screen().getByRole("dialog", { name: "Ordem de uso" })).getByRole("combobox", {
+      name: "Modelo de OpenCode",
+    });
+    expect(opencode.textContent).toContain("Escolha um modelo gratuito");
+    expect((await options(opencode)).map((o) => o.textContent)).toEqual(["Big Pickle"]);
+  });
 });

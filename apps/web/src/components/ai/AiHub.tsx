@@ -11,12 +11,15 @@ import {
   useAccountOrder,
   useAiHub,
   useApi,
+  useBrainMachines,
   useMe,
   useRoles,
+  useSetAccountOrderModel,
   useSetAccountPermissions,
+  useSetCrossProvider,
   useSetKeyFallback,
 } from "@agenteschat/client";
-import { orderAccounts, orderPlaces } from "@agenteschat/client/lib/ai-accounts";
+import { orderAccounts, orderModelChoices, orderPlaces } from "@agenteschat/client/lib/ai-accounts";
 import { accountShortName, hubAccountsInOrder } from "@agenteschat/client/lib/ai-choice";
 import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -46,6 +49,7 @@ import {
   planLevel,
   planLine,
   Select,
+  SettingNote,
   SettingRow,
   SettingsSection,
   Switch,
@@ -505,16 +509,20 @@ function PickDialog({
 /**
  * "Ordem de uso": one box per maker and computer, its accounts numbered first to last (whoever may move one drags it
  * by its place, or presses the place for Mover para cima / para baixo), a signed-out one skipped at the end; then the
- * switch that goes on with the API key once every plan is at its limit.
+ * switch that goes on with other AI providers (one box per computer then, every maker in it, each account with its
+ * model: ADR 0041 §6, amended 2026-11-26) and the one that goes on with the API key once every plan is at its limit.
  */
 function OrderDialog({ hub, onClose }: { hub: AiHub; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const fallback = useSetKeyFallback(org.id);
+  const crossing = useSetCrossProvider(org.id);
   // The order's own view: a move updates it at once.
-  const groups = useAccountOrder(org.id).data?.groups ?? hub.order;
-  const several = new Set(groups.map((g) => g.machineId)).size > 1 || groups.length > 1;
+  const order = useAccountOrder(org.id).data;
+  const groups = order?.groups ?? hub.order;
+  const cross = order?.crossProvider ?? hub.crossProvider ?? false;
+  const several = new Set(groups.map((g) => g.machineId)).size > 1 || (!cross && groups.length > 1);
   return (
     <Dialog
       open
@@ -527,9 +535,23 @@ function OrderDialog({ hub, onClose }: { hub: AiHub; onClose: () => void }) {
     >
       <div className="ac-dialog__body">
         {groups.map((g) => (
-          <OrderGroup key={`${g.machineId}:${g.kind}`} group={g} computer={several} />
+          <OrderGroup key={g.kinds ? g.machineId : `${g.machineId}:${g.kind}`} group={g} computer={several} />
         ))}
         <section className="ac-setsec">
+          <SettingRow
+            title={t("aiHub.order.cross")}
+            hint={{ name: t("common.about", { label: t("aiHub.order.cross") }), text: t("aiHub.order.crossHint") }}
+            htmlFor="aa-cross"
+          >
+            <Switch
+              id="aa-cross"
+              checked={cross}
+              disabled={!hub.canConfigure || crossing.isPending}
+              onCheckedChange={(on) => crossing.mutate(on, { onError: (e) => toast.show(errorText(t, e), "error") })}
+            />
+          </SettingRow>
+          {/* Gemini comes into the order with it: Google's own rule for personal plans, said plainly. */}
+          {cross && <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>}
           <SettingRow
             title={t("aiHub.order.fallback")}
             hint={{
@@ -551,11 +573,15 @@ function OrderDialog({ hub, onClose }: { hub: AiHub; onClose: () => void }) {
   );
 }
 
-/** One maker's accounts on one computer, in their order: the placed first, the skipped after. */
+/**
+ * One maker's accounts on one computer, in their order: the placed first, the skipped after. Across AI providers
+ * (`kinds`) every maker of the computer, each row with its maker's mark and, for whoever may move it, its model.
+ */
 function OrderGroup({ group, computer }: { group: AccountOrderGroup; computer: boolean }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const { place, drop } = useOrderMoves(org.id, group);
+  const cross = group.kinds !== undefined;
   const blocks = orderAccounts(group.accounts);
   const places = orderPlaces(group.accounts);
   // A row goes by its first login, which the grip names; moving it moves the whole account.
@@ -565,18 +591,20 @@ function OrderGroup({ group, computer }: { group: AccountOrderGroup; computer: b
   // Alone in its order, an account has nothing to move past: its number, no grip.
   const alone = places.filter((n) => n !== null).length < 2;
   const maker = t(`aiAccounts.connect.${group.kind}`);
-  const name = computer
-    ? t("aiHub.order.group", {
-        maker,
-        computer: computerNameOf(t, org.name, group.computer, isPersonal(org)),
-      })
-    : maker;
+  const where = computerNameOf(t, org.name, group.computer, isPersonal(org));
+  const name = cross
+    ? computer
+      ? t("aiHub.order.crossGroup", { computer: where })
+      : t("aiHub.order.crossGroupOne")
+    : computer
+      ? t("aiHub.order.group", { maker, computer: where })
+      : maker;
   const text = planMeterText(t, i18n.language);
   return (
     <div className="plan-order">
       <div className="plan-order__head">
         <div className="plan-order__title ac-iconline">
-          <ProviderLogo id={group.kind} size="xs" />
+          {!cross && <ProviderLogo id={group.kind} size="xs" />}
           <span className="ac-hintline">
             <span>{name}</span>
             <InfoHint name={t("common.about", { label: name })}>{t("usageViews.order.hint")}</InfoHint>
@@ -615,6 +643,7 @@ function OrderGroup({ group, computer }: { group: AccountOrderGroup; computer: b
             )}
             <div className="plan-row__head">
               <span className="plan-acct__name">
+                {cross && <ProviderLogo id={a.provider === "zen" ? "zen" : a.kind} size="xs" />}
                 <span className="plan-row__title" title={title}>
                   {title}
                 </span>
@@ -630,9 +659,61 @@ function OrderGroup({ group, computer }: { group: AccountOrderGroup; computer: b
                 </span>
               )}
             </div>
+            {cross && a.canMove && <OrderModel group={group} account={a} name={title} />}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** The model an account thinks on in the order across AI providers: its AI's default, or one its computer lists. */
+function OrderModel({
+  group,
+  account,
+  name,
+}: {
+  group: AccountOrderGroup;
+  account: AccountOrderGroup["accounts"][number];
+  name: string;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const machines = useBrainMachines(org.id).data;
+  const save = useSetAccountOrderModel(org.id);
+  // Radix takes no empty value: the default is a word no model is called.
+  const DEFAULT = "default";
+  const chosen = account.orderModel ?? DEFAULT;
+  const listed = orderModelChoices(machines, group.machineId, account.kind);
+  // OpenCode takes a place only on a free model: no default to fall back to.
+  const free = account.kind === "opencode";
+  const options = [
+    ...(free ? [] : [{ value: DEFAULT, label: t("aiHub.order.modelDefault") }]),
+    ...listed,
+    // Chosen before its computer stopped listing it (offline, say): still shown as chosen.
+    ...(chosen !== DEFAULT && !listed.some((m) => m.value === chosen) ? [{ value: chosen, label: chosen }] : []),
+  ];
+  return (
+    <div className="aa-order__model">
+      <Select
+        size="sm"
+        align="end"
+        aria-label={t("aiHub.order.model", { name })}
+        value={free && chosen === DEFAULT ? undefined : chosen}
+        placeholder={t("aiHub.order.modelPickFree")}
+        disabled={save.isPending}
+        options={options}
+        onValueChange={(model) =>
+          save.mutate(
+            { accountId: account.id, model: model === DEFAULT ? null : model },
+            {
+              onSuccess: () => toast.show(t("aiHub.order.modelSaved")),
+              onError: (e) => toast.show(errorText(t, e), "error"),
+            },
+          )
+        }
+      />
     </div>
   );
 }

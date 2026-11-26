@@ -11460,7 +11460,15 @@
       "signedOut": "Sesión cerrada · se omite",
       "skipped": "Se omite",
       "fallback": "Seguir con la clave de API cuando todos los planes lleguen al límite",
-      "fallbackHint": "Apagado: los agentes esperan a que se renueve el primer plan. Encendido: siguen con la clave de API del espacio de trabajo, que se paga por uso. Una misión nunca."
+      "fallbackHint": "Apagado: los agentes esperan a que se renueve el primer plan. Encendido: siguen con la clave de API del espacio de trabajo, que se paga por uso. Una misión nunca.",
+      "cross": "Seguir con otros proveedores de IA cuando se acabe el plan",
+      "crossHint": "Apagado: los agentes se quedan en cuentas de la misma IA. Encendido: cada computadora tiene un solo orden para Claude, ChatGPT, Gemini y OpenCode (en un modelo gratuito), y los agentes siguen con la siguiente cuenta de ese orden, en el modelo que elijas para ella. Una misión o un agente fijado a su propia cuenta nunca lo hace.",
+      "crossGroup": "Todas las IA · {{computer}}",
+      "crossGroupOne": "Todas las IA",
+      "model": "Modelo de {{name}}",
+      "modelDefault": "El predeterminado de su IA",
+      "modelPickFree": "Elige un modelo gratuito",
+      "modelSaved": "Modelo guardado."
     },
     "detail": {
       "limits": "Límites",

@@ -11093,7 +11093,15 @@
       "signedOut": "Abgemeldet · übersprungen",
       "skipped": "Übersprungen",
       "fallback": "Mit dem API-Schlüssel weitermachen, wenn alle Abos am Limit sind",
-      "fallbackHint": "Aus: Die Agenten warten, bis sich das erste Abo erneuert. An: Sie machen mit dem API-Schlüssel des Workspace weiter, der pro Nutzung bezahlt wird. Eine Mission nie."
+      "fallbackHint": "Aus: Die Agenten warten, bis sich das erste Abo erneuert. An: Sie machen mit dem API-Schlüssel des Workspace weiter, der pro Nutzung bezahlt wird. Eine Mission nie.",
+      "cross": "Mit anderen KI-Anbietern weitermachen, wenn der Plan aufgebraucht ist",
+      "crossHint": "Aus: Agenten bleiben bei Konten derselben KI. An: Jeder Computer hat eine Reihenfolge für Claude, ChatGPT, Gemini und OpenCode (mit einem kostenlosen Modell), und Agenten machen mit dem nächsten Konto darin weiter, mit dem Modell, das du dafür wählst. Eine Mission oder ein Agent, der auf sein eigenes Konto festgelegt ist, tut das nie.",
+      "crossGroup": "Alle KIs · {{computer}}",
+      "crossGroupOne": "Alle KIs",
+      "model": "Modell für {{name}}",
+      "modelDefault": "Standard seiner KI",
+      "modelPickFree": "Wähle ein kostenloses Modell",
+      "modelSaved": "Modell gespeichert."
     },
     "detail": {
       "limits": "Limits",

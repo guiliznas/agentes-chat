@@ -153,6 +153,12 @@
 .ac-dialog.aa-order .plan-row[data-skipped] .plan-row__title {
   color: var(--ink-muted);
 }
+/* Across AI providers: each account's model under its row, lined up with its name. */
+.ac-dialog.aa-order .aa-order__model {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--space-3) var(--space-2);
+}
 .ac-dialog.aa-order .ac-setsec {
   margin-top: 20px;
   padding: 20px 0 0;

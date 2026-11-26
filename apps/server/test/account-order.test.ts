@@ -300,6 +300,8 @@ test("the order across AI providers: off by default; on, one order per computer 
   const wrong = await setModel(api, OWNER_GEMINI, "gpt-5.4");
   expect(wrong.status).toBe(400);
   expect(await code(wrong)).toBe("brain.invalid_model");
+  // "Automático" picks a tier for an agent's own brain: in the order a model is named.
+  expect((await setModel(api, OWNER_GEMINI, "auto")).status).toBe(400);
   const paid = await setModel(api, OWNER_OPENCODE, "anthropic/claude-sonnet-4-6");
   expect(paid.status).toBe(400);
   expect(await code(paid)).toBe("account.order_model_paid");

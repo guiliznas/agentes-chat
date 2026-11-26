@@ -60,6 +60,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { isAutoModel } from "@agenteschat/providers";
 import {
   ACCOUNT_ONLY_BRAINS,
   CROSS_PROVIDER_KINDS,
@@ -615,6 +616,10 @@ export async function setAccountOrderModel(
   }
   const kind = kindOf(row);
   const value = normalizeBrainModel(kind, model);
+  // "Automático" picks a tier per run for the agent's own brain: in the order a model is one the CLI runs as named.
+  if (isAutoModel(value)) {
+    throw new ValidationError("Choose a model, or the CLI's own default", "brain.invalid_model", { model: value });
+  }
   if (kind === "opencode" && value !== null && !isOpencodeFreeModel(value)) {
     throw new ValidationError(
       "In the order OpenCode thinks only on one of its free models",

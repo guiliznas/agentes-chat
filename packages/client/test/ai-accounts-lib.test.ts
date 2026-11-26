@@ -886,3 +886,50 @@ test("an order row of an account signed in once per agent shows its newest readi
   expect(newestUsage([{ usage: old }, { usage: null }, { usage: fresh }])).toBe(fresh);
   expect(newestUsage([{ usage: null }])).toBeNull();
 });
+
+describe("the order across AI providers (ADR 0041 §6, amended 2026-11-26)", () => {
+  const machines = [
+    {
+      machineId: "m1",
+      name: "Mac",
+      online: true,
+      options: [
+        {
+          kind: "opencode" as const,
+          available: true,
+          defaultModel: null,
+          models: [
+            { value: "auto", label: "Automático" },
+            { value: "opencode/big-pickle", label: "Big Pickle", free: true },
+            { value: "anthropic/claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+          ],
+        },
+        {
+          kind: "antigravity" as const,
+          available: true,
+          defaultModel: null,
+          models: [{ value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" }],
+        },
+      ],
+    },
+  ];
+
+  test("an account's models there are its CLI's on its computer: never Automático, on OpenCode only free ones", async () => {
+    const { orderModelChoices } = await import("../src/lib/ai-accounts");
+    expect(orderModelChoices(machines, "m1", "opencode")).toEqual([
+      { value: "opencode/big-pickle", label: "Big Pickle" },
+    ]);
+    expect(orderModelChoices(machines, "m1", "antigravity")).toEqual([
+      { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+    ]);
+    expect(orderModelChoices(machines, "m2", "antigravity")).toEqual([]);
+  });
+
+  test("a group across CLIs replaces the computer's whole order, whatever its first account's kind", async () => {
+    const { sameOrderGroup } = await import("../src/api/queries");
+    const old = { machineId: "m1", computer: "Mac", kind: "claude_code" as const, accounts: [] };
+    expect(sameOrderGroup(old, { ...old, kind: "antigravity", kinds: ["antigravity", "claude_code"] })).toBe(true);
+    expect(sameOrderGroup(old, { ...old, kind: "codex" })).toBe(false);
+    expect(sameOrderGroup(old, { ...old, machineId: "m2", kinds: ["claude_code"] })).toBe(false);
+  });
+});

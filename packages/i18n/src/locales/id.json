@@ -10691,7 +10691,15 @@
       "signedOut": "Keluar · dilewati",
       "skipped": "Dilewati",
       "fallback": "Lanjut dengan kunci API saat semua paket mencapai batas",
-      "fallbackHint": "Mati: agen menunggu paket pertama diperbarui. Nyala: agen lanjut dengan kunci API ruang kerja, yang dibayar per pemakaian. Misi tidak pernah."
+      "fallbackHint": "Mati: agen menunggu paket pertama diperbarui. Nyala: agen lanjut dengan kunci API ruang kerja, yang dibayar per pemakaian. Misi tidak pernah.",
+      "cross": "Lanjutkan dengan penyedia AI lain saat paket habis",
+      "crossHint": "Mati: agen tetap di akun AI yang sama. Hidup: setiap komputer punya satu urutan untuk Claude, ChatGPT, Gemini, dan OpenCode (dengan model gratis), dan agen lanjut dengan akun berikutnya di urutan itu, dengan model yang kamu pilih untuknya. Misi atau agen yang dikunci ke akunnya sendiri tidak pernah melakukannya.",
+      "crossGroup": "Semua AI · {{computer}}",
+      "crossGroupOne": "Semua AI",
+      "model": "Model untuk {{name}}",
+      "modelDefault": "Bawaan AI-nya",
+      "modelPickFree": "Pilih model gratis",
+      "modelSaved": "Model disimpan."
     },
     "detail": {
       "limits": "Batas",

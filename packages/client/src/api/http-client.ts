@@ -1486,9 +1486,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           json: { serves },
         }),
       accountOrder: (orgId) =>
-        request<{ groups: AccountOrderGroup[]; keyFallback?: boolean; canConfigure?: boolean }>(
-          `${org(orgId)}/ai-accounts/order`,
-        ),
+        request<{
+          groups: AccountOrderGroup[];
+          keyFallback?: boolean;
+          crossProvider?: boolean;
+          canConfigure?: boolean;
+        }>(`${org(orgId)}/ai-accounts/order`),
       setAccountPermissions: (orgId, accountId, input) =>
         request<{ permissions: AccountPermissions; agentIds: string[] }>(
           `${org(orgId)}/ai-accounts/${enc(accountId)}/permissions`,
@@ -1496,6 +1499,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ),
       setKeyFallback: (orgId, on) =>
         request<{ on: boolean }>(`${org(orgId)}/ai-accounts/key-fallback`, { method: "PUT", json: { on } }),
+      setCrossProvider: (orgId, on) =>
+        request<{ on: boolean }>(`${org(orgId)}/ai-accounts/cross-provider`, { method: "PUT", json: { on } }),
+      setAccountOrderModel: (orgId, accountId, model) =>
+        request<AccountOrderGroup>(`${org(orgId)}/ai-accounts/${enc(accountId)}/order-model`, {
+          method: "PUT",
+          json: { model },
+        }),
       moveAccountInOrder: (orgId, accountId, index) =>
         request<AccountOrderGroup>(`${org(orgId)}/ai-accounts/${enc(accountId)}/order`, {
           method: "PUT",

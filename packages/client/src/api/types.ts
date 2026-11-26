@@ -6853,16 +6853,22 @@ export interface MachineAccount {
   sameAs?: string;
   /**
    * A run at another account's limit may go on with it: Claude Code's or Codex's own sign-in (never a key), shared
-   * between agents and signed in. Only these have a place in the order of use (absent: an older server).
+   * between agents and signed in. Only these have a place in the order of use (absent: an older server). In the order
+   * across CLIs also Antigravity's own sign-in and an OpenCode key on one of its free models.
    */
   movable?: boolean;
+  /** The model a run thinks with once the order across CLIs brings it here (ADR 0041 §6); absent: its CLI's default. */
+  orderModel?: string;
 }
 
 /** `GET …/ai-accounts/order`: one computer's Claude or ChatGPT accounts in their order of use (ADR 0041 §6). */
 export interface AccountOrderGroup {
   machineId: string;
   computer: string;
+  /** Its kind; across CLIs (`kinds`), its first account's. */
   kind: MachineAccountKind;
+  /** The order across CLIs is on (amended 2026-11-26): every account of the computer, of these kinds, in one order. */
+  kinds?: MachineAccountKind[];
   /** First to last. `canMove`: the viewer may move it (its owner or an admin). */
   accounts: (MachineAccount & { canMove: boolean })[];
 }
@@ -6946,6 +6952,11 @@ export interface AiHub {
   order: AccountOrderGroup[];
   /** "Continuar com a chave de API quando todos os planos estiverem no limite" (off by default). */
   keyFallback: boolean;
+  /**
+   * "Seguir com outros provedores" (off by default; absent: an older server): with no next account of its CLI, a run
+   * goes on with the next of another CLI on its computer, and `order` is one group per computer.
+   */
+  crossProvider?: boolean;
   canManageKeys: boolean;
   /** Turns `keyFallback` on or off and moves anyone's account in the order. */
   canConfigure: boolean;

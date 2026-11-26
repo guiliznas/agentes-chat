@@ -11916,7 +11916,15 @@
       "signedOut": "Wylogowano · pominięte",
       "skipped": "Pominięte",
       "fallback": "Kontynuuj z kluczem API, gdy wszystkie plany osiągną limit",
-      "fallbackHint": "Wyłączone: agenci czekają, aż pierwszy plan się odnowi. Włączone: kontynuują z kluczem API przestrzeni roboczej, płatnym za użycie. Misja nigdy."
+      "fallbackHint": "Wyłączone: agenci czekają, aż pierwszy plan się odnowi. Włączone: kontynuują z kluczem API przestrzeni roboczej, płatnym za użycie. Misja nigdy.",
+      "cross": "Kontynuuj z innymi dostawcami AI, gdy plan się skończy",
+      "crossHint": "Wyłączone: agenci zostają przy kontach tej samej AI. Włączone: każdy komputer ma jedną kolejność dla Claude, ChatGPT, Gemini i OpenCode (na darmowym modelu), a agenci przechodzą do następnego konta w niej, na modelu, który dla niego wybierzesz. Misja ani agent przypisany do własnego konta nigdy tego nie robi.",
+      "crossGroup": "Wszystkie AI · {{computer}}",
+      "crossGroupOne": "Wszystkie AI",
+      "model": "Model dla {{name}}",
+      "modelDefault": "Domyślny dla jego AI",
+      "modelPickFree": "Wybierz darmowy model",
+      "modelSaved": "Model zapisany."
     },
     "detail": {
       "limits": "Limity",

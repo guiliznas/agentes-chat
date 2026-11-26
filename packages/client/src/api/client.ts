@@ -1405,7 +1405,7 @@ export interface ApiClient {
      */
     accountOrder(
       orgId: string,
-    ): Promise<{ groups: AccountOrderGroup[]; keyFallback?: boolean; canConfigure?: boolean }>;
+    ): Promise<{ groups: AccountOrderGroup[]; keyFallback?: boolean; crossProvider?: boolean; canConfigure?: boolean }>;
     /**
      * An account's Gerenciar, Usar em agentes and Atender todos (only those given change): `manage` its owner, `use`
      * whoever manages it, `reply` its owner or an admin (`account.permission_forbidden`). `agentIds`: agents moved off it.
@@ -1417,6 +1417,13 @@ export interface ApiClient {
     ): Promise<{ permissions: AccountPermissions; agentIds: string[] }>;
     /** "Continuar com a chave de API quando todos os planos estiverem no limite" (admins). */
     setKeyFallback(orgId: string, on: boolean): Promise<{ on: boolean }>;
+    /** "Seguir com outros provedores quando o plano acabar" (admins, ADR 0041 §6 amended 2026-11-26). */
+    setCrossProvider(orgId: string, on: boolean): Promise<{ on: boolean }>;
+    /**
+     * The model the account thinks with in the order across CLIs (null: its CLI's default; on OpenCode a free one), its
+     * owner or an admin (`account.order_forbidden`).
+     */
+    setAccountOrderModel(orgId: string, accountId: string, model: string | null): Promise<AccountOrderGroup>;
     /** Moves the account to `index` (0 first) in its order: its owner or an admin (`account.order_forbidden`). */
     moveAccountInOrder(orgId: string, accountId: string, index: number): Promise<AccountOrderGroup>;
     /** Its owner names it (1 to 40 characters). */

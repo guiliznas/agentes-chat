@@ -17,6 +17,7 @@ import { useApi } from "./context";
 import { keys } from "./keys";
 import { useMissionBrain, useSetMissionBrain } from "./missions";
 import {
+  sameOrderGroup,
   useAgentBrain,
   useAiAccounts,
   useBrainMachines,
@@ -26,7 +27,7 @@ import {
   useSettings,
   useUpdateSettings,
 } from "./queries";
-import type { AccountPermissions, AgentSetupResult, AiAccounts, BrainOption } from "./types";
+import type { AccountOrderGroup, AccountPermissions, AgentSetupResult, AiAccounts, BrainOption } from "./types";
 
 /**
  * "Contas de IA" as one view (`GET …/ai-accounts`'s `hub`): every plan account on the workspace's computers with the
@@ -85,6 +86,41 @@ export function useSetKeyFallback(orgId: string) {
       qc.setQueryData<{ keyFallback?: boolean }>(keys.accountOrder(orgId), (old) =>
         old ? { ...old, keyFallback: on } : old,
       );
+    },
+  });
+}
+
+/**
+ * "Seguir com outros provedores quando o plano acabar" (admins): the order becomes one per computer, so it and the hub
+ * are read again.
+ */
+export function useSetCrossProvider(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => api.machines.setCrossProvider(orgId, on),
+    onSuccess: ({ on }) => {
+      qc.setQueryData<AiAccounts>(keys.aiAccounts(orgId), (old) =>
+        old?.hub ? { ...old, hub: { ...old.hub, crossProvider: on } } : old,
+      );
+      void qc.invalidateQueries({ queryKey: keys.accountOrder(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
+    },
+  });
+}
+
+/** The model an account thinks with in the order across CLIs (its owner or an admin): its group comes back. */
+export function useSetAccountOrderModel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ accountId, model }: { accountId: string; model: string | null }) =>
+      api.machines.setAccountOrderModel(orgId, accountId, model),
+    onSuccess: (group) => {
+      qc.setQueryData<{ groups: AccountOrderGroup[] }>(keys.accountOrder(orgId), (old) =>
+        old ? { ...old, groups: old.groups.map((g) => (sameOrderGroup(g, group) ? group : g)) } : old,
+      );
+      void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
     },
   });
 }

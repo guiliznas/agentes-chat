@@ -4806,7 +4806,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     const view = await seededAi(...args);
     if (view.hub) return view;
     const nobody = { userIds: [], roleIds: [] };
-    const { groups, keyFallback, canConfigure } = await client.machines.accountOrder(args[0]);
+    const { groups, keyFallback, crossProvider, canConfigure } = await client.machines.accountOrder(args[0]);
     return {
       ...view,
       hub: {
@@ -4850,6 +4850,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
           })),
         order: groups,
         keyFallback: keyFallback ?? false,
+        crossProvider: crossProvider ?? false,
         canManageKeys: true,
         canConfigure: canConfigure ?? false,
       },

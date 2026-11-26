@@ -10,6 +10,7 @@ import type {
   AgentBrain,
   AiAccounts,
   AiComputer,
+  BrainMachine,
   BrainScope,
   Credential,
   Machine,
@@ -721,3 +722,19 @@ export function accountCardFacts(
 
 /** An account's mark: a key account's coding plan, else its CLI's maker. */
 export const accountMark = (a: Pick<MachineAccount, "kind" | "provider">) => a.provider ?? a.kind;
+
+/**
+ * The models an account may think on in the order across CLIs (ADR 0041 §6, amended 2026-11-26): what its CLI lists on
+ * its computer (`BrainOption.models`), never "Automático", on OpenCode only its free ones. Its CLI's own default is
+ * the other choice, but on OpenCode, where only a free model gives the account a place.
+ */
+export function orderModelChoices(
+  machines: readonly BrainMachine[] | undefined,
+  machineId: string,
+  kind: MachineAccountKind,
+): { value: string; label: string }[] {
+  const option = machines?.find((m) => m.machineId === machineId)?.options.find((o) => o.kind === kind);
+  return (option?.models ?? [])
+    .filter((m) => m.value !== "auto" && (kind !== "opencode" || m.free === true))
+    .map((m) => ({ value: m.value, label: m.label }));
+}

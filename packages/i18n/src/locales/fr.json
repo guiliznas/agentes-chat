@@ -11509,7 +11509,15 @@
       "signedOut": "Déconnecté · ignoré",
       "skipped": "Ignoré",
       "fallback": "Continuer avec la clé d'API quand tous les forfaits sont à leur limite",
-      "fallbackHint": "Désactivé : les agents attendent que le premier forfait se renouvelle. Activé : ils continuent avec la clé d'API de l'espace de travail, payée à l'usage. Jamais pour une mission."
+      "fallbackHint": "Désactivé : les agents attendent que le premier forfait se renouvelle. Activé : ils continuent avec la clé d'API de l'espace de travail, payée à l'usage. Jamais pour une mission.",
+      "cross": "Continuer avec d'autres fournisseurs d'IA quand le forfait est épuisé",
+      "crossHint": "Désactivé : les agents restent sur les comptes de la même IA. Activé : chaque ordinateur a un seul ordre pour Claude, ChatGPT, Gemini et OpenCode (sur un modèle gratuit), et les agents continuent avec le compte suivant de cet ordre, sur le modèle que vous choisissez pour lui. Une mission ou un agent limité à son propre compte ne le fait jamais.",
+      "crossGroup": "Toutes les IA · {{computer}}",
+      "crossGroupOne": "Toutes les IA",
+      "model": "Modèle de {{name}}",
+      "modelDefault": "Par défaut de son IA",
+      "modelPickFree": "Choisissez un modèle gratuit",
+      "modelSaved": "Modèle enregistré."
     },
     "detail": {
       "limits": "Limites",

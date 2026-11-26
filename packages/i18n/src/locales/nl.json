@@ -11137,7 +11137,15 @@
       "signedOut": "Afgemeld · overgeslagen",
       "skipped": "Overgeslagen",
       "fallback": "Doorgaan met de API-sleutel als alle abonnementen hun limiet bereiken",
-      "fallbackHint": "Uit: agents wachten tot het eerste abonnement vernieuwt. Aan: ze gaan door met de API-sleutel van de werkruimte, die per gebruik wordt betaald. Een missie nooit."
+      "fallbackHint": "Uit: agents wachten tot het eerste abonnement vernieuwt. Aan: ze gaan door met de API-sleutel van de werkruimte, die per gebruik wordt betaald. Een missie nooit.",
+      "cross": "Doorgaan met andere AI-aanbieders als het abonnement op is",
+      "crossHint": "Uit: agents blijven bij accounts van dezelfde AI. Aan: elke computer heeft één volgorde voor Claude, ChatGPT, Gemini en OpenCode (op een gratis model), en agents gaan verder met het volgende account daarin, op het model dat je ervoor kiest. Een missie of een agent die aan zijn eigen account vastzit, doet dat nooit.",
+      "crossGroup": "Alle AI's · {{computer}}",
+      "crossGroupOne": "Alle AI's",
+      "model": "Model voor {{name}}",
+      "modelDefault": "Standaard van zijn AI",
+      "modelPickFree": "Kies een gratis model",
+      "modelSaved": "Model opgeslagen."
     },
     "detail": {
       "limits": "Limieten",

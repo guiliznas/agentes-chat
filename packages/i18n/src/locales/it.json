@@ -11536,7 +11536,15 @@
       "signedOut": "Disconnesso · saltato",
       "skipped": "Saltato",
       "fallback": "Continuare con la chiave API quando tutti i piani sono al limite",
-      "fallbackHint": "Spento: gli agenti aspettano il rinnovo del primo piano. Acceso: continuano con la chiave API dello spazio di lavoro, pagata a consumo. Mai per una missione."
+      "fallbackHint": "Spento: gli agenti aspettano il rinnovo del primo piano. Acceso: continuano con la chiave API dello spazio di lavoro, pagata a consumo. Mai per una missione.",
+      "cross": "Continua con altri fornitori di IA quando il piano finisce",
+      "crossHint": "Disattivato: gli agenti restano sugli account della stessa IA. Attivato: ogni computer ha un solo ordine per Claude, ChatGPT, Gemini e OpenCode (su un modello gratuito), e gli agenti proseguono con l'account successivo di quell'ordine, sul modello che scegli per esso. Una missione o un agente vincolato al proprio account non lo fa mai.",
+      "crossGroup": "Tutte le IA · {{computer}}",
+      "crossGroupOne": "Tutte le IA",
+      "model": "Modello di {{name}}",
+      "modelDefault": "Predefinito della sua IA",
+      "modelPickFree": "Scegli un modello gratuito",
+      "modelSaved": "Modello salvato."
     },
     "detail": {
       "limits": "Limiti",

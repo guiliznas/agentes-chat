@@ -84,11 +84,13 @@ const movable = (a: AiAccounts["accounts"][number]) => a.movable ?? (a.shared ==
  * The order of use as the server lists it: the viewer's Claude and ChatGPT sign-ins, by computer and kind, those a run
  * never moves to last.
  */
-function orderGroups(ai: AiAccounts): AccountOrderGroup[] {
+function orderGroups(ai: AiAccounts, cross = false): AccountOrderGroup[] {
   const groups: AccountOrderGroup[] = [];
+  // Across AI providers (ADR 0041 §6, amended 2026-11-26): one order per computer, Gemini and an OpenCode key too.
+  const kinds = cross ? ["claude_code", "codex", "antigravity", "opencode"] : ["claude_code", "codex"];
   const listed = ai.accounts
     .map((a, i) => ({ a, i }))
-    .filter(({ a }) => (a.kind === "claude_code" || a.kind === "codex") && a.provider === null)
+    .filter(({ a }) => kinds.includes(a.kind) && (a.provider === null || (cross && a.provider === "zen")))
     .sort(
       (x, y) =>
         Number(movable(y.a)) - Number(movable(x.a)) ||
@@ -96,11 +98,12 @@ function orderGroups(ai: AiAccounts): AccountOrderGroup[] {
         x.i - y.i,
     );
   for (const { a } of listed) {
-    let g = groups.find((x) => x.machineId === a.machineId && x.kind === a.kind);
+    let g = groups.find((x) => x.machineId === a.machineId && (cross || x.kind === a.kind));
     if (!g) {
       g = { machineId: a.machineId, computer: a.computer, kind: a.kind, accounts: [] };
       groups.push(g);
     }
+    if (cross && !g.kinds?.includes(a.kind)) g.kinds = [...(g.kinds ?? []), a.kind];
     // An admin may move anyone's: a fixture says so with its own `canMove`.
     g.accounts.push({ ...withNamed(a), movable: movable(a), canMove: (a as { canMove?: boolean }).canMove ?? a.mine });
   }
@@ -176,6 +179,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
   let ai: AiAccounts = { accounts: [], computers: [] };
   let keyFallback = false;
+  let crossProvider = false;
   const logins: Login[] = [];
   const installs = new Map<string, CliInstall | null>();
   const loginStatus = new Map<string, AccountLoginStatus>();
@@ -409,7 +413,12 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         return { serves, agentIds: [] };
       },
       // Read whenever an order renders: not logged.
-      accountOrder: async () => ({ groups: clone(orderGroups(ai)), keyFallback, canConfigure: true }),
+      accountOrder: async () => ({
+        groups: clone(orderGroups(ai, crossProvider)),
+        keyFallback,
+        crossProvider,
+        canConfigure: true,
+      }),
       setAccountPermissions: async (orgId, accountId, input) => {
         log("machines.setAccountPermissions", orgId, accountId, input);
         const nobody = { mode: "owner" as const, userIds: [], roleIds: [] };
@@ -427,9 +436,26 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         keyFallback = on;
         return { on };
       },
+      setCrossProvider: async (orgId, on) => {
+        log("machines.setCrossProvider", orgId, on);
+        crossProvider = on;
+        return { on };
+      },
+      setAccountOrderModel: async (orgId, accountId, model) => {
+        log("machines.setAccountOrderModel", orgId, accountId, model);
+        const a = ai.accounts.find((x) => x.id === accountId);
+        if (!a) throw new MockNotFoundError("Conta não encontrada.");
+        if (model === null) delete a.orderModel;
+        else a.orderModel = model;
+        const group = orderGroups(ai, crossProvider).find((g) => g.accounts.some((x) => x.id === accountId));
+        if (!group) throw new MockNotFoundError("Conta não encontrada.");
+        return clone(group);
+      },
       moveAccountInOrder: async (orgId, accountId, index) => {
         log("machines.moveAccountInOrder", orgId, accountId, index);
-        const group = orderGroups(ai).find((g) => g.accounts.some((a) => a.id === accountId && a.movable));
+        const group = orderGroups(ai, crossProvider).find((g) =>
+          g.accounts.some((a) => a.id === accountId && a.movable),
+        );
         if (!group) throw new MockNotFoundError("Conta não encontrada.");
         // As the server: a place is an account's among those with one, its logins (`sameAs`) move together.
         const accounts = orderAccounts(group.accounts.filter((a) => a.movable));
@@ -438,7 +464,11 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         others.splice(Math.min(index, others.length), 0, moved);
         const ids = others.flat().map((a) => a.id);
         for (const a of ai.accounts) if (ids.includes(a.id)) a.useOrder = ids.indexOf(a.id);
-        return clone(orderGroups(ai).find((g) => g.machineId === group.machineId && g.kind === group.kind) ?? group);
+        return clone(
+          orderGroups(ai, crossProvider).find(
+            (g) => g.machineId === group.machineId && (crossProvider || g.kind === group.kind),
+          ) ?? group,
+        );
       },
       renameAccount: async (orgId, machineId, accountId, label) => {
         log("machines.renameAccount", orgId, machineId, accountId, label);

@@ -11572,6 +11572,16 @@ export const ptBR = {
       fallback: "Continuar com a chave de API quando todos os planos estiverem no limite",
       fallbackHint:
         "Desligado: os agentes esperam o primeiro plano renovar. Ligado: eles seguem com a chave de API do workspace, paga por uso. Uma missão nunca segue.",
+      /** A ordem entre provedores de IA (ADR 0041 §6, emenda de 2026-11-26). */
+      cross: "Seguir com outros provedores de IA quando o plano acabar",
+      crossHint:
+        "Desligado: os agentes ficam nas contas da mesma IA. Ligado: cada computador tem uma ordem só para Claude, ChatGPT, Gemini e OpenCode (num modelo gratuito), e os agentes seguem com a próxima conta dela, no modelo que você escolher para ela. Uma missão ou um agente preso à própria conta nunca segue.",
+      crossGroup: "Todas as IAs · {{computer}}",
+      crossGroupOne: "Todas as IAs",
+      model: "Modelo de {{name}}",
+      modelDefault: "Padrão da IA",
+      modelPickFree: "Escolha um modelo gratuito",
+      modelSaved: "Modelo salvo.",
     },
     detail: {
       limits: "Limites",

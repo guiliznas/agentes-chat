@@ -6607,6 +6607,10 @@ export const useAccountOrder = (orgId: string, enabled = true) => {
  * Moves an account in its order ("Subir", "Descer", a drag): the group the server answers replaces the old one at once.
  * Every agent's "Quem pensa" lists the accounts with their place, so those refetch too.
  */
+/** The same group of an order of use: one computer's of one kind, or across CLIs (`kinds`) the computer's whole order. */
+export const sameOrderGroup = (a: AccountOrderGroup, b: AccountOrderGroup) =>
+  a.machineId === b.machineId && (b.kinds !== undefined || a.kind === b.kind);
+
 export function useMoveAccountInOrder(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -6618,7 +6622,7 @@ export function useMoveAccountInOrder(orgId: string) {
         old
           ? {
               ...old,
-              groups: old.groups.map((g) => (g.machineId === group.machineId && g.kind === group.kind ? group : g)),
+              groups: old.groups.map((g) => (sameOrderGroup(g, group) ? group : g)),
             }
           : old,
       );

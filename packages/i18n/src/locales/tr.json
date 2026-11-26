@@ -11032,7 +11032,15 @@
       "signedOut": "Oturum kapalı · atlandı",
       "skipped": "Atlandı",
       "fallback": "Tüm planlar sınıra gelince API anahtarıyla devam et",
-      "fallbackHint": "Kapalı: ajanlar ilk planın yenilenmesini bekler. Açık: kullanım başına ödenen çalışma alanı API anahtarıyla devam ederler. Bir görev asla devam etmez."
+      "fallbackHint": "Kapalı: ajanlar ilk planın yenilenmesini bekler. Açık: kullanım başına ödenen çalışma alanı API anahtarıyla devam ederler. Bir görev asla devam etmez.",
+      "cross": "Plan bitince diğer yapay zekâ sağlayıcılarıyla devam et",
+      "crossHint": "Kapalı: ajanlar aynı yapay zekânın hesaplarında kalır. Açık: her bilgisayarda Claude, ChatGPT, Gemini ve OpenCode (ücretsiz bir modelle) için tek bir sıra olur ve ajanlar bu sıradaki bir sonraki hesapla, o hesap için seçtiğin modelde devam eder. Bir görev ya da kendi hesabına sabitlenmiş bir ajan bunu asla yapmaz.",
+      "crossGroup": "Tüm yapay zekâlar · {{computer}}",
+      "crossGroupOne": "Tüm yapay zekâlar",
+      "model": "{{name}} modeli",
+      "modelDefault": "Yapay zekâsının varsayılanı",
+      "modelPickFree": "Ücretsiz bir model seç",
+      "modelSaved": "Model kaydedildi."
     },
     "detail": {
       "limits": "Sınırlar",

@@ -10680,7 +10680,15 @@
       "signedOut": "已退出 · 跳过",
       "skipped": "跳过",
       "fallback": "所有套餐都达到上限时继续使用 API 密钥",
-      "fallbackHint": "关闭：智能体等待第一个套餐恢复。开启：它们继续使用工作区按用量付费的 API 密钥。任务从不继续。"
+      "fallbackHint": "关闭：智能体等待第一个套餐恢复。开启：它们继续使用工作区按用量付费的 API 密钥。任务从不继续。",
+      "cross": "套餐用完后改用其他 AI 提供商继续",
+      "crossHint": "关闭：智能体只使用同一 AI 的账号。开启：每台电脑为 Claude、ChatGPT、Gemini 和 OpenCode（免费模型）排一个顺序，智能体按这个顺序换到下一个账号继续，使用你为该账号选择的模型。任务或固定使用自己账号的智能体永远不会这样做。",
+      "crossGroup": "所有 AI · {{computer}}",
+      "crossGroupOne": "所有 AI",
+      "model": "{{name}} 的模型",
+      "modelDefault": "该 AI 的默认模型",
+      "modelPickFree": "选择一个免费模型",
+      "modelSaved": "模型已保存。"
     },
     "detail": {
       "limits": "上限",

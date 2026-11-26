@@ -26929,6 +26929,30 @@
   "aiHub.order.fallbackHint": {
     "value": "Off: agents wait for the first plan to renew. On: they go on with the workspace's API key, which is paid per use. A mission never does."
   },
+  "aiHub.order.cross": {
+    "value": "Go on with other AI providers when the plan runs out"
+  },
+  "aiHub.order.crossHint": {
+    "value": "Off: agents stay with accounts of the same AI. On: each computer has one order for Claude, ChatGPT, Gemini and OpenCode (on a free model), and agents go on with the next account in it, on the model you choose for it. A mission or an agent set to its account alone never does."
+  },
+  "aiHub.order.crossGroup": {
+    "value": "All AIs · {{computer}}"
+  },
+  "aiHub.order.crossGroupOne": {
+    "value": "All AIs"
+  },
+  "aiHub.order.model": {
+    "value": "Model for {{name}}"
+  },
+  "aiHub.order.modelDefault": {
+    "value": "Its AI's default"
+  },
+  "aiHub.order.modelPickFree": {
+    "value": "Choose a free model"
+  },
+  "aiHub.order.modelSaved": {
+    "value": "Model saved."
+  },
   "aiHub.detail.limits": {
     "value": "Limits"
   },
@@ -46313,9 +46337,6 @@
   },
   "work.handed.step": {
     "value": "step {{current}} of {{total}}"
-  },
-  "work.handed.done": {
-    "value": "done in {{duration}}"
   },
   "work.duration.minutes": {
     "value": {
