@@ -7,7 +7,7 @@ import {
   type WebPushResult,
   type WebPushSender,
 } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, gt, inArray, isNull, lte, notInArray, or, schema } from "@agenteschat/db";
+import { and, asc, type Database, eq, gt, inArray, isNull, lte, ne, notInArray, or, schema } from "@agenteschat/db";
 import { errorNumber } from "./errors";
 import { mediaOf } from "./media";
 import { voiceOf } from "./message-preview";
@@ -18,7 +18,7 @@ import { type PushTextInput, pushLocale, renderPush } from "./push-messages";
 import { accountClosed } from "./standing";
 import { isPersonalWorkspace } from "./workspace-mode";
 
-const { pushDevices, notifications, agents, users, approvals, sessions } = schema;
+const { pushDevices, notifications, agents, users, approvals, sessions, organizations, organizationMembers } = schema;
 
 /**
  * Push to the phone app (ADR 0035, ADR 0152, ADR 0178) and to browsers (Web Push, ADR 0071). A
@@ -323,6 +323,48 @@ async function actorName(db: Database, orgId: string, actor: NotificationActor |
   return u?.name ?? null;
 }
 
+/**
+ * A name as a person reads it on a phone: case, accents and spacing don't count ("Téo" and "teo" look alike). Local
+ * rather than `chat-tools`' `plainName`: importing that module from here loads the search chain in a cycle.
+ */
+const sameName = (name: string) =>
+  name
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * The workspace a push names beside its actor, or null: only when the person is in other workspaces and one of them
+ * has a live agent whose name reads the same (case, accents and spacing don't count), so "Lodi" alone could be either.
+ * A person with one workspace, or a name no other workspace of theirs uses, sees the push as before.
+ */
+export async function pushWorkspaceName(
+  db: Database,
+  orgId: string,
+  userId: string,
+  name: string | null,
+): Promise<string | null> {
+  const wanted = name ? sameName(name) : "";
+  if (!wanted) return null;
+  const elsewhere = await db
+    .select({ name: agents.name })
+    .from(agents)
+    .innerJoin(organizationMembers, eq(organizationMembers.orgId, agents.orgId))
+    .where(
+      and(
+        eq(organizationMembers.userId, userId),
+        ne(agents.orgId, orgId),
+        isNull(agents.archivedAt),
+        isNull(agents.deletedAt),
+      ),
+    );
+  if (!elsewhere.some((a) => sameName(a.name) === wanted)) return null;
+  const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
+  return org?.name?.trim() || null;
+}
+
 /** Chat notifications, whose text is what the message said. */
 const SAID_KINDS = new Set(["dm", "mention", "agent_reply", "thread_reply"]);
 
@@ -487,6 +529,7 @@ export async function deliverPush(
     reason: typeof latest.reason === "string" ? latest.reason : null,
     // Read once for every device: only the words change (ADR 0159), never who is told or when.
     personal: await isPersonalWorkspace(db, row.orgId),
+    workspace: await pushWorkspaceName(db, row.orgId, row.userId, name),
   };
 
   let sent = 0;
